@@ -24,12 +24,14 @@ class VanillaImportanceSampling(BaseImportanceSampler):
 
     @torch.no_grad()
     def generate_samples_and_weights(self, n_samples:int=1000):
-        x_samples = self.sampling_distribution.sample((n_samples,))
-        log_q_x = self.sampling_distribution.log_prob(x_samples)
+        x_samples, log_q_x = self.sampling_distribution(n_samples)
         log_p_x = self.target_distribution.log_prob(x_samples)
+        if True in torch.isnan(log_p_x) or True in torch.isinf(log_p_x):
+            print("Nan encountered in importance weights")
+            log_p_x[torch.isnan(log_p_x)] = -1e6
+            log_p_x[torch.isinf(log_p_x)] = -1e6
         normalised_sampling_weights = F.softmax(log_p_x - log_q_x, dim=-1)
         return x_samples, normalised_sampling_weights
-
 
 if __name__ == '__main__':
     from TargetDistributions.Guassian_FullCov import Guassian_FullCov

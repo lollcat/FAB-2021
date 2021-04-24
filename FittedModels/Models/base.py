@@ -5,7 +5,7 @@ class BaseLearntDistribution(abc.ABC):
 
     @abc.abstractmethod
     def forward(self, batch_size: int) -> (torch.tensor, torch.tensor):
-        """forward pass of the model"""
+        """forward pass of the model, return samples, log_probs"""
 
     @abc.abstractmethod
     def sample(self, n: int) -> torch.tensor:

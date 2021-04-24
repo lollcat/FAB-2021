@@ -15,7 +15,7 @@ class LearntDistributionManager:
         self.learnt_sampling_dist: BaseLearntDistribution
         self.learnt_sampling_dist = fitted_model
         self.target_dist = target_distribution
-        self.optimizer = torch.optim.Adam(self.learnt_sampling_dist.parameters())
+        self.optimizer = torch.optim.Adamax(self.learnt_sampling_dist.parameters(), lr=1e-3)
         self.loss_type = loss_type
         if loss_type == "kl":
             self.loss = self.KL_loss
@@ -30,20 +30,24 @@ class LearntDistributionManager:
 
     def train(self, epochs=100, batch_size=1000):
         epoch_per_print = int(epochs/10)
-        history = {"loss": []}
+        history = {"loss": [],
+                   "log_p_x": [],
+                   "log_q_x": []}
         pbar = tqdm(range(epochs))
         for epoch in pbar:
             self.optimizer.zero_grad()
             x_samples, log_q_x = self.learnt_sampling_dist(batch_size)
             log_p_x = self.target_dist.log_prob(x_samples)
             loss = self.loss(log_q_x, log_p_x)
+            if torch.isnan(loss):
+                raise Exception("NaN loss encountered")
             loss.backward()
             self.optimizer.step()
             history["loss"].append(loss.item())
+            history["log_p_x"].append(torch.mean(log_p_x))
+            history["log_q_x"].append(torch.mean(log_q_x))
             if epoch % epoch_per_print == 0 or epoch == epochs:
-                pbar.set_description(f"loss: {history['loss'][-1]}")
-                #for key in history:
-                #    print(f"{key}: {history[key][-1]}")
+                pbar.set_description(f"loss: {history['loss'][-1]}, mean log p_x {torch.mean(log_p_x)}")
         return history
 
     def KL_loss(self, log_q_x, log_p_x):
@@ -51,10 +55,14 @@ class LearntDistributionManager:
         return torch.mean(kl)
 
     def dreg_alpha_divergence_loss(self, log_q_x, log_p_x):
+        log_p_x[torch.isinf(log_p_x)] = -1e6  # do this to prevent loss breaking
+        log_p_x[torch.isnan(log_p_x)] = -1e6  # this assumes that nan comes up in the low density regions of p_x
         # summing all samples within the log
         log_w = log_p_x - log_q_x
         with torch.no_grad():
             w_alpha_normalised_alpha = F.softmax(self.alpha*log_w, dim=-1)
+        #w_alpha_normalised_alpha[minus_inf_log_p_x_indicies] = 0  # do this to prevent nan
+        #log_w[minus_inf_log_p_x_indicies] = 0  # do this to prevent nan
         return torch.sum(((1 + self.alpha) * w_alpha_normalised_alpha + self.alpha * w_alpha_normalised_alpha**2) * log_w)
 
     @torch.no_grad()
@@ -98,11 +106,18 @@ if __name__ == '__main__':
     if dim == 2:
         fig_after_train = plot_distributions(tester)
         plt.show()
-    plt.plot(history["loss"])
+
+    figure, axs = plt.subplots(len(history), 1, figsize=(6, 10))
+    for i, key in enumerate(history):
+        axs[i].plot(history[key])
+        axs[i].set_title(key)
+        if key == "alpha_divergence":
+            axs[i].set_yscale("log")
     plt.show()
+
     plt.violinplot([sampling_weights])
     plt.yscale("log")
-    #tester.train(2)
+
     print(f"means {tester.learnt_sampling_dist.means, tester.target_dist.loc}")
     print(f"learnt dist is scale tril {tester.learnt_sampling_dist.distribution.scale_tril}")
     print(f"target dist scale tril {tester.target_dist.scale_tril}")

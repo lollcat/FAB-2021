@@ -20,6 +20,7 @@ def plot_3D(x, z, n, ax, title=None):
 
 
 def plot_distribution(distribution, range=10, n_points=100):
+
     x_min = -range/2
     x_max = range/2
     x_points_1D = torch.linspace(x_min, x_max, n_points)
