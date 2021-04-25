@@ -1,10 +1,9 @@
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
-from NormalisingFlow.MADE.First_layer import FirstLayer
-from NormalisingFlow.MADE.Middle_layer import MiddleLayer
-from NormalisingFlow.MADE.Final_layer import FinalLayer
-from NormalisingFlow.MADE.skip_layer import SkipLayer
+from NormalisingFlow.Nets.MADE.First_layer import FirstLayer
+from NormalisingFlow.Nets.MADE.Middle_layer import MiddleLayer
+from NormalisingFlow.Nets.MADE.Final_layer import FinalLayer
+from NormalisingFlow.Nets.MADE.skip_layer import SkipLayer
 
 
 class MADE_IAF(nn.Module):

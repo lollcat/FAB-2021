@@ -10,10 +10,11 @@ class AnnealedImportanceSampler(BaseImportanceSampler):
     where 0 = b_0 < b_1 ... < b_d = 1
     """
     def __init__(self, sampling_distribution, target_distribution,
-                 n_distributions=200, save_for_visualisation=True, save_spacing=20):
+                 n_distributions=200, n_updates_Metropolis=10, save_for_visualisation=True, save_spacing=20):
         self.sampling_distribution = sampling_distribution
         self.target_distribution = target_distribution
         self.n_distributions = n_distributions
+        self.n_updates_Metropolis = n_updates_Metropolis
         self.B_space = torch.linspace(0, 1, n_distributions)  # TODO update to geometric spacing
 
         self.save_for_visualisation = save_for_visualisation
@@ -22,12 +23,11 @@ class AnnealedImportanceSampler(BaseImportanceSampler):
             self.log_w_history = []
             self.samples_history = []
 
-    @torch.no_grad()
+
     def run(self, n_runs):
         log_w = torch.zeros(n_runs)  # log importance weight
-        x_new = self.sampling_distribution.sample((n_runs, ))
-        log_w += self.intermediate_unnormalised_log_prob(x_new, 1) - \
-                     self.intermediate_unnormalised_log_prob(x_new, 0)
+        x_new, log_prob_p0 = self.sampling_distribution(n_runs)
+        log_w += self.intermediate_unnormalised_log_prob(x_new, 1) - log_prob_p0
         for j in range(1, self.n_distributions-1):
             x_new = self.Metropolis_transition(x_new, j)
             log_w += self.intermediate_unnormalised_log_prob(x_new, j+1) - \
@@ -39,8 +39,8 @@ class AnnealedImportanceSampler(BaseImportanceSampler):
         return x_new, log_w
 
 
-    def Metropolis_transition(self, x, j, n_updates=10):
-        for n in range(n_updates):
+    def Metropolis_transition(self, x, j):
+        for n in range(self.n_updates_Metropolis):
             x_proposed = x + torch.randn(x.shape)
             x_proposed_log_prob = self.intermediate_unnormalised_log_prob(x_proposed, j)
             x_prev_log_prob = self.intermediate_unnormalised_log_prob(x, j)
@@ -67,8 +67,8 @@ class AnnealedImportanceSampler(BaseImportanceSampler):
         expectation = normalised_importance_weights.T @ function_values
         effective_sample_size = self.effective_sample_size(normalised_importance_weights)
         info_dict = {"effective_sample_size": effective_sample_size,
-                     "normalised_sampling_weights": normalised_importance_weights,
-                     "samples": samples}
+                     "normalised_sampling_weights": normalised_importance_weights.detach(),
+                     "samples": samples.detach()}
         return expectation, info_dict
 
 

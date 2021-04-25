@@ -29,7 +29,7 @@ class LearntDistributionManager:
 
 
     def train(self, epochs=100, batch_size=1000):
-        epoch_per_print = int(epochs/10)
+        epoch_per_print = max(int(epochs / 10), 1)
         history = {"loss": [],
                    "log_p_x": [],
                    "log_q_x": []}
@@ -39,7 +39,7 @@ class LearntDistributionManager:
             x_samples, log_q_x = self.learnt_sampling_dist(batch_size)
             log_p_x = self.target_dist.log_prob(x_samples)
             loss = self.loss(log_q_x, log_p_x)
-            if torch.isnan(loss):
+            if torch.isnan(loss) or torch.isinf(loss):
                 raise Exception("NaN loss encountered")
             loss.backward()
             self.optimizer.step()
@@ -51,6 +51,8 @@ class LearntDistributionManager:
         return history
 
     def KL_loss(self, log_q_x, log_p_x):
+        log_p_x[torch.isinf(log_p_x)] = -1e6  # do this to prevent loss breaking
+        log_p_x[torch.isnan(log_p_x)] = -1e6
         kl = log_q_x - log_p_x
         return torch.mean(kl)
 

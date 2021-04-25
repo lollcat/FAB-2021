@@ -8,6 +8,7 @@ from FittedModels.Models.FlowModel import FlowModel
 from FittedModels.utils import plot_distributions
 from FittedModels.train import LearntDistributionManager
 from Utils import plot_func2D, MC_estimate_true_expectation
+from FittedModels.utils import plot_history
 
 def expectation_function(x):
     A = torch.ones((x.shape[-1], x.shape[-1]))
@@ -36,10 +37,6 @@ if __name__ == '__main__':
     plt.violinplot([info['normalised_sampling_weights']])
     plt.yscale("log")
     plt.show()
-    figure, axs = plt.subplots(len(history), 1, figsize=(6, 10))
-    for i, key in enumerate(history):
-        axs[i].plot(history[key])
-        axs[i].set_title(key)
-        if key == "alpha_divergence":
-            axs[i].set_yscale("log")
+
+    plot_history(history)
     plt.show()

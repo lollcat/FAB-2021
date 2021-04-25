@@ -19,7 +19,7 @@ class VanillaImportanceSampling(BaseImportanceSampler):
         expectation = torch.sum(normalised_sampling_weights*expectation_func_x)
         effective_sample_size = self.effective_sample_size(normalised_sampling_weights)
         info_dict = {"effective_sample_size": effective_sample_size,
-                     "normalised_sampling_weights": normalised_sampling_weights}
+                     "normalised_sampling_weights": normalised_sampling_weights.detach()}
         return expectation, info_dict
 
     @torch.no_grad()
