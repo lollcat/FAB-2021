@@ -12,6 +12,9 @@ from ImportanceSampling.AnnealedImportanceSampler import AnnealedImportanceSampl
 
 
 class AIS_trainer(LearntDistributionManager):
+    """
+    Merges annealed importance sampling into the training
+    """
     def __init__(self, target_distribution, fitted_model,
                  n_distributions=10, n_updates_Metropolis=5, save_for_visualisation=False, save_spacing=20,
                  loss_type="kl", alpha=2):

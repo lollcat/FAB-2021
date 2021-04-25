@@ -3,14 +3,14 @@ import torch.nn as nn
 from TargetDistributions.base import BaseTargetDistribution
 
 class MoG(BaseTargetDistribution):
-    def __init__(self, dim=2, n_mixes=5):
+    def __init__(self, dim=2, n_mixes=5, min_cov=0.5):
         super(MoG, self).__init__()
         self.dim = dim
         self.n_mixes = n_mixes
         self.distributions = []
         for i in range(n_mixes):
             loc = torch.randn(dim)*3
-            covariance = torch.diag(torch.rand(dim) + 0.1)
+            covariance = torch.diag(torch.rand(dim) + min_cov)
             self.distributions.append(torch.distributions.multivariate_normal.MultivariateNormal(loc,
                                                                                         covariance_matrix=covariance))
     @torch.no_grad()
@@ -18,6 +18,8 @@ class MoG(BaseTargetDistribution):
         # log p(x, m) = log p(x | m ) + log p(m) - assume uniform prior so p(m) is 0.5
         log_prob_concat = torch.stack([distribution.log_prob(x) for distribution in self.distributions]) \
                           + torch.log(torch.tensor(1/self.n_mixes))
+        log_prob_concat = torch.clamp_min(log_prob_concat, -1e1)  # prevent -inf
+        log_prob_concat[torch.isnan(log_prob_concat)] = -1e1    # prevent nan
         # log p(x) = log( sum_M p(x, m) )
         return torch.logsumexp(log_prob_concat, dim=0)
 

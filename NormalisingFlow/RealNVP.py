@@ -14,6 +14,8 @@ class RealNVP(nn.Module, BaseFlow):
         self.reversed = reversed
 
     def forward(self, x):
+        """return samples and log | dy / dx |"""
+
         if self.reversed:
             x = x.flip(dims=(-1,))
         x_1_to_d = x[:, 0:self.d]
@@ -21,6 +23,7 @@ class RealNVP(nn.Module, BaseFlow):
         y_1_to_d = x_1_to_d
         st = self.MLP(x_1_to_d)
         s,t = st.split(self.D_minus_d, dim=-1)
+        s = self.reparameterise_s(s)
         y_d_plus_1_to_D = x_d_plus_1_to_D * torch.exp(s) + t
         y = torch.cat([y_1_to_d, y_d_plus_1_to_D], dim=-1)
         log_determinant = torch.sum(s, dim=-1)
@@ -36,12 +39,16 @@ class RealNVP(nn.Module, BaseFlow):
         x_1_to_d = y_1_to_d
         st = self.MLP(y_1_to_d)
         s,t = st.split(self.D_minus_d, dim=-1)
+        s = self.reparameterise_s(s)
         x_d_plus_1_to_D = (y_d_plus_1_to_D - t) * torch.exp(-s)
         x = torch.cat([x_1_to_d, x_d_plus_1_to_D], dim=-1)
         log_determinant = -torch.sum(s, dim=-1)
         if self.reversed:
             x = x.flip(dims=(-1,))
         return x, log_determinant
+
+    def reparameterise_s(self, s):
+        return s/10  # reparameterise s to start of stable
 
 if __name__ == '__main__':
     dim = 5

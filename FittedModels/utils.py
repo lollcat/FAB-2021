@@ -16,7 +16,9 @@ def plot_history(history):
     return figure, axs
 
 
-def plot_distributions(learnt_dist_manager: LearntDistributionManager, x_min=4, x_max=-4, n_points=100):
+def plot_distributions(learnt_dist_manager: LearntDistributionManager, range=10, n_points=100):
+    x_min = -range/2
+    x_max = range/2
     x_points_1D = torch.linspace(x_min, x_max, n_points)
     x_points = torch.tensor(list(itertools.product(x_points_1D, repeat=2)))
     with torch.no_grad():

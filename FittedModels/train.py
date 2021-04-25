@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from FittedModels.Models.base import BaseLearntDistribution
-Notebook = False
+Notebook = True
 if Notebook:
     from tqdm import tqdm_notebook as tqdm
 else:
@@ -15,7 +15,7 @@ class LearntDistributionManager:
         self.learnt_sampling_dist: BaseLearntDistribution
         self.learnt_sampling_dist = fitted_model
         self.target_dist = target_distribution
-        self.optimizer = torch.optim.Adamax(self.learnt_sampling_dist.parameters(), lr=1e-3)
+        self.optimizer = torch.optim.Adam(self.learnt_sampling_dist.parameters(), lr=1e-3)
         self.loss_type = loss_type
         if loss_type == "kl":
             self.loss = self.KL_loss
@@ -40,7 +40,15 @@ class LearntDistributionManager:
             log_p_x = self.target_dist.log_prob(x_samples)
             loss = self.loss(log_q_x, log_p_x)
             if torch.isnan(loss) or torch.isinf(loss):
-                raise Exception("NaN loss encountered")
+                if True in torch.isnan(log_p_x) or True in torch.isinf(loss):
+                    print("NaN/-inf loss encountered in log_p_x")
+                if True in torch.isnan(log_q_x) or True in torch.isinf(log_q_x):
+                    print("NaN/-inf loss encountered in log_q_x")
+                from FittedModels.utils import plot_history
+                import matplotlib.pyplot as plt
+                plot_history(history)
+                plt.show()
+                raise Exception(f"NaN loss encountered on epoch {epoch}")
             loss.backward()
             self.optimizer.step()
             history["loss"].append(loss.item())
