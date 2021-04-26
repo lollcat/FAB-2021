@@ -35,7 +35,7 @@ class IAF(nn.Module, BaseFlow):
         for i in range(self.x_dim):
             m, s = self.AutoregressiveNN(z.clone())
             sigma = torch.sigmoid(s)
-            z[:, i] = sigma[:, i] * x[:, i] + (1 - sigma)[:, i] * m[:, i]
+            z[:, i] = (x[:, i] - (1 - sigma)[:, i] * m[:, i])/sigma[:, i]
             log_determinant -= torch.log(sigma[:, i])
         return z, log_determinant
 
@@ -43,7 +43,7 @@ class IAF(nn.Module, BaseFlow):
 if __name__ == '__main__':
     dim = 3
     z = torch.randn((10, dim))
-    iaf = IAF(x_dim=3)
+    iaf = IAF(x_dim=3, reverse=True)
     x, log_determinant = iaf(z)
     print(x.shape, log_determinant.shape)
     z_backward, log_det_backward = iaf.backward(x)
