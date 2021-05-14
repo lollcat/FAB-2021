@@ -31,7 +31,7 @@ class NN(nn.Module):
             nn.init.ones_(self.output_layer_log_stds.weight)
             self.output_layer_log_stds.requires_grad = False
 
-    @torch.no_grad()
+
     def forward(self, x):
         return self.sample_posterior_y_given_x(x)
 
@@ -40,7 +40,7 @@ class NN(nn.Module):
         posterior_distribution = self.posterior_y_given_x(x)
         return posterior_distribution.sample()
 
-    @torch.no_grad()
+
     def posterior_y_given_x_log_prob(self, y, x):
         posterior_distribution = self.posterior_y_given_x(x)
         if self.y_dim > 1:
@@ -48,7 +48,7 @@ class NN(nn.Module):
         else:
             return posterior_distribution.log_prob(y)
 
-    @torch.no_grad()
+
     def posterior_y_given_x(self, x):
         for hidden_layer in self.hidden_layers:
             x = F.elu(hidden_layer(x))
@@ -110,7 +110,7 @@ class PosteriorBNN(BaseTargetDistribution):
         self.target = Target(x_dim, y_dim, n_hidden_layers, layer_width, simple_mode=simple_mode)
         self.X, self.Y = self.target.sample(n_datapoints)
 
-    @torch.no_grad()
+
     def log_prob(self, w):
         if len(w.shape) > 1:
             log_probs = list(map(self.log_prob_single_w, torch.split(w, 1, dim=0)))
@@ -118,7 +118,7 @@ class PosteriorBNN(BaseTargetDistribution):
         else:
             return self.log_prob_single_w(w)
 
-    @torch.no_grad()
+
     def log_prob_single_w(self, w):
         """p(w | X, Y) proportional to p(w) p(Y | X, w)"""
         w = torch.squeeze(w)
@@ -142,7 +142,7 @@ if __name__ == '__main__':
     posterior_bnn = PosteriorBNN(n_datapoints=10, x_dim=1, y_dim=1, n_hidden_layers=0, layer_width=0, simple_mode=True)
     from Utils import plot_distribution
     import matplotlib.pyplot as plt
-    plot_distribution(posterior_bnn, n_points=300, range=4)
+    plot_distribution(posterior_bnn, n_points=300)
     plt.show()
 
 

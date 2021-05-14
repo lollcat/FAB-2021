@@ -46,8 +46,8 @@ class AIS_trainer(LearntDistributionManager):
             # save info
             log_p_x = self.target_dist.log_prob(x_samples)
             history["loss"].append(loss.item())
-            history["log_p_x"].append(torch.mean(log_p_x))
-            history["log_w"].append(torch.mean(log_w))
+            history["log_p_x"].append(torch.mean(log_p_x).item())
+            history["log_w"].append(torch.mean(log_w).item())
             if epoch % epoch_per_print == 0 or epoch == epochs:
                 pbar.set_description(f"loss: {history['loss'][-1]}, mean log p_x {torch.mean(log_p_x)}")
         return history

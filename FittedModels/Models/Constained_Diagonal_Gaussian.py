@@ -5,11 +5,13 @@ from FittedModels.Models.base import BaseLearntDistribution
 
 
 class DiagonalGaussian(nn.Module, BaseLearntDistribution):
-    # diagonal guassian distribution
-    def __init__(self, dim=5, log_std_initial_scaling=1):
+    # diagonal guassian distribution constained to have bounded covariance
+    def __init__(self, dim=5, pre_sigmoid_std_initial_scaling=-1, std_min=-1, std_max=10):
         super(DiagonalGaussian, self).__init__()
         self.means = torch.nn.Parameter(torch.zeros(dim))
-        self.log_std = torch.nn.Parameter(torch.ones(dim)*log_std_initial_scaling)
+        self.std_min = std_min
+        self.std_max = std_max
+        self.pre_sigmoid_std = torch.nn.Parameter(torch.ones(dim) * pre_sigmoid_std_initial_scaling)
 
     def forward(self, batch_size=1):
         distribution = self.distribution
@@ -27,7 +29,7 @@ class DiagonalGaussian(nn.Module, BaseLearntDistribution):
 
     @property
     def covariance(self):
-        return torch.diag(torch.exp(self.log_std))
+        return torch.diag(self.std_min + torch.sigmoid(self.pre_sigmoid_std) * (self.std_max - self.std_min))
 
     @property
     def distribution(self):
@@ -38,5 +40,6 @@ if __name__ == '__main__':
     dist = DiagonalGaussian()
     sample, log_prob = dist(2)
     print(sample.shape, log_prob.shape)
+    print(dist.covariance)
 
 

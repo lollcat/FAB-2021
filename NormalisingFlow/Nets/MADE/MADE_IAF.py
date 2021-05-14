@@ -28,7 +28,6 @@ class MADE_IAF(nn.Module):
         m, s = self.FinalLayer(x)
         m = m + self.m_SkipLayer(input)
         s = s + self.s_SkipLayer(s)
-        s = s/10 + 1.5  # reparameterise to be about +1 to +2
         return m, s
 
 

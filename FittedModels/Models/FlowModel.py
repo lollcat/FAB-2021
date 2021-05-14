@@ -9,11 +9,12 @@ class FlowModel(nn.Module):
     we are also assuming that we are only interested in p(x), so return this for both forwards and backwards,
     we could add methods for p(z) if this comes into play
     """
-    def __init__(self, x_dim, flow_type="IAF", n_flow_steps=3):
+    def __init__(self, x_dim, flow_type="IAF", n_flow_steps=3, prior_scaling=1.0):
         self.dim = x_dim
         super(FlowModel, self).__init__()
+        self.prior_scaling = torch.tensor([prior_scaling])
         self.prior = torch.distributions.MultivariateNormal(loc=torch.zeros(x_dim),
-                                                            covariance_matrix=torch.eye(x_dim)*4)
+                                                                covariance_matrix=torch.eye(x_dim)*self.prior_scaling)
         if flow_type == "IAF":
             from NormalisingFlow.IAF import IAF
             flow = IAF
@@ -34,11 +35,34 @@ class FlowModel(nn.Module):
         """
         log p(x) = log p(z) - log |dx/dz|
         """
-        x = self.prior.sample((batch_size,))
+        x = self.prior.rsample((batch_size,))
         log_prob = self.prior.log_prob(x)
         for flow_step in self.flow_blocks:
             x, log_determinant = flow_step(x)
             log_prob -= log_determinant
+        return x, log_prob
+
+    def forward_with_hooks(self, batch_size=1):
+    #def forward(self, batch_size=1):
+        """
+        for debugging, comment out forward and rename this function
+        """
+        x = self.prior.sample((batch_size,))
+        log_prob = self.prior.log_prob(x)
+        for i, flow_step in enumerate(self.flow_blocks):
+            x, log_determinant = flow_step(x)
+            log_prob -= log_determinant
+            if i == 0:
+                pass
+                # x.register_hook(lambda grad: print("\n\ngrad x first", grad))
+                # log_prob.register_hook(lambda grad: print("\n\ngrad log_prob first", grad))
+        x.register_hook(lambda grad: print("\n\ngrad x final max, min, nana", grad.max(), grad.min(),
+                                           torch.sum(torch.isnan(grad))))
+        log_prob.register_hook(lambda grad: print("\n\ngrad log_prob final max min nan", grad.max(), grad.min(),
+                                           torch.sum(torch.isnan(grad))))
+        self.flow_blocks[-1].AutoregressiveNN.FirstLayer.latent_to_layer.weight. \
+            register_hook(lambda grad: print("\n\ngrad layer first max min nan", grad.max(), grad.min(),
+                                           torch.sum(torch.isnan(grad))))
         return x, log_prob
 
     def backward(self, x):
@@ -56,6 +80,12 @@ class FlowModel(nn.Module):
     def log_prob(self, x):
         x, log_prob = self.backward(x)
         return log_prob
+
+    def sample(self, shape):
+        # just a wrapper so we can call sample func for plotting like in torch.distributions
+        x, log_prob = self.forward(shape[0])
+        return x
+
 
     def check_forward_backward_consistency(self, n=100):
         """p(x) generated from forward should be the same as log p(x) for the same samples"""
@@ -76,9 +106,9 @@ class FlowModel(nn.Module):
               f"{torch.max(torch.abs(log_prob - log_prob_backward))}")
 
 
-    def check_normalisation_constant(self, n=500000):
+    def check_normalisation_constant(self, n=int(1e6)):
         """This should be approximately one if things are working correctly, check with importance sampling"""
-        normal_dist = torch.distributions.MultivariateNormal(torch.zeros(self.dim), torch.eye(self.dim))
+        normal_dist = torch.distributions.MultivariateNormal(torch.zeros(self.dim), 5*torch.eye(self.dim))
         x_samples = normal_dist.sample((n,))
         log_prob_normal = normal_dist.log_prob(x_samples)
         log_prob_backward = self.log_prob(x_samples)
@@ -87,9 +117,13 @@ class FlowModel(nn.Module):
         print(f"normalisation constant is {Z_backward}")
 
 
-
 if __name__ == '__main__':
-    model = FlowModel(x_dim=5, n_flow_steps=3, flow_type="RealNVP") #
+    from Utils import plot_distribution
+    import matplotlib.pyplot as plt
+    torch.manual_seed(1)
+    model = FlowModel(x_dim=2, n_flow_steps=2, prior_scaling=1)  # , flow_type="RealNVP"
     model.check_forward_backward_consistency()
-    model.check_normalisation_constant()
+    model.check_normalisation_constant(n=int(5e6))
+    plot_distribution(model, range=15)
+    plt.show()
 

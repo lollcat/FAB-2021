@@ -13,7 +13,7 @@ class MoG(BaseTargetDistribution):
             covariance = torch.diag(torch.rand(dim) + min_cov)
             self.distributions.append(torch.distributions.multivariate_normal.MultivariateNormal(loc,
                                                                                         covariance_matrix=covariance))
-    @torch.no_grad()
+
     def log_prob(self, x: torch.tensor) -> torch.tensor:
         # log p(x, m) = log p(x | m ) + log p(m) - assume uniform prior so p(m) is 0.5
         log_prob_concat = torch.stack([distribution.log_prob(x) for distribution in self.distributions]) \
