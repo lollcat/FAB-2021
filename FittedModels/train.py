@@ -3,7 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from FittedModels.Models.base import BaseLearntDistribution
 from DebuggingUtils import check_gradients
-Notebook = True
+Notebook = False
 if Notebook:
     from tqdm.notebook import tqdm
 else:
@@ -11,7 +11,7 @@ else:
 
 class LearntDistributionManager:
     def __init__(self, target_distribution, fitted_model, importance_sampler,
-                 loss_type="kl", alpha=2, lr=1e-3):
+                 loss_type="kl", alpha=2, lr=1e-3, prevent_extreme_q_x=False):
         self.importance_sampler = importance_sampler
         self.learnt_sampling_dist: BaseLearntDistribution
         self.learnt_sampling_dist = fitted_model
@@ -19,10 +19,16 @@ class LearntDistributionManager:
         self.optimizer = torch.optim.Adamax(self.learnt_sampling_dist.parameters(), lr=lr)
         self.loss_type = loss_type
         if loss_type == "kl":
-            self.loss = self.KL_loss
+            if prevent_extreme_q_x:
+                self.loss = lambda log_q_x, log_p_x: self.KL_loss(log_q_x, log_p_x, clip_q=True)
+            else:
+                self.loss = self.KL_loss
             self.alpha = 1
         elif loss_type == "DReG":
-            self.loss = self.dreg_alpha_divergence_loss
+            if prevent_extreme_q_x:
+                self.loss = lambda log_q_x, log_p_x: self.dreg_alpha_divergence_loss(log_q_x, log_p_x, clip_q=True)
+            else:
+                self.loss = self.dreg_alpha_divergence_loss
             self.alpha = alpha  # alpha for alpha-divergence
             self.alpha_one_minus_alpha_sign = torch.sign(torch.tensor(self.alpha * (1 - self.alpha)))
         else:
@@ -59,23 +65,27 @@ class LearntDistributionManager:
                 pbar.set_description(f"loss: {history['loss'][-1]}, mean log p_x {torch.mean(log_p_x)}")
         return history
 
-    def KL_loss(self, log_q_x, log_p_x, clamp=False):
-        if clamp is True:
-            log_q_x = log_q_x.clamp(min=-1)
+    def KL_loss(self, log_q_x, log_p_x, clip_q=False):
+        if clip_q is True:
+            log_q_x = log_q_x.clip(min=-3)
         kl = log_q_x - log_p_x
+        kl = kl.clamp(-1e16, 1e16)
         kl = torch.masked_select(kl, ~torch.isinf(kl) & ~torch.isnan(kl))
         kl_loss = torch.mean(kl)
         return kl_loss
 
-    def dreg_alpha_divergence_loss(self, log_q_x, log_p_x):
+    def dreg_alpha_divergence_loss(self, log_q_x, log_p_x, clip_q=True):
         # summing all samples within the log
-        #log_q_x = log_q_x.clamp(max= 2)
+        if clip_q is True:
+            log_q_x = log_q_x.clamp(max=2)
         log_w = log_p_x - log_q_x
         # prevent -inf from low density regions breaking things
         log_w = torch.masked_select(log_w, ~torch.isinf(log_w) & ~torch.isnan(log_w))
         with torch.no_grad():
             w_alpha_normalised_alpha = F.softmax(self.alpha*log_w, dim=-1)
-        return torch.sum(((1 + self.alpha) * w_alpha_normalised_alpha + self.alpha * w_alpha_normalised_alpha**2) * log_w)
+        dreg_loss = - self.alpha_one_minus_alpha_sign * \
+                    torch.sum(((1 + self.alpha) * w_alpha_normalised_alpha + self.alpha * w_alpha_normalised_alpha**2) * log_w)
+        return dreg_loss
 
     @torch.no_grad()
     def estimate_expectation(self, n_samples=int(1e4), expectation_function=lambda x: torch.sum(x, dim=-1)):

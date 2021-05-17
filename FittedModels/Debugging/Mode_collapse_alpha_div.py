@@ -23,18 +23,25 @@ def expectation_function(x):
 
 if __name__ == '__main__':
     torch.manual_seed(2)
-    epochs = 10000
+    torch.set_default_dtype(torch.float64)
+    epochs = 1000
+    batch_size = 100
     dim = 2
     n_samples_estimation = int(1e4)
-    target = MoG(dim=dim, n_mixes=2, min_cov=1)
-    fig = plot_distribution(target)
+    target = MoG(dim=dim, n_mixes=2, min_cov=1, loc_scaling=10)
+    fig = plot_distribution(target, bounds=[[-20, 20], [-20, 20]])
     torch.manual_seed(0)
-    learnt_sampler = FlowModel(x_dim=dim, n_flow_steps=5)  # , flow_type="RealNVP"
-    tester = LearntDistributionManager(target, learnt_sampler, VanillaImportanceSampling, loss_type="DReG")  # "kl"
+    learnt_sampler = FlowModel(x_dim=dim , n_flow_steps=5) # , flow_type="RealNVP"
+    tester = LearntDistributionManager(target, learnt_sampler, VanillaImportanceSampling, loss_type="DReG")
+    expectation_before, sampling_weights_before = tester.estimate_expectation(n_samples_estimation, expectation_function)
     samples_before = plot_samples(tester)
     plt.show()
-    history = tester.train(epochs, batch_size=100)
-    samples_fig_after = plot_samples(tester)
+    fig_before_train = plot_distributions(tester, bounds=[[-20, 20], [-20, 20]])
+    plt.show()
+    history = tester.train(epochs, batch_size=batch_size)
+    samples_after = plot_samples(tester)
     plt.show()
     plot_history(history)
     plt.show()
+    #fig_after_train = plot_distributions(tester, bounds=[[-20, 20], [-20, 20]])
+    #plt.show()

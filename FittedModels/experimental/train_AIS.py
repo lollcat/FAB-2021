@@ -42,7 +42,6 @@ class AIS_trainer(LearntDistributionManager):
                 raise Exception("NaN loss encountered")
             loss.backward()
             self.optimizer.step()
-
             # save info
             log_p_x = self.target_dist.log_prob(x_samples)
             history["loss"].append(loss.item())

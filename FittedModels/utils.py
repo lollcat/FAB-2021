@@ -8,16 +8,22 @@ from Utils import plot_3D
 import pandas as pd
 import numpy as np
 
-def plot_history(history):
+def plot_history(history, bounds=None, running_chunk_n=30):
     figure, axs = plt.subplots(len(history), 1, figsize=(6, 10))
     for i, key in enumerate(history):
         data = pd.Series(history[key])
         data.replace([np.inf, -np.inf], np.nan, inplace=True)
-        if True in data.isna():
+        rolling_interval = int(len(data) / running_chunk_n)
+        if sum(data.isna()) > 0:
             data = data.dropna()
             print(f"NaN encountered in {key} history")
         axs[i].plot(data)
+        axs[i].plot(data.rolling(rolling_interval).mean())
         axs[i].set_title(key)
+        if bounds is not None:
+            mini = max(bounds[0], data.min())
+            maxi = min(bounds[1], data.max())
+            axs[i].set_ylim([mini, maxi])
         if key == "alpha_divergence":
             axs[i].set_yscale("log")
     plt.tight_layout()

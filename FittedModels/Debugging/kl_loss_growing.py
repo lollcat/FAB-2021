@@ -27,13 +27,13 @@ if __name__ == '__main__':
     1. Caused my extreme points making gradient unstable?
      - seems like this was actually just a result of incorrectly fixing the last bug
     """
-    torch.manual_seed(2)
+    torch.manual_seed(0)
     epochs = 130 # 130
     batch_size = 100
     dim = 2
     n_samples_estimation = int(1e4)
     target = Guassian_FullCov(dim=dim, scale_covariance=1)
-    fig = plot_distribution(target)
+    fig = plot_distribution(target, bounds=[[-20, 20], [-20, 20]])
 
     torch.manual_seed(0)
     learnt_sampler = FlowModel(x_dim=dim, n_flow_steps=3)
@@ -47,16 +47,5 @@ if __name__ == '__main__':
     plot_history(history)
     plt.show()
 
-    plt.plot(history["loss"])
-    plt.ylim([-20, 10])
-    plt.show()
 
-    plt.figure()
-    plt.plot(history["log_p_x"])
-    plt.ylim([-20, 10])
-    plt.show()
-    plt.figure()
-    plt.plot(history["log_q_x"])
-    plt.ylim([-20, 10])
-    plt.show()
 
