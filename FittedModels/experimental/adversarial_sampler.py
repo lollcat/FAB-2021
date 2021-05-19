@@ -126,6 +126,22 @@ def plot_distributions(learnt_dist_manager: LearntDistributionManager, range=10,
     fig.suptitle(title)
     return fig
 
+def plot_samples(learnt_dist_manager: LearntDistributionManager):
+    samples_q = learnt_dist_manager.learnt_sampling_dist.sample((500,))
+    samples_q = torch.clamp(samples_q , -100, 100).detach()
+    samples_g = learnt_dist_manager.adversarial_model.sample((500,))
+    samples_g = torch.clamp(samples_g, -100, 100).detach()
+    samples_p = learnt_dist_manager.target_dist.sample((500, )).detach()
+    fig, axs = plt.subplots(1, 3, sharex="all", sharey="all")
+    axs[0].scatter(samples_q[:, 0], samples_q[:, 1])
+    axs[0].set_title("q(x) samples")
+    axs[1].scatter(samples_p[:, 0], samples_p[:, 1])
+    axs[1].set_title("p(x) samples")
+    axs[2].scatter(samples_g[:, 0], samples_g[:, 1])
+    axs[2].set_title("g(x) samples")
+    return fig
+
+
 if __name__ == '__main__':
     import torch
     import matplotlib.pyplot as plt

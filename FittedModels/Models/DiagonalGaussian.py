@@ -7,6 +7,7 @@ from FittedModels.Models.base import BaseLearntDistribution
 class DiagonalGaussian(nn.Module, BaseLearntDistribution):
     # diagonal guassian distribution
     def __init__(self, dim=5, log_std_initial_scaling=1):
+        self.class_definition = (dim, log_std_initial_scaling)
         super(DiagonalGaussian, self).__init__()
         self.means = torch.nn.Parameter(torch.zeros(dim))
         self.log_std = torch.nn.Parameter(torch.ones(dim)*log_std_initial_scaling)

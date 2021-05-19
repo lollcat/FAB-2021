@@ -9,12 +9,13 @@ class FlowModel(nn.Module):
     we are also assuming that we are only interested in p(x), so return this for both forwards and backwards,
     we could add methods for p(z) if this comes into play
     """
-    def __init__(self, x_dim, flow_type="IAF", n_flow_steps=3, prior_scaling=1.0):
+    def __init__(self, x_dim, flow_type="IAF", n_flow_steps=3, scaling_factor=1.0):
+        self.class_definition = (x_dim, flow_type, n_flow_steps, scaling_factor)
         self.dim = x_dim
         super(FlowModel, self).__init__()
-        self.prior_scaling = torch.tensor([prior_scaling])
+        self.scaling_factor = torch.tensor([scaling_factor])
         self.prior = torch.distributions.MultivariateNormal(loc=torch.zeros(x_dim),
-                                                                covariance_matrix=torch.eye(x_dim)*self.prior_scaling)
+                                                                covariance_matrix=torch.eye(x_dim))
         if flow_type == "IAF":
             from NormalisingFlow.IAF import IAF
             flow = IAF
@@ -31,6 +32,17 @@ class FlowModel(nn.Module):
         else:
             raise Exception("incorrectly specified flow")
 
+    def widen(self, x):
+        x = x*self.scaling_factor
+        log_det = x.shape[-1]*torch.log(self.scaling_factor)
+        return x, log_det
+
+    def un_widen(self, x):
+        x = x/self.scaling_factor
+        log_det = - x.shape[-1]*torch.log(self.scaling_factor)
+        return x, log_det
+
+
     def forward(self, batch_size=1):
         """
         log p(x) = log p(z) - log |dx/dz|
@@ -39,6 +51,9 @@ class FlowModel(nn.Module):
         log_prob = self.prior.log_prob(x)
         for flow_step in self.flow_blocks:
             x, log_determinant = flow_step(x)
+            log_prob -= log_determinant
+        if self.scaling_factor != 1:
+            x, log_determinant = self.widen(x)
             log_prob -= log_determinant
         return x, log_prob
 
@@ -70,6 +85,9 @@ class FlowModel(nn.Module):
         log p(x) = log p(z) + log |dz/dx|
         """
         log_prob = torch.zeros(x.shape[0])
+        if self.scaling_factor != 1:
+            x, log_det = self.un_widen(x)
+            log_prob += log_det
         for flow_step in self.flow_blocks[::-1]:
             x, log_determinant = flow_step.backward(x)
             log_prob += log_determinant
@@ -98,6 +116,10 @@ class FlowModel(nn.Module):
         for flow_step in self.flow_blocks:
             x, log_determinant = flow_step(x)
             log_prob -= log_determinant
+        if self.scaling_factor != 1:
+            x, log_determinant = self.widen(x)
+            log_prob -= log_determinant
+
         log_prob_backward = self.log_prob(x)
         z_backward = self.backward(x)[0]
         print(f"Checking forward backward consistency of x, the following should be close to zero: "
@@ -121,9 +143,10 @@ if __name__ == '__main__':
     from Utils import plot_distribution
     import matplotlib.pyplot as plt
     torch.manual_seed(1)
-    model = FlowModel(x_dim=2, n_flow_steps=2, prior_scaling=1)  # , flow_type="RealNVP"
+    model = FlowModel(x_dim=2, n_flow_steps=2, scaling_factor=2.0)  # , flow_type="RealNVP"
+    model(100)
     model.check_forward_backward_consistency()
     model.check_normalisation_constant(n=int(5e6))
-    plot_distribution(model, range=15)
+    plot_distribution(model,)
     plt.show()
 

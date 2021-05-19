@@ -47,7 +47,7 @@ if __name__ == '__main__':
     target = Guassian_FullCov(dim=dim, scale_covariance=1)
 
     torch.manual_seed(seed)
-    learnt_sampler = FlowModel(x_dim=dim, n_flow_steps=3, prior_scaling=50)
+    learnt_sampler = FlowModel(x_dim=dim, n_flow_steps=3, scaling_factor=50)
     tester = LearntDistributionManager(target, learnt_sampler, VanillaImportanceSampling, loss_type="DReG", lr=1e-3) #
     #fig_before_train = plot_distributions(tester, n_points=200, grid=False, log_prob=True)
     #plot_samples(tester)

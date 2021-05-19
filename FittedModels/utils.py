@@ -29,11 +29,11 @@ def plot_history(history, bounds=None, running_chunk_n=30):
     plt.tight_layout()
     return figure, axs
 
-def plot_samples(learnt_dist_manager: LearntDistributionManager):
-    samples_q = learnt_dist_manager.learnt_sampling_dist.sample((500,))
+def plot_samples(learnt_dist_manager: LearntDistributionManager, n_samples = 1000):
+    samples_q = learnt_dist_manager.learnt_sampling_dist.sample((n_samples,))
     samples_q = torch.clamp(samples_q , -100, 100).detach()
-    samples_p = learnt_dist_manager.target_dist.sample((500, )).detach()
-    fig, axs = plt.subplots(1, 2)
+    samples_p = learnt_dist_manager.target_dist.sample((n_samples, )).detach()
+    fig, axs = plt.subplots(1, 2, sharex="all", sharey="all")
     axs[0].scatter(samples_q[:, 0], samples_q[:, 1])
     axs[0].set_title("q(x) samples")
     axs[1].scatter(samples_p[:, 0], samples_p[:, 1])

@@ -4,6 +4,11 @@ from mpl_toolkits.mplot3d import axes3d
 import matplotlib.pyplot as plt
 import matplotlib as mpl
 
+def expectation_function(x):
+    # just an example expectation function
+    A = torch.ones((x.shape[-1], x.shape[-1]))
+    return torch.einsum("bi,ij,bj->b", x, A, x)
+
 def plot_3D(x, z, n, ax, title=None):
     x = x.numpy()
     z = z.numpy()
