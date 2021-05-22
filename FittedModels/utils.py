@@ -8,6 +8,29 @@ from Utils import plot_3D
 import pandas as pd
 import numpy as np
 
+def plot_divergences(history):
+    plt.figure()
+    plt.plot(history["kl"])
+    plt.title("MC estimate of kl(q||p)")
+    plt.figure()
+    plt.plot(history["alpha_2_divergence"])
+    # plt.yscale("log")
+    plt.title("MC estimate of log alpha divergence (alpha=2)")
+    plt.figure()
+    plt.plot(history["alpha_2_divergence_over_p"])
+    # plt.yscale("log")
+    plt.title("MC estimate of log alpha divergence (alpha=2) using p(x) to sample")
+
+def plot_sampling_info(history):
+    plt.figure()
+    plt.plot(history["importance_weights_var"])
+    plt.yscale("log")
+    plt.title("unnormalised importance weights variance")
+    plt.figure()
+    plt.plot(history["normalised_importance_weights_var"])
+    plt.yscale("log")
+    plt.title("normalised importance weights variance")
+
 def plot_history(history, bounds=None, running_chunk_n=30):
     figure, axs = plt.subplots(len(history), 1, figsize=(6, 10))
     for i, key in enumerate(history):

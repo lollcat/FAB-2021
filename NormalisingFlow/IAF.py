@@ -30,9 +30,9 @@ class IAF(nn.Module, BaseFlow):
         log_determinant = torch.zeros(x.shape[0])
         m, s = self.AutoregressiveNN(x)
         m, s = self.reparameterise_s(m, s)
-        if m.requires_grad: # to prevent grad problems
-            m.register_hook(self.Monitor_NaN.overwrite_NaN_grad)
-            s.register_hook(self.Monitor_NaN.overwrite_NaN_grad)
+        #if m.requires_grad: # to prevent grad problems
+        #    m.register_hook(self.Monitor_NaN.overwrite_NaN_grad)
+        #    s.register_hook(self.Monitor_NaN.overwrite_NaN_grad)
         x = torch.exp(s) * x + m
         log_determinant += torch.sum(s, dim=1)
         if self.reverse:

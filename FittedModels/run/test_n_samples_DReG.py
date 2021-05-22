@@ -16,8 +16,10 @@ def run_experiment(k, dim=2, seed=0, n_samples=int(1e3), epochs=500, batch_size=
     torch.manual_seed(seed)
     #target = Guassian_FullCov(dim=dim)
     #learnt_sampler = DiagonalGaussian(dim=dim)
-    target = MoG(dim=dim, n_mixes=2, min_cov=1, loc_scaling=3)
-    learnt_sampler = FlowModel(x_dim=dim, n_flow_steps=3, flow_type="RealNVP")
+    #target = MoG(dim=dim, n_mixes=2, min_cov=1, loc_scaling=3)
+    # learnt_sampler = FlowModel(x_dim=dim, n_flow_steps=3, flow_type="RealNVP")
+    target = MoG(dim=dim, n_mixes=10, min_cov=0, loc_scaling=1.5)
+    learnt_sampler = FlowModel(x_dim=dim, n_flow_steps=3, scaling_factor=2.0)
     tester = LearntDistributionManager(target, learnt_sampler, VanillaImportanceSampling, loss_type="DReG", k=k)
     try:
         history = tester.train(epochs, batch_size=batch_size)

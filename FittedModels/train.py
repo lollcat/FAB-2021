@@ -37,12 +37,10 @@ class LearntDistributionManager:
 
         self.fixed_learnt_sampling_dist = type(fitted_model)(*fitted_model.class_definition)  # for computing d weights dz
 
-
-
-    def train(self, epochs=100, batch_size=256, extra_info=True):
+    def train(self, epochs=100, batch_size=256, extra_info=True,
+              clip_grad=False, max_grad_norm=2, break_on_inf=True):
         if self.loss_type == "DReG" and self.k is None:
             self.k = batch_size
-
         epoch_per_print = max(int(epochs / 20), 1)
         epoch_per_save = max(int(epochs / 100), 1)
         history = {"loss": [],
@@ -54,24 +52,22 @@ class LearntDistributionManager:
                "alpha_2_divergence": [],
                 "alpha_2_divergence_over_p": [],
                "importance_weights_var": [],
-               "normalised_importance_weights_var": []})
+               "normalised_importance_weights_var": [],
+            "effective_sample_size": []})
         pbar = tqdm(range(epochs))
         for epoch in pbar:
             self.optimizer.zero_grad()
             x_samples, log_q_x = self.learnt_sampling_dist(batch_size)
             log_p_x = self.target_dist.log_prob(x_samples)
             loss = self.loss(x_samples, log_q_x, log_p_x)
-            if True in torch.isnan(log_p_x) or True in torch.isinf(log_p_x):
-                print("NaN/-inf loss encountered in log_p_x")
-            if True in torch.isnan(log_q_x) or True in torch.isinf(log_q_x):
-                print("NaN/-inf loss encountered in log_q_x")
-            if torch.isnan(loss) or torch.isinf(loss):
-                from FittedModels.utils import plot_history
-                import matplotlib.pyplot as plt
-                plot_history(history)
-                plt.show()
-                raise Exception(f"NaN loss encountered on epoch {epoch}")
+            if break_on_inf is False and torch.isinf(loss):
+                print("continuing run after getting infinity loss")
+                loss = torch.clip(loss, -1e16, 1e16)
+            self.check_infs_and_NaNs(epoch, log_p_x, log_q_x, loss, history)
             loss.backward()
+            if clip_grad is True:
+                grad_norm = torch.nn.utils.clip_grad_norm_(self.learnt_sampling_dist.parameters(), max_grad_norm)
+                # torch.nn.utils.clip_grad_value_(self.learnt_sampling_dist.parameters(), 0.001)
             self.optimizer.step()
             history["loss"].append(loss.item())
             history["log_p_x"].append(torch.mean(log_p_x).item())
@@ -80,25 +76,23 @@ class LearntDistributionManager:
                 pbar.set_description(f"loss: {history['loss'][-1]}, mean log p_x {torch.mean(log_p_x)}")
             if epoch % epoch_per_save == 0 or epoch == epochs:
                 history["kl"].append(self.kl_MC_estimate())
-                history["alpha_2_divergence"].append(self.alpha_divergence_MC_estimate())
-                history["alpha_2_divergence_over_p"].append(self.alpha_divergence_over_p_MC_estimate())
-                history["importance_weights_var"].append(self.importance_weights_variance())
-                history["normalised_importance_weights_var"].append(
-                    self.normalised_importance_weights_variance())
+                if hasattr(self.target_dist, "sample"):  # check if sample func exists
+                    history["alpha_2_divergence"].append(self.alpha_divergence_MC_estimate())
+                    try:
+                        history["alpha_2_divergence_over_p"].append(self.alpha_divergence_over_p_MC_estimate())
+                    except:
+                        print("Couldn't calculate alpha divergence over p")
+                importance_weights_var, normalised_importance_weights_var, ESS = self.importance_weights_key_info()
+                history["importance_weights_var"].append(importance_weights_var)
+                history["normalised_importance_weights_var"].append(normalised_importance_weights_var)
+                history["effective_sample_size"].append(ESS)
         return history
 
     def KL_loss(self, x_samples_not_used, log_q_x, log_p_x):
         kl = log_q_x - log_p_x
-        kl = torch.masked_select(kl, ~torch.isinf(kl) & ~torch.isnan(kl))
+        # kl = torch.masked_select(kl, ~torch.isinf(kl) & ~torch.isnan(kl))
         kl_loss = torch.mean(kl)
         return kl_loss
-
-    def alpha_MC_loss(self, x_samples_not_used, log_q_x, log_p_x):
-        alpha_div = -self.alpha_one_minus_alpha_sign*self.alpha*(log_p_x - log_q_x)
-        alpha_div = alpha_div.clamp(-1e16, 1e16)
-        alpha_div = torch.masked_select(alpha_div, ~torch.isinf(alpha_div) & ~torch.isnan(alpha_div))
-        MC_loss = torch.mean(alpha_div)
-        return MC_loss
 
     def dreg_alpha_divergence_loss(self, x_samples, log_q_x_not_used, log_p_x):
         self.update_fixed_version_of_learnt_distribution()
@@ -110,29 +104,41 @@ class LearntDistributionManager:
         log_w = log_w.reshape((outside_dim, self.k))
         with torch.no_grad():
             w_alpha_normalised_alpha = F.softmax(self.alpha*log_w, dim=-1)
-        # prevent -inf from low density regions breaking things
-        #log_w = torch.masked_select(log_w, ~torch.isinf(log_w) & ~torch.isnan(log_w))
-        w_alpha_normalised_alpha[torch.isinf(log_w)] = 0
-        log_w[torch.isinf(log_w)] = 0
         DreG_for_each_batch_dim = - self.alpha_one_minus_alpha_sign * \
                     torch.sum(((1 - self.alpha) * w_alpha_normalised_alpha + self.alpha * w_alpha_normalised_alpha**2)
                               * log_w, dim=-1)
         dreg_loss = torch.mean(DreG_for_each_batch_dim)
         return dreg_loss
 
-    def importance_weights_variance(self, batch_size=1000):
+    def importance_weights_key_info(self, batch_size=1000):
         x_samples, log_q_x = self.learnt_sampling_dist(batch_size)
         log_p_x = self.target_dist.log_prob(x_samples)
         # variance in unnormalised weights
         weights = torch.exp(log_p_x - log_q_x)
-        return torch.var(weights).item()
-
-    def normalised_importance_weights_variance(self, batch_size=1000):
-        x_samples, log_q_x = self.learnt_sampling_dist(batch_size)
-        log_p_x = self.target_dist.log_prob(x_samples)
-        # variance in normalised weights
         normalised_weights = torch.softmax(log_p_x - log_q_x, dim=-1)
-        return torch.var(normalised_weights).item()
+        ESS = self.importance_sampler.effective_sample_size(normalised_weights)/batch_size
+        return torch.var(weights).item(), torch.var(normalised_weights).item(), ESS.item()
+
+    def get_gradients(self, n_batches=100, batch_size=100):
+        grads = []
+        for i in range(n_batches):
+            self.optimizer.zero_grad()
+            x_samples, log_q_x = self.learnt_sampling_dist(batch_size)
+            log_p_x = self.target_dist.log_prob(x_samples)
+            loss = self.loss(x_samples, log_q_x, log_p_x)
+            self.learnt_sampling_dist.flow_blocks[0].AutoregressiveNN.FinalLayer.layer_to_m.weight.register_hook(
+                lambda grad: grads.append(grad.detach())
+            )
+            loss.backward()
+        grads = torch.stack(grads)
+        return grads
+
+    def alpha_MC_loss(self, x_samples_not_used, log_q_x, log_p_x):
+        alpha_div = -self.alpha_one_minus_alpha_sign*self.alpha*(log_p_x - log_q_x)
+        alpha_div = alpha_div.clamp(-1e16, 1e16)
+        alpha_div = torch.masked_select(alpha_div, ~torch.isinf(alpha_div) & ~torch.isnan(alpha_div))
+        MC_loss = torch.mean(alpha_div)
+        return MC_loss
 
     def kl_MC_estimate(self, batch_size=1000):
         x_samples, log_q_x = self.learnt_sampling_dist(batch_size)
@@ -161,6 +167,18 @@ class LearntDistributionManager:
         log_alpha_divergence = -alpha_one_minus_alpha_sign * \
                                (torch.logsumexp((alpha - 1) * (log_p_x - log_q_x), dim=-1) - torch.log(N))
         return log_alpha_divergence.item()
+
+    def check_infs_and_NaNs(self, epoch, log_p_x, log_q_x, loss, history):
+        if True in torch.isnan(log_p_x) or True in torch.isinf(log_p_x):
+            print("NaN/-inf loss encountered in log_p_x")
+        if True in torch.isnan(log_q_x) or True in torch.isinf(log_q_x):
+            print("NaN/-inf loss encountered in log_q_x")
+        if torch.isnan(loss) or torch.isinf(loss):
+            from FittedModels.utils import plot_history
+            import matplotlib.pyplot as plt
+            plot_history(history)
+            plt.show()
+            raise Exception(f"NaN loss encountered on epoch {epoch}")
 
 
     def update_fixed_version_of_learnt_distribution(self):
