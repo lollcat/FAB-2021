@@ -12,11 +12,15 @@ else:
 
 class LearntDistributionManager:
     def __init__(self, target_distribution, fitted_model, importance_sampler,
-                 loss_type="kl", alpha=2, lr=1e-3, k=None):
+                 loss_type="kl", alpha=2, lr=1e-3, k=None, use_GPU=True):
+        if use_GPU is True:
+            self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        else:
+            self.device = "cpu"
         self.importance_sampler = importance_sampler
         self.learnt_sampling_dist: BaseLearntDistribution
-        self.learnt_sampling_dist = fitted_model
-        self.target_dist = target_distribution
+        self.learnt_sampling_dist = fitted_model.to(self.device)
+        self.target_dist = target_distribution.to(self.device)
         self.optimizer = torch.optim.Adam(self.learnt_sampling_dist.parameters(), lr=lr)
         self.loss_type = loss_type
         if loss_type == "kl":
@@ -40,6 +44,7 @@ class LearntDistributionManager:
             raise Exception("loss_type incorrectly specified")
 
         self.fixed_learnt_sampling_dist = type(fitted_model)(*fitted_model.class_definition)  # for computing d weights dz
+        self.fixed_learnt_sampling_dist.to(self.device)
 
     def train(self, epochs=100, batch_size=256, extra_info=True,
               clip_grad=False, max_grad_norm=2, break_on_inf=True):
