@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 from TargetDistributions.base import BaseTargetDistribution
 
-class custom_MoG(torch.distributions.MixtureSameFamily, BaseTargetDistribution):
+class custom_MoG(torch.distributions.MixtureSameFamily, BaseTargetDistribution, nn.Module):
     # Mog with hard coded mean and cov
     def __init__(self, dim=2, loc_scaling=1, cov_scaling=1, locs_=(-1, 1)):
         self.dim = dim
@@ -20,7 +20,7 @@ class custom_MoG(torch.distributions.MixtureSameFamily, BaseTargetDistribution):
         com = torch.distributions.MultivariateNormal(locs, covs)
         super(custom_MoG, self).__init__(mixture_distribution=mix, component_distribution = com)
 
-class MoG(torch.distributions.MixtureSameFamily, BaseTargetDistribution):
+class MoG(torch.distributions.MixtureSameFamily, BaseTargetDistribution, nn.Module):
     # mog with random mean and var
     def __init__(self, dim=2, n_mixes=5, min_cov=0.5, loc_scaling=3.0):
         self.dim = dim

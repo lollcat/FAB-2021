@@ -106,7 +106,7 @@ class Target:
         y = self.model(x)
         return x, y
 
-class PosteriorBNN(BaseTargetDistribution):
+class PosteriorBNN(BaseTargetDistribution, nn.Module):
     """
      p(w | X, Y) proportional to p(w) p(Y | X, w)
      where we generate X, Y datasets using the Target class

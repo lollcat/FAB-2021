@@ -1,5 +1,5 @@
 import torch
-
+import torch.nn as nn
 
 class Energy(torch.nn.Module):
 
@@ -26,7 +26,7 @@ class Energy(torch.nn.Module):
         return -torch.autograd.grad(e.sum(), x)[0]
 
 
-class DoubleWellEnergy(Energy):
+class DoubleWellEnergy(Energy, nn.Module):
     def __init__(self, dim, a=0.0, b=-4., c=1.):
         super().__init__(dim)
         self._a = a

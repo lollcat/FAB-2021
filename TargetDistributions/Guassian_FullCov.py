@@ -1,7 +1,8 @@
 import torch
 from TargetDistributions.base import BaseTargetDistribution
+import torch.nn as nn
 
-class Guassian_FullCov(torch.distributions.multivariate_normal.MultivariateNormal, BaseTargetDistribution):
+class Guassian_FullCov(torch.distributions.multivariate_normal.MultivariateNormal, BaseTargetDistribution, nn.Module):
     def __init__(self, dim=5, scale_covariance=1):
         # scale_covariance just multiplies covariance by a constant, giving us the ability to make the distribution
         # more or less wide
