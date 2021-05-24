@@ -15,7 +15,7 @@ from FittedModels.utils import plot_distributions
 from FittedModels.train import LearntDistributionManager
 from Utils import plot_func2D, MC_estimate_true_expectation, plot_distribution, expectation_function
 from FittedModels.Models.FlowModel import FlowModel
-from FittedModels.experimental.train_AIS import AIS_trainer
+from FittedModels.Experimental_methods.train_AIS import AIS_trainer
 from FittedModels.utils import plot_history
 import matplotlib.pyplot as plt
 from TargetDistributions.MoG import MoG

@@ -20,4 +20,4 @@ if __name__ == '__main__':
     loss = masked.sum()
     print(f'loss: {loss}')
 
-    loss.backward()
+    loss.z_to_x()

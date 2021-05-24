@@ -58,10 +58,11 @@ class NN(nn.Module):
             x = self.activation(hidden_layer(x))
         means = self.output_layer_means(x)
         # reparameterise to keep std resonably high, so that we have resonable density of most of y
+        # but not ridiculously high or low, as this gives us nans
         if self.fixed_variance is False:
-            log_std = self.output_layer_log_stds(x) + 1
+            log_std = self.output_layer_log_stds(x)/20 + 1
         else:
-            log_std = self.log_stds
+            log_std = self.log_stds/20 + 1
         stds = torch.exp(log_std)
         return torch.distributions.normal.Normal(loc=means, scale=stds)
 
@@ -83,6 +84,7 @@ class NN(nn.Module):
 
     @property
     def n_parameters(self):
+        # number of trainable parameters
         return sum([tensor.numel() for tensor in self.parameters() if tensor.requires_grad])
 
 
@@ -152,14 +154,30 @@ if __name__ == '__main__':
         samples_w = torch.randn(posterior_bnn.model.n_parameters)
         print(posterior_bnn.log_prob(samples_w))
     """
+
+
+    from ImportanceSampling.VanillaImportanceSampler import VanillaImportanceSampling
+    from FittedModels.Models.FlowModel import FlowModel
+    from FittedModels.train import LearntDistributionManager
     torch.manual_seed(0)
+    posterior_bnn = PosteriorBNN(n_datapoints=10, x_dim=2, y_dim=2, n_hidden_layers=1, layer_width=2)
+    x = torch.zeros(posterior_bnn.n_parameters)
+    print(posterior_bnn.log_prob(x))
+    learnt_sampler = FlowModel(x_dim=posterior_bnn.n_parameters, n_flow_steps=3, scaling_factor=5)
+    tester = LearntDistributionManager(posterior_bnn, learnt_sampler, VanillaImportanceSampling, loss_type="DReG")
+    expectation_before, info_before = tester.estimate_expectation(int(1e4), lambda x: torch.sum(x))
+    print(expectation_before, info_before)
+
+    """
     posterior_bnn = PosteriorBNN(n_datapoints=2, x_dim=1, y_dim=1, n_hidden_layers=0, layer_width=0
                                  ,linear_activations=True, fixed_variance=True, use_bias=True)
+    
     assert posterior_bnn.n_parameters == 2
     from Utils import plot_distribution
     import matplotlib.pyplot as plt
     plot_distribution(posterior_bnn, n_points=100)
     plt.show()
+    """
 
 
 

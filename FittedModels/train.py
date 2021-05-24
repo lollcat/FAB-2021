@@ -27,11 +27,15 @@ class LearntDistributionManager:
             self.alpha = alpha  # alpha for alpha-divergence
             self.alpha_one_minus_alpha_sign = torch.sign(torch.tensor(self.alpha * (1 - self.alpha)))
             self.k = k  # number of samples that going inside the log sum, if none then put all of them inside
-        elif loss_type == "alpha_MC":
+        elif loss_type == "DReG_kl":
+            self.loss = self.dreg_kl_loss
+            self.alpha = 1
+            self.k = k  # number of samples that going inside the log sum, if none then put all of them inside
+
+        elif loss_type == "alpha_MC": # this does terribly
             self.loss = self.alpha_MC_loss
             self.alpha = alpha  # alpha for alpha-divergence
             self.alpha_one_minus_alpha_sign = torch.sign(torch.tensor(self.alpha * (1 - self.alpha)))
-            self.k = k  # number of samples that going inside the log sum, if none then put all of them inside
         else:
             raise Exception("loss_type incorrectly specified")
 
@@ -39,7 +43,7 @@ class LearntDistributionManager:
 
     def train(self, epochs=100, batch_size=256, extra_info=True,
               clip_grad=False, max_grad_norm=2, break_on_inf=True):
-        if self.loss_type == "DReG" and self.k is None:
+        if (self.loss_type == "DReG" or self.loss_type == "DReG_kl") and self.k is None:
             self.k = batch_size
         epoch_per_print = max(int(epochs / 20), 1)
         epoch_per_save = max(int(epochs / 100), 1)
@@ -50,10 +54,12 @@ class LearntDistributionManager:
             history.update({
                "kl": [],
                "alpha_2_divergence": [],
-                "alpha_2_divergence_over_p": [],
                "importance_weights_var": [],
                "normalised_importance_weights_var": [],
-            "effective_sample_size": []})
+                "effective_sample_size": []})
+            if hasattr(self.target_dist, "sample"):
+                history.update({"alpha_2_divergence_over_p": []})
+
         pbar = tqdm(range(epochs))
         for epoch in pbar:
             self.optimizer.zero_grad()
@@ -76,8 +82,8 @@ class LearntDistributionManager:
                 pbar.set_description(f"loss: {history['loss'][-1]}, mean log p_x {torch.mean(log_p_x)}")
             if epoch % epoch_per_save == 0 or epoch == epochs:
                 history["kl"].append(self.kl_MC_estimate())
+                history["alpha_2_divergence"].append(self.alpha_divergence_MC_estimate())
                 if hasattr(self.target_dist, "sample"):  # check if sample func exists
-                    history["alpha_2_divergence"].append(self.alpha_divergence_MC_estimate())
                     try:
                         history["alpha_2_divergence_over_p"].append(self.alpha_divergence_over_p_MC_estimate())
                     except:
@@ -90,9 +96,22 @@ class LearntDistributionManager:
 
     def KL_loss(self, x_samples_not_used, log_q_x, log_p_x):
         kl = log_q_x - log_p_x
-        # kl = torch.masked_select(kl, ~torch.isinf(kl) & ~torch.isnan(kl))
         kl_loss = torch.mean(kl)
         return kl_loss
+
+    def dreg_kl_loss(self, x_samples, log_q_x_not_used, log_p_x):
+        self.update_fixed_version_of_learnt_distribution()
+        log_q_x = self.fixed_learnt_sampling_dist.log_prob(x_samples)
+        log_w = log_p_x - log_q_x
+        outside_dim = log_q_x.shape[0]/self.k  # this is like a batch dimension that we average DReG estimation over
+        assert outside_dim % 1 == 0  # always make k & n_samples work together nicely for averaging
+        outside_dim = int(outside_dim)
+        log_w = log_w.reshape((outside_dim, self.k))
+        with torch.no_grad():
+            w_normalised_squared = F.softmax(log_w, dim=-1)**2
+        DreG_for_each_batch_dim = - torch.sum(w_normalised_squared * log_w, dim=-1)
+        dreg_loss = torch.mean(DreG_for_each_batch_dim)
+        return dreg_loss
 
     def dreg_alpha_divergence_loss(self, x_samples, log_q_x_not_used, log_p_x):
         self.update_fixed_version_of_learnt_distribution()

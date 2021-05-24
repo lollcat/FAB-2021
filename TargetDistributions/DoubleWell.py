@@ -27,7 +27,7 @@ class Energy(torch.nn.Module):
 
 
 class DoubleWellEnergy(Energy):
-    def __init__(self, dim, a=0, b=-4., c=1.):
+    def __init__(self, dim, a=0.0, b=-4., c=1.):
         super().__init__(dim)
         self._a = a
         self._b = b
@@ -41,5 +41,11 @@ class DoubleWellEnergy(Energy):
         return e1 + e2
 
     def log_prob(self, x):
-        return torch.squeeze(-self._energy(x))
+        return torch.squeeze(-self.energy(x))
 
+if __name__ == '__main__':
+    from Utils import plot_distribution
+    import matplotlib.pyplot as plt
+    target = DoubleWellEnergy(2, a=-0.5, b=-6)
+    dist = plot_distribution(target, bounds=[[-3, 3], [-3, 3]], n_points=100)
+    plt.show()

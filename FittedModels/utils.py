@@ -16,10 +16,11 @@ def plot_divergences(history):
     plt.plot(history["alpha_2_divergence"])
     # plt.yscale("log")
     plt.title("MC estimate of log alpha divergence (alpha=2)")
-    plt.figure()
-    plt.plot(history["alpha_2_divergence_over_p"])
-    # plt.yscale("log")
-    plt.title("MC estimate of log alpha divergence (alpha=2) using p(x) to sample")
+    if "alpha_2_divergence_over_p" in history.keys():
+        plt.figure()
+        plt.plot(history["alpha_2_divergence_over_p"])
+        # plt.yscale("log")
+        plt.title("MC estimate of log alpha divergence (alpha=2) using p(x) to sample")
 
 def plot_sampling_info(history):
     plt.figure()

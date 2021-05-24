@@ -4,6 +4,13 @@ from mpl_toolkits.mplot3d import axes3d
 import matplotlib.pyplot as plt
 import matplotlib as mpl
 
+def plot_samples_single_dist(distribution, n_samples = 1000):
+    samples_q = distribution.sample((n_samples,)).detach()
+    fig, axs = plt.subplots(1)
+    axs.scatter(samples_q[:, 0], samples_q[:, 1])
+    axs.set_title("q(x) samples")
+
+
 def expectation_function(x):
     # just an example expectation function
     A = torch.ones((x.shape[-1], x.shape[-1]))
