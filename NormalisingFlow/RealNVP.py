@@ -9,7 +9,7 @@ class RealNVP(nn.Module, BaseFlow):
         super(RealNVP, self).__init__()
         self.use_exp = use_exp
         self.d = x_dim // 2  # elements copied from input to output
-        self.D_minus_d = x_dim - self.d # dependent on d elements
+        self.D_minus_d = x_dim - self.d  # dependent on d elements
         hidden_layer_width = nodes_per_x*x_dim  # this lets us enter the layer width default argument dependent on x_dim
         self.MLP = MLP(self.d, self.D_minus_d*2, hidden_layer_width, n_hidden_layers=n_hidden_layers)
         self.reversed = reversed

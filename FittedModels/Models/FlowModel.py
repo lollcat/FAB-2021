@@ -14,8 +14,10 @@ class FlowModel(nn.Module):
         self.dim = x_dim
         super(FlowModel, self).__init__()
         self.scaling_factor = torch.tensor([scaling_factor])
-        self.prior = torch.distributions.MultivariateNormal(loc=torch.zeros(x_dim),
-                                                                covariance_matrix=torch.eye(x_dim))
+        self.register_buffer("prior_mean", torch.zeros(x_dim))
+        self.register_buffer("prior_covariance", torch.eye(x_dim))
+        self.prior = torch.distributions.MultivariateNormal(loc=self.prior_mean,
+                                                                covariance_matrix=self.prior_covariance)
 
         if flow_type == "IAF":
             from NormalisingFlow.IAF import IAF
@@ -66,7 +68,7 @@ class FlowModel(nn.Module):
         Given x, find z and it's log probability
         log p(x) = log p(z) + log |dz/dx|
         """
-        log_prob = torch.zeros(x.shape[0])
+        log_prob = torch.zeros(x.shape[0], device=x.device)
         if self.scaling_factor != 1:
             x, log_det = self.un_widen(x)
             log_prob += log_det

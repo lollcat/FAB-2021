@@ -2,11 +2,11 @@ import torch
 import torch.nn as nn
 from TargetDistributions.base import BaseTargetDistribution
 
-class custom_MoG(torch.distributions.MixtureSameFamily, BaseTargetDistribution, nn.Module):
+class custom_MoG(BaseTargetDistribution, nn.Module):
     # Mog with hard coded mean and cov
     def __init__(self, dim=2, loc_scaling=1, cov_scaling=1, locs_=(-1, 1)):
+        super(custom_MoG, self).__init__()
         self.dim = dim
-        distributions = []
         locs = []
         covs = []
         for i in range(2):
@@ -16,13 +16,27 @@ class custom_MoG(torch.distributions.MixtureSameFamily, BaseTargetDistribution, 
             covs.append(covariance[None, :, :])
         locs = torch.cat(locs)
         covs = torch.cat(covs)
-        mix = torch.distributions.Categorical(torch.tensor([0.6, 0.4]))
-        com = torch.distributions.MultivariateNormal(locs, covs)
-        super(custom_MoG, self).__init__(mixture_distribution=mix, component_distribution = com)
+        self.register_buffer("locs", locs)
+        self.register_buffer("covs", covs)
+        self.register_buffer("cat_probs", torch.tensor([0.6, 0.4]))
 
-class MoG(torch.distributions.MixtureSameFamily, BaseTargetDistribution, nn.Module):
+    @property
+    def get_distribution(self):
+        mix = torch.distributions.Categorical(self.cat_probs)
+        com = torch.distributions.MultivariateNormal(self.locs, self.covs)
+        return torch.distributions.MixtureSameFamily(mixture_distribution=mix, component_distribution=com)
+
+    def log_prob(self, x):
+        return self.get_distribution.log_prob(x)
+
+    def sample(self, shape=(1,)):
+        return self.get_distribution.sample(shape)
+
+
+class MoG(BaseTargetDistribution, nn.Module):
     # mog with random mean and var
     def __init__(self, dim=2, n_mixes=5, min_cov=0.5, loc_scaling=3.0):
+        super(MoG, self).__init__()
         self.dim = dim
         self.n_mixes = n_mixes
         self.distributions = []
@@ -36,12 +50,22 @@ class MoG(torch.distributions.MixtureSameFamily, BaseTargetDistribution, nn.Modu
 
         locs = torch.cat(locs)
         covs = torch.cat(covs)
-        mix = torch.distributions.Categorical(torch.rand(n_mixes))
-        com = torch.distributions.MultivariateNormal(locs, covs)
-        super(MoG, self).__init__(mixture_distribution = mix, component_distribution = com)
 
+        self.register_buffer("cat_probs", torch.rand(n_mixes))
+        self.register_buffer("locs", locs)
+        self.register_buffer("covs", covs)
 
+    @property
+    def get_distribution(self):
+        mix = torch.distributions.Categorical(self.cat_probs)
+        com = torch.distributions.MultivariateNormal(self.locs, self.covs)
+        return torch.distributions.MixtureSameFamily(mixture_distribution=mix, component_distribution=com)
 
+    def log_prob(self, x):
+        return self.get_distribution.log_prob(x)
+
+    def sample(self, shape=(1,)):
+        return self.get_distribution.sample(shape)
 
 
 if __name__ == '__main__':
