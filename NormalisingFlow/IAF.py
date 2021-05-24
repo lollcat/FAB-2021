@@ -16,7 +16,7 @@ class IAF(nn.Module, BaseFlow):
         self.reversed = reversed
 
     def inverse(self, x):
-        log_determinant = torch.zeros(x.shape[0])
+        log_determinant = torch.zeros(x.shape[0]).to(x.device)
         m, s = self.AutoregressiveNN(x)
         m, s = self.reparameterise_s(m, s)
         if self.use_exp:
@@ -41,7 +41,7 @@ class IAF(nn.Module, BaseFlow):
 
     def forward(self, x):
         # found https://github.com/karpathy/pytorch-normalizing-flows/blob/master/nflib/flows.py useful for this
-        log_determinant = torch.zeros(x.shape[0])
+        log_determinant = torch.zeros(x.shape[0]).to(x.device)
         z = torch.zeros_like(x)
         if self.reversed:
             x = x.flip(dims=(-1,))

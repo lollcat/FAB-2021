@@ -13,11 +13,9 @@ class FlowModel(nn.Module):
         self.class_definition = (x_dim, flow_type, n_flow_steps, scaling_factor, *flow_args, *flow_kwargs)
         self.dim = x_dim
         super(FlowModel, self).__init__()
-        self.scaling_factor = torch.tensor([scaling_factor])
+        self.register_buffer("scaling_factor", torch.tensor([scaling_factor]))
         self.register_buffer("prior_mean", torch.zeros(x_dim))
         self.register_buffer("prior_covariance", torch.eye(x_dim))
-        self.prior = torch.distributions.MultivariateNormal(loc=self.prior_mean,
-                                                                covariance_matrix=self.prior_covariance)
 
         if flow_type == "IAF":
             from NormalisingFlow.IAF import IAF
@@ -32,6 +30,11 @@ class FlowModel(nn.Module):
             reversed = i % 2 == 0
             flow_block = flow(x_dim, reversed=reversed, *flow_args, **flow_kwargs)
             self.flow_blocks.append(flow_block)
+
+    @property
+    def prior(self):
+        return torch.distributions.MultivariateNormal(loc=self.prior_mean,
+                                                                covariance_matrix=self.prior_covariance)
 
     def forward(self, batch_size=1):
         # for the forward pass of the model we generate x samples

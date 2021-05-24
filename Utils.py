@@ -13,7 +13,7 @@ def plot_samples_single_dist(distribution, n_samples = 1000):
 
 def expectation_function(x):
     # just an example expectation function
-    A = torch.ones((x.shape[-1], x.shape[-1]))
+    A = torch.ones((x.shape[-1], x.shape[-1])).to(x.device)
     return torch.einsum("bi,ij,bj->b", x, A, x)
 
 def plot_3D(x, z, n, ax, title=None):

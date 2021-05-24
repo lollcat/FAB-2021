@@ -55,8 +55,8 @@ def plot_history(history, bounds=None, running_chunk_n=30):
 
 def plot_samples(learnt_dist_manager: LearntDistributionManager, n_samples = 1000):
     samples_q = learnt_dist_manager.learnt_sampling_dist.sample((n_samples,))
-    samples_q = torch.clamp(samples_q , -100, 100).detach()
-    samples_p = learnt_dist_manager.target_dist.sample((n_samples, )).detach()
+    samples_q = torch.clamp(samples_q , -100, 100).detach().cpu()
+    samples_p = learnt_dist_manager.target_dist.sample((n_samples, )).detach().cpu()
     fig, axs = plt.subplots(1, 2, sharex="all", sharey="all")
     axs[0].scatter(samples_q[:, 0], samples_q[:, 1])
     axs[0].set_title("q(x) samples")
