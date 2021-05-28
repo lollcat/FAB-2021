@@ -1,6 +1,9 @@
 import torch
 import torch.nn.functional as F
 from ImportanceSampling.base import BaseImportanceSampler
+from collections.abc import Callable
+import numpy as np
+
 
 class AnnealedImportanceSampler(BaseImportanceSampler):
     """
@@ -10,12 +13,22 @@ class AnnealedImportanceSampler(BaseImportanceSampler):
     where 0 = b_0 < b_1 ... < b_d = 1
     """
     def __init__(self, sampling_distribution, target_distribution,
-                 n_distributions=200, n_updates_Metropolis=10, save_for_visualisation=True, save_spacing=20):
+                 n_distributions=200, n_updates_Metropolis=10, save_for_visualisation=True, save_spacing=20,
+                 distribution_spacing="geometric"):
         self.sampling_distribution = sampling_distribution
         self.target_distribution = target_distribution
         self.n_distributions = n_distributions
         self.n_updates_Metropolis = n_updates_Metropolis
-        self.B_space = torch.linspace(0, 1, n_distributions)  # TODO update to geometric spacing
+        n_linspace_points = int(n_distributions/5) # rough heuristic, copying ratio used in example in AIS paper
+        n_geomspace_points = n_distributions - n_linspace_points
+        if distribution_spacing == "geometric":
+            self.B_space = torch.tensor(list(np.linspace(0, 0.01, n_linspace_points)) +
+                                        list(np.geomspace(0.01, 1, n_geomspace_points)))
+        elif distribution_spacing == "linear":
+            self.B_space = torch.linspace(0, 1, n_distributions)
+        else:
+            raise Exception(f"distribution spacing incorrectly specified: '{distribution_spacing}',"
+                            f"options are 'geometric' or 'linear'")
 
         self.save_for_visualisation = save_for_visualisation
         if self.save_for_visualisation:
@@ -59,7 +72,7 @@ class AnnealedImportanceSampler(BaseImportanceSampler):
         return (1-beta)*self.sampling_distribution.log_prob(x) + beta*self.target_distribution.log_prob(x)
 
 
-    def calculate_expectation(self, n_samples: int = 1000, expectation_function=lambda x: torch.sum(x, dim=-1)) \
+    def calculate_expectation(self, n_samples: int, expectation_function)\
             -> (torch.tensor, dict):
         samples, log_w = self.run(n_runs=n_samples)
         normalised_importance_weights = F.softmax(log_w, dim=-1)
@@ -76,10 +89,11 @@ class AnnealedImportanceSampler(BaseImportanceSampler):
 if __name__ == '__main__':
     from TargetDistributions.Guassian_FullCov import Guassian_FullCov
     from FittedModels.Models.DiagonalGaussian import DiagonalGaussian
+    from Utils.numerical_utils import expectation_function, MC_estimate_true_expectation
     dim = 5
     target = Guassian_FullCov(dim=dim)
     learnt_sampler = DiagonalGaussian(dim=dim)
     test = AnnealedImportanceSampler(sampling_distribution=learnt_sampler, target_distribution=target)
-    true_expectation = torch.sum(test.target_distribution.mean)
-    expectation, info_dict = test.calculate_expectation(5000)
+    true_expectation = MC_estimate_true_expectation(target, expectation_function, int(1e4))
+    expectation, info_dict = test.calculate_expectation(5000, expectation_function=expectation_function)
     print(true_expectation, expectation)

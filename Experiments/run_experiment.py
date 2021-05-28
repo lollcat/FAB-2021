@@ -1,7 +1,7 @@
 import torch
 from Experiments.Configurations.base import base_config, target_config
 from FittedModels.Models.FlowModel import FlowModel
-from Utils import plot_func2D, MC_estimate_true_expectation, plot_distribution, expectation_function
+from Utils.plotting_utils import MC_estimate_true_expectation
 
 
 def run_experiment(config: base_config):
@@ -11,7 +11,7 @@ def run_experiment(config: base_config):
         target = get_target(x_dim=config["x_dim"], target_config=base_config["target_config"])
         if hasattr(target, "sample"):
             if base_config["expectation_function"] == "standard":
-                from Utils import expectation_function
+                from Utils.plotting_utils import expectation_function
                 true_expectation = MC_estimate_true_expectation(target, expectation_function, int(1e6))
 
 

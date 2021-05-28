@@ -1,10 +1,10 @@
 import abc
 import torch
-
+from collections.abc import Callable
 class BaseImportanceSampler(abc.ABC):
 
     @abc.abstractmethod
-    def calculate_expectation(self, n_samples:int=1000, expectation_function=lambda x: torch.sum(x, dim=-1))\
+    def calculate_expectation(self, n_samples: int, expectation_function)\
             -> (torch.tensor, dict):
         """This is the job of the importance sampler"""
 

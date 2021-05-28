@@ -1,9 +1,9 @@
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
-from NormalisingFlow.base import BaseFlow
+from FittedModels.Models.base import BaseLearntDistribution
 
-class FlowModel(nn.Module):
+
+class FlowModel(nn.Module, BaseLearntDistribution):
     """
     here forward goes from z -> x, and backwards from x-> z, could maybe re-order
     we are also assuming that we are only interested in p(x), so return this for both forwards and backwards,
@@ -127,11 +127,14 @@ class FlowModel(nn.Module):
 
 
 if __name__ == '__main__':
-    from Utils import plot_distribution
+    from Utils.plotting_utils import plot_distribution
     import matplotlib.pyplot as plt
     torch.manual_seed(1)
     model = FlowModel(x_dim=2, n_flow_steps=3, scaling_factor=2.0, use_exp=False, flow_type="RealNVP")  #
     model(100)
+    x, log_prob = model.batch_forward(100, 10)
+    log_prob_ = model.batch_log_prob(x, 10)
+    samples = model.batch_sample((100,), 10)
     model.check_forward_backward_consistency()
     model.check_normalisation_constant(n=int(5e6))
     plot_distribution(model,)

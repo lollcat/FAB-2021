@@ -44,7 +44,7 @@ class DoubleWellEnergy(Energy, nn.Module):
         return torch.squeeze(-self.energy(x))
 
 if __name__ == '__main__':
-    from Utils import plot_distribution
+    from Utils.plotting_utils import plot_distribution
     import matplotlib.pyplot as plt
     target = DoubleWellEnergy(2, a=-0.5, b=-6)
     dist = plot_distribution(target, bounds=[[-3, 3], [-3, 3]], n_points=100)

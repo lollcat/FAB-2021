@@ -1,13 +1,11 @@
 import torch
 import matplotlib.pyplot as plt
-from FittedModels.utils import plot_distributions
+
 torch.manual_seed(5)
 from ImportanceSampling.VanillaImportanceSampler import VanillaImportanceSampling
 from TargetDistributions.BayesianNN import PosteriorBNN
 from FittedModels.Models.FlowModel import FlowModel
-from FittedModels.utils import plot_distributions
 from FittedModels.train import LearntDistributionManager
-from Utils import plot_func2D, MC_estimate_true_expectation
 from FittedModels.utils import plot_history
 
 def expectation_function(x):

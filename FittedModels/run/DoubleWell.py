@@ -1,25 +1,15 @@
 from TargetDistributions.DoubleWell import DoubleWellEnergy
 
-from Utils import plot_distribution
 import torch
-import numpy as np
-import matplotlib.pyplot as plt
-import matplotlib as mpl
-from FittedModels.utils import plot_distributions, plot_samples, plot_sampling_info, plot_divergences
+
 torch.manual_seed(5)
 from ImportanceSampling.VanillaImportanceSampler import VanillaImportanceSampling
-from TargetDistributions.MoG import MoG
-from TargetDistributions.Guassian_FullCov import Guassian_FullCov
-from FittedModels.Models.DiagonalGaussian import DiagonalGaussian
 from FittedModels.utils import plot_distributions
 from FittedModels.train import LearntDistributionManager
-from Utils import plot_func2D, MC_estimate_true_expectation, plot_distribution, expectation_function
+from Utils.plotting_utils import plot_distribution, expectation_function
 from FittedModels.Models.FlowModel import FlowModel
-from FittedModels.Experimental_methods.train_AIS import AIS_trainer
 from FittedModels.utils import plot_history
 import matplotlib.pyplot as plt
-from TargetDistributions.MoG import MoG
-from TargetDistributions.MoG import custom_MoG
 
 if __name__ == '__main__':
     target = DoubleWellEnergy(2, a=-0.5, b=-6)

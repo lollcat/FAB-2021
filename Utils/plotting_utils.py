@@ -11,11 +11,6 @@ def plot_samples_single_dist(distribution, n_samples = 1000):
     axs.set_title("q(x) samples")
 
 
-def expectation_function(x):
-    # just an example expectation function
-    A = torch.ones((x.shape[-1], x.shape[-1])).to(x.device)
-    return torch.einsum("bi,ij,bj->b", x, A, x)
-
 def plot_3D(x, z, n, ax, title=None):
     x = x.numpy()
     z = z.numpy()
@@ -66,11 +61,7 @@ def plot_func2D(function, range=10, n_points=100):
     plot_3D(x_points, f_x, n_points, ax, title="f(x)")
     return fig
 
-def MC_estimate_true_expectation(distribution, expectation_function, n_samples):
-    # requires the distribution to be able to be sampled from
-    x_samples = distribution.sample((n_samples,))
-    f_x = expectation_function(x_samples)
-    return torch.mean(f_x)
+
 
 
 if __name__ == '__main__':

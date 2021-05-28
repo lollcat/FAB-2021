@@ -2,6 +2,7 @@ import torch
 import torch.nn.functional as F
 from ImportanceSampling.base import BaseImportanceSampler
 from FittedModels.Models.base import BaseLearntDistribution
+from collections.abc import Callable
 
 class VanillaImportanceSampling(BaseImportanceSampler):
     def __init__(self, sampling_distribution, target_distribution):
@@ -12,7 +13,7 @@ class VanillaImportanceSampling(BaseImportanceSampler):
         self.target_distribution = target_distribution
 
     @torch.no_grad()
-    def calculate_expectation(self, n_samples:int=1000, expectation_function=lambda x: torch.sum(x, dim=-1))\
+    def calculate_expectation(self, n_samples: int, expectation_function)\
             -> (torch.tensor, dict):
         x_samples, normalised_sampling_weights = self.generate_samples_and_weights(n_samples=n_samples)
         expectation_func_x = expectation_function(x_samples)
@@ -26,10 +27,6 @@ class VanillaImportanceSampling(BaseImportanceSampler):
     def generate_samples_and_weights(self, n_samples:int=1000):
         x_samples, log_q_x = self.sampling_distribution(n_samples)
         log_p_x = self.target_distribution.log_prob(x_samples)
-        if True in torch.isnan(log_p_x) or True in torch.isinf(log_p_x):
-            print("Nan encountered in importance weights")
-            log_p_x[torch.isnan(log_p_x)] = -1e6
-            log_p_x[torch.isinf(log_p_x)] = -1e6
         normalised_sampling_weights = F.softmax(log_p_x - log_q_x, dim=-1)
         return x_samples, normalised_sampling_weights
 
@@ -41,7 +38,7 @@ if __name__ == '__main__':
     target_dist = Guassian_FullCov(size)
     sampling_dist = DiagonalGaussian(size)
     importance_sampler = VanillaImportanceSampling(sampling_dist, target_dist)
-    expectation, info = importance_sampler.calculate_expectation(n_samples)
+    expectation, info = importance_sampler.calculate_expectation(n_samples, expectation_function=lambda x: torch.sum(x))
     true_expectation = torch.sum(target_dist.mean)
     print(f"calculated expectation is {expectation} \n true expectation is {true_expectation}")
 

@@ -5,7 +5,7 @@ from ImportanceSampling.VanillaImportanceSampler import VanillaImportanceSamplin
 from TargetDistributions.MoG import MoG
 from FittedModels.utils import plot_distributions
 from FittedModels.train import LearntDistributionManager
-from Utils import plot_func2D
+from Utils.plotting_utils import plot_func2D
 from FittedModels.Models.FlowModel import FlowModel
 from FittedModels.utils import plot_history
 import matplotlib.pyplot as plt

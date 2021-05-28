@@ -10,6 +10,7 @@ if Notebook:
 else:
     from tqdm import tqdm
 
+
 class LearntDistributionManager:
     def __init__(self, target_distribution, fitted_model, importance_sampler,
                  loss_type="kl", alpha=2, lr=1e-3, k=None, use_GPU=True):
@@ -36,7 +37,7 @@ class LearntDistributionManager:
             self.alpha = 1
             self.k = k  # number of samples that going inside the log sum, if none then put all of them inside
 
-        elif loss_type == "alpha_MC": # this does terribly
+        elif loss_type == "alpha_MC":  # this does terribly
             self.loss = self.alpha_MC_loss
             self.alpha = alpha  # alpha for alpha-divergence
             self.alpha_one_minus_alpha_sign = torch.sign(torch.tensor(self.alpha * (1 - self.alpha)))
@@ -47,7 +48,19 @@ class LearntDistributionManager:
         self.fixed_learnt_sampling_dist.to(self.device)
 
     def train(self, epochs=100, batch_size=256, extra_info=True,
-              clip_grad=False, max_grad_norm=2, break_on_inf=True):
+              clip_grad=False, max_grad_norm=2,
+              KPI_batch_size=int(1e4), inner_batch_size=int(1e5)):
+        """
+        :param epochs:
+        :param batch_size:
+        :param extra_info: print MC estimates of divergences, and importance sampling info
+        :param clip_grad: max norm gradient clipping
+        :param max_grad_norm: for gradient clipping
+        :param KPI_batch_size:  n_samples used for MC estimates of divergences and importance sampling info
+        :param inner_batch_size: batch size for each forward pass of the model
+        :return: dictionary of training history
+        """
+
         if (self.loss_type == "DReG" or self.loss_type == "DReG_kl") and self.k is None:
             self.k = batch_size
         epoch_per_print = max(int(epochs / 20), 1)
@@ -65,16 +78,12 @@ class LearntDistributionManager:
             if hasattr(self.target_dist, "sample"):
                 history.update({"alpha_2_divergence_over_p": []})
 
-        pbar = tqdm(range(epochs))
+        pbar = tqdm(range(epochs), position=0, leave=True)
         for epoch in pbar:
             self.optimizer.zero_grad()
             x_samples, log_q_x = self.learnt_sampling_dist(batch_size)
             log_p_x = self.target_dist.log_prob(x_samples)
             loss = self.loss(x_samples, log_q_x, log_p_x)
-            if break_on_inf is False and torch.isinf(loss):
-                print("continuing run after getting infinity loss")
-                loss = torch.clip(loss, -1e16, 1e16)
-            self.check_infs_and_NaNs(epoch, log_p_x, log_q_x, loss, history)
             loss.backward()
             if clip_grad is True:
                 grad_norm = torch.nn.utils.clip_grad_norm_(self.learnt_sampling_dist.parameters(), max_grad_norm)
@@ -87,13 +96,13 @@ class LearntDistributionManager:
                 pbar.set_description(f"loss: {history['loss'][-1]}, mean log p_x {torch.mean(log_p_x)}")
             if epoch % epoch_per_save == 0 or epoch == epochs:
                 history["kl"].append(self.kl_MC_estimate())
-                history["alpha_2_divergence"].append(self.alpha_divergence_MC_estimate())
+                history["alpha_2_divergence"].append(self.alpha_divergence_MC_estimate(KPI_batch_size))
                 if hasattr(self.target_dist, "sample"):  # check if sample func exists
                     try:
-                        history["alpha_2_divergence_over_p"].append(self.alpha_divergence_over_p_MC_estimate())
+                        history["alpha_2_divergence_over_p"].append(self.alpha_divergence_over_p_MC_estimate(KPI_batch_size))
                     except:
                         print("Couldn't calculate alpha divergence over p")
-                importance_weights_var, normalised_importance_weights_var, ESS = self.importance_weights_key_info()
+                importance_weights_var, normalised_importance_weights_var, ESS = self.importance_weights_key_info(KPI_batch_size)
                 history["importance_weights_var"].append(importance_weights_var)
                 history["normalised_importance_weights_var"].append(normalised_importance_weights_var)
                 history["effective_sample_size"].append(ESS)
@@ -103,20 +112,6 @@ class LearntDistributionManager:
         kl = log_q_x - log_p_x
         kl_loss = torch.mean(kl)
         return kl_loss
-
-    def dreg_kl_loss(self, x_samples, log_q_x_not_used, log_p_x):
-        self.update_fixed_version_of_learnt_distribution()
-        log_q_x = self.fixed_learnt_sampling_dist.log_prob(x_samples)
-        log_w = log_p_x - log_q_x
-        outside_dim = log_q_x.shape[0]/self.k  # this is like a batch dimension that we average DReG estimation over
-        assert outside_dim % 1 == 0  # always make k & n_samples work together nicely for averaging
-        outside_dim = int(outside_dim)
-        log_w = log_w.reshape((outside_dim, self.k))
-        with torch.no_grad():
-            w_normalised_squared = F.softmax(log_w, dim=-1)**2
-        DreG_for_each_batch_dim = - torch.sum(w_normalised_squared * log_w, dim=-1)
-        dreg_loss = torch.mean(DreG_for_each_batch_dim)
-        return dreg_loss
 
     def dreg_alpha_divergence_loss(self, x_samples, log_q_x_not_used, log_p_x):
         self.update_fixed_version_of_learnt_distribution()
@@ -131,6 +126,20 @@ class LearntDistributionManager:
         DreG_for_each_batch_dim = - self.alpha_one_minus_alpha_sign * \
                     torch.sum(((1 - self.alpha) * w_alpha_normalised_alpha + self.alpha * w_alpha_normalised_alpha**2)
                               * log_w, dim=-1)
+        dreg_loss = torch.mean(DreG_for_each_batch_dim)
+        return dreg_loss
+
+    def dreg_kl_loss(self, x_samples, log_q_x_not_used, log_p_x):
+        self.update_fixed_version_of_learnt_distribution()
+        log_q_x = self.fixed_learnt_sampling_dist.log_prob(x_samples)
+        log_w = log_p_x - log_q_x
+        outside_dim = log_q_x.shape[0]/self.k  # this is like a batch dimension that we average DReG estimation over
+        assert outside_dim % 1 == 0  # always make k & n_samples work together nicely for averaging
+        outside_dim = int(outside_dim)
+        log_w = log_w.reshape((outside_dim, self.k))
+        with torch.no_grad():
+            w_normalised_squared = F.softmax(log_w, dim=-1)**2
+        DreG_for_each_batch_dim = - torch.sum(w_normalised_squared * log_w, dim=-1)
         dreg_loss = torch.mean(DreG_for_each_batch_dim)
         return dreg_loss
 
@@ -159,8 +168,6 @@ class LearntDistributionManager:
 
     def alpha_MC_loss(self, x_samples_not_used, log_q_x, log_p_x):
         alpha_div = -self.alpha_one_minus_alpha_sign*self.alpha*(log_p_x - log_q_x)
-        alpha_div = alpha_div.clamp(-1e16, 1e16)
-        alpha_div = torch.masked_select(alpha_div, ~torch.isinf(alpha_div) & ~torch.isnan(alpha_div))
         MC_loss = torch.mean(alpha_div)
         return MC_loss
 
@@ -168,7 +175,6 @@ class LearntDistributionManager:
         x_samples, log_q_x = self.learnt_sampling_dist(batch_size)
         log_p_x = self.target_dist.log_prob(x_samples)
         kl = log_q_x - log_p_x
-        kl = torch.masked_select(kl, ~torch.isinf(kl) & ~torch.isnan(kl))
         kl_loss = torch.mean(kl)
         return kl_loss.item()
 
@@ -192,19 +198,6 @@ class LearntDistributionManager:
                                (torch.logsumexp((alpha - 1) * (log_p_x - log_q_x), dim=-1) - torch.log(N))
         return log_alpha_divergence.item()
 
-    def check_infs_and_NaNs(self, epoch, log_p_x, log_q_x, loss, history):
-        if True in torch.isnan(log_p_x) or True in torch.isinf(log_p_x):
-            print("NaN/-inf loss encountered in log_p_x")
-        if True in torch.isnan(log_q_x) or True in torch.isinf(log_q_x):
-            print("NaN/-inf loss encountered in log_q_x")
-        if torch.isnan(loss) or torch.isinf(loss):
-            from FittedModels.utils import plot_history
-            import matplotlib.pyplot as plt
-            plot_history(history)
-            plt.show()
-            raise Exception(f"NaN loss encountered on epoch {epoch}")
-
-
     def update_fixed_version_of_learnt_distribution(self):
         self.fixed_learnt_sampling_dist.load_state_dict(self.learnt_sampling_dist.state_dict())
 
@@ -216,14 +209,6 @@ class LearntDistributionManager:
 
     def effective_sample_size(self, normalised_sampling_weights):
         return self.importance_sampler.effective_sample_size(normalised_sampling_weights)
-
-    def debugging_check_dreg(self, x_samples):
-        # checks that we have some gradient!
-        self.update_fixed_version_of_learnt_distribution()
-        log_q_x = self.fixed_learnt_sampling_dist.log_prob(x_samples)
-        reparam_equiv = torch.autograd.grad(log_q_x[0], x_samples,
-                                            retain_graph=True)
-        pass
 
 
     def debugging_check_jacobians(self, loss, log_q_x, log_p_x, x_samples):
@@ -243,45 +228,6 @@ class LearntDistributionManager:
         reparam_equiv = torch.autograd.grad(log_p_x[0], x_samples[:, 0],
                                                       retain_graph=True)
         return
-
-    def debugging(self, epochs=100, batch_size=256):
-        # https://github.com/pytorch/pytorch/issues/15131
-        #torch.manual_seed(1)
-        history = {"loss": [],
-                   "log_p_x": [],
-                   "log_q_x": []}
-        pbar = tqdm(range(epochs))
-        #torch.autograd.set_detect_anomaly(True)
-        for epoch in pbar:
-            self.optimizer.zero_grad()
-            x_samples, log_q_x = self.learnt_sampling_dist(batch_size)
-            log_p_x = self.target_dist.log_prob(x_samples)
-            loss = self.loss(log_q_x, log_p_x)
-
-            #x_samples.register_hook(lambda grad: print("\n\nmin max grad x_samples", grad.min(), grad.max()))
-            #log_p_x.register_hook(lambda grad: print("\n\nmin max grad log_p_x", grad.min(), grad.max()))
-            #log_q_x.register_hook(lambda grad: print("\n\nmin max grad log_q_x", grad.min(), grad.max()))
-            #self.learnt_sampling_dist.flow_blocks[
-            #    0].AutoregressiveNN.FirstLayer.latent_to_layer.weight.register_hook(
-            #    lambda grad: print("\n\nmax, min grad x_samples", grad.max(), grad.min()))
-            #log_q_x.register_hook(lambda grad: print("\n\ngrad log_q_x", grad))
-
-            #self.debugging_check_jacobians(loss, log_q_x, log_p_x, x_samples)
-            if True in torch.isnan(log_p_x) or True in torch.isinf(log_p_x):
-                print("NaN/-inf loss encountered in log_p_x")
-            if True in torch.isnan(log_q_x) or True in torch.isinf(log_q_x):
-                print("NaN/-inf loss encountered in log_q_x")
-            if torch.isnan(loss) or torch.isinf(loss):
-                from FittedModels.utils import plot_history
-                import matplotlib.pyplot as plt
-                plot_history(history)
-                plt.show()
-                raise Exception(f"NaN loss encountered on epoch {epoch}")
-            loss.backward()
-            torch.nn.utils.clip_grad_value_(self.learnt_sampling_dist.parameters(), 10)
-            names, is_nan = check_gradients(self.learnt_sampling_dist.named_parameters())
-            self.optimizer.step()
-        return history
 
 
 if __name__ == '__main__':

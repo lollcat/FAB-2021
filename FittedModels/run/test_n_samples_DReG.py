@@ -1,13 +1,9 @@
 import torch
 import matplotlib.pyplot as plt
-from FittedModels.utils import plot_distributions
+
 torch.manual_seed(5)
 from ImportanceSampling.VanillaImportanceSampler import VanillaImportanceSampling
-from TargetDistributions.Guassian_FullCov import Guassian_FullCov
-from FittedModels.Models.DiagonalGaussian import DiagonalGaussian
-from FittedModels.utils import plot_distributions, plot_history
 from FittedModels.train import LearntDistributionManager
-from Utils import expectation_function
 from FittedModels.Models.FlowModel import FlowModel
 from TargetDistributions.MoG import MoG
 

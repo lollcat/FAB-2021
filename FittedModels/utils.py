@@ -1,10 +1,8 @@
 import torch
 import itertools
-from mpl_toolkits.mplot3d import axes3d
 import matplotlib.pyplot as plt
-import matplotlib as mpl
 from FittedModels.train import LearntDistributionManager
-from Utils import plot_3D
+from Utils.plotting_utils import plot_3D
 import pandas as pd
 import numpy as np
 
