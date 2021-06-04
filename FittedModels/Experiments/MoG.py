@@ -4,7 +4,9 @@ from FittedModels.utils import plot_samples
 torch.manual_seed(5)
 from ImportanceSampling.VanillaImportanceSampler import VanillaImportanceSampling
 from FittedModels.train import LearntDistributionManager
-from Utils.plotting_utils import MC_estimate_true_expectation, plot_distribution, expectation_function
+from Utils.plotting_utils import plot_distribution
+from Utils.numerical_utils import MC_estimate_true_expectation
+from Utils.numerical_utils import quadratic_function as expectation_function
 from FittedModels.Models.FlowModel import FlowModel
 import matplotlib.pyplot as plt
 from TargetDistributions.MoG import custom_MoG
@@ -21,11 +23,19 @@ if __name__ == '__main__':
 
     torch.manual_seed(0)
     learnt_sampler = FlowModel(x_dim=dim , n_flow_steps=3) #, flow_type="RealNVP")
+    # kl with annealing
+    tester = LearntDistributionManager(target, learnt_sampler, VanillaImportanceSampling, loss_type="kl",
+                                       annealing=True)
     # DReG_kl
-    tester = LearntDistributionManager(target, learnt_sampler, VanillaImportanceSampling, loss_type="kl", k=None)
+    #tester = LearntDistributionManager(target, learnt_sampler, VanillaImportanceSampling, loss_type="DReG", k=None)
     expectation_before, info_before = tester.estimate_expectation(n_samples_estimation, expectation_function)
     samples_before = plot_samples(tester, n_samples=int(1e4))
     plt.show()
-    history = tester.train(epochs, batch_size=int(1e3))
+    history = tester.train(epochs, batch_size=int(1e3), clip_grad_max=False) #True)
     samples_fig_after = plot_samples(tester)
     plt.show()
+
+    tester.setup_loss("DReG", alpha=2, k=None, new_lr=1e-4)
+    history2 = tester.train(epochs, batch_size=int(1e3), clip_grad_max=False)  # True)
+
+

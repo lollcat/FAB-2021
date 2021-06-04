@@ -2,8 +2,9 @@ import torch
 from TargetDistributions.base import BaseTargetDistribution
 import torch.nn as nn
 
-class Guassian_FullCov(torch.distributions.multivariate_normal.MultivariateNormal, BaseTargetDistribution, nn.Module):
+class Guassian_FullCov(BaseTargetDistribution, nn.Module):
     def __init__(self, dim=5, scale_covariance=1):
+        super(Guassian_FullCov, self).__init__()
         # scale_covariance just multiplies covariance by a constant, giving us the ability to make the distribution
         # more or less wide
         loc = torch.randn(size=(dim,))
@@ -14,7 +15,19 @@ class Guassian_FullCov(torch.distributions.multivariate_normal.MultivariateNorma
                       + dim * torch.maximum(torch.diag(torch.max(scale_tril, dim=1).values),
                                             torch.diag(torch.max(scale_tril, dim=0).values))
         scale_tril *= scale_covariance
-        super(Guassian_FullCov, self).__init__(loc, scale_tril)
+        scale_tril = torch.tril(scale_tril)
+        self.register_buffer("scale_tril", scale_tril)
+        self.register_buffer("loc", loc)
+
+    @property
+    def get_distribution(self):
+        return torch.distributions.multivariate_normal.MultivariateNormal(self.loc, scale_tril=self.scale_tril)
+
+    def log_prob(self, x):
+        return self.get_distribution.log_prob(x)
+
+    def sample(self, shape=(1,)):
+        return self.get_distribution.sample(shape)
 
 
 if __name__ == '__main__':

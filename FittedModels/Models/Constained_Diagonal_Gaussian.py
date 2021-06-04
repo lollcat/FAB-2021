@@ -9,8 +9,8 @@ class DiagonalGaussian(nn.Module, BaseLearntDistribution):
     def __init__(self, dim=5, pre_sigmoid_std_initial_scaling=-1, std_min=-1, std_max=10):
         super(DiagonalGaussian, self).__init__()
         self.means = torch.nn.Parameter(torch.zeros(dim))
-        self.std_min = std_min
-        self.std_max = std_max
+        self.register_buffer("std_min", std_min)
+        self.register_buffer("std_max", std_max)
         self.pre_sigmoid_std = torch.nn.Parameter(torch.ones(dim) * pre_sigmoid_std_initial_scaling)
 
     def forward(self, batch_size=1):

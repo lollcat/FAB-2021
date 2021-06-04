@@ -25,7 +25,7 @@ if __name__ == '__main__':
     expectation_before, info_before = tester.estimate_expectation(n_samples_estimation, expectation_function)
     samples_fig_before = plot_samples(tester)
     plt.show()
-    history = tester.train(epoch, batch_size=batch_size, clip_grad=True, max_grad_norm=1)
+    history = tester.train(epoch, batch_size=batch_size, clip_grad_norm=True, max_grad_norm=1)
     expectation, info = tester.estimate_expectation(n_samples_estimation, expectation_function)
     samples_fig_after = plot_samples(tester)
     plt.show()

@@ -36,6 +36,8 @@ if __name__ == "__main__":
     # do some checks to ensure autoregressive property
     z_test_tensor = torch.tensor([[1.5, 4.7, 5, 76]], requires_grad=True)
     autoNN = MADE_IAF(z_test_tensor.shape[1], z_test_tensor.shape[1] * 2)
+
+
     m, s = autoNN(z_test_tensor)
     gradient_w_r_t_first_element = torch.autograd.grad(m[:, 0], z_test_tensor, only_inputs=True, retain_graph=True)[0]\
         .detach().numpy()

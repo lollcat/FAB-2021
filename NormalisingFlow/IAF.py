@@ -62,11 +62,20 @@ if __name__ == '__main__':
     dim = 3
     z = torch.randn((10, dim))
     iaf = IAF(x_dim=3, reversed=True)
+    from copy import deepcopy
+    iaf_copy2 = deepcopy(iaf.AutoregressiveNN.FirstLayer)
+    iaf_copy1 = deepcopy(iaf.AutoregressiveNN)
+    iaf_copy = deepcopy(iaf)
+    print(2+2)
+    """
     x, log_determinant = iaf(z)
     print(x.shape, log_determinant.shape)
     z_backward, log_det_backward = iaf.forward(x)
     print(torch.sum(torch.abs(log_det_backward + log_determinant)))
     print(torch.sum(torch.abs(z_backward - z)))
+    """
+
+
 
 
 

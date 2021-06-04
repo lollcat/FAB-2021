@@ -31,7 +31,7 @@ if __name__ == '__main__':
     plt.show()
     fig_before_train = plot_distributions(tester, bounds=[[-20, 20], [-20, 20]])
     plt.show()
-    history = tester.train(epochs, batch_size=batch_size, clip_grad=True)
+    history = tester.train(epochs, batch_size=batch_size, clip_grad_norm=True)
     samples_after = plot_samples(tester)
     plt.show()
     plot_history(history)

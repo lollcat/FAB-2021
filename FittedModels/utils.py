@@ -7,30 +7,28 @@ import pandas as pd
 import numpy as np
 
 def plot_divergences(history):
-    plt.figure()
-    plt.plot(history["kl"])
-    plt.title("MC estimate of kl(q||p)")
-    plt.figure()
-    plt.plot(history["alpha_2_divergence"])
-    # plt.yscale("log")
-    plt.title("MC estimate of log alpha divergence (alpha=2)")
+    figure, axs = plt.subplots(3 if "alpha_2_divergence_over_p" in history.keys() else 2
+                               , 1, figsize=(6, 10))
+    axs[0].plot(history["kl"])
+    axs[0].set_title("MC estimate of kl(q||p)")
+    axs[1].plot(history["alpha_2_divergence"])
+    axs[1].set_title("MC estimate of log alpha divergence (alpha=2)")
     if "alpha_2_divergence_over_p" in history.keys():
-        plt.figure()
-        plt.plot(history["alpha_2_divergence_over_p"])
-        # plt.yscale("log")
-        plt.title("MC estimate of log alpha divergence (alpha=2) using p(x) to sample")
+        axs[2].plot(history["alpha_2_divergence_over_p"])
+        axs[2].set_title("MC estimate of log alpha divergence (alpha=2) using p(x) to sample")
+    plt.tight_layout()
 
 def plot_sampling_info(history):
-    plt.figure()
-    plt.plot(history["importance_weights_var"])
-    plt.yscale("log")
-    plt.title("unnormalised importance weights variance")
-    plt.figure()
-    plt.plot(history["normalised_importance_weights_var"])
-    plt.yscale("log")
-    plt.title("normalised importance weights variance")
+    figure, axs = plt.subplots(2, 1, figsize=(6, 10))
+    axs[0].plot(history["importance_weights_var"])
+    axs[0].set_yscale("log")
+    axs[0].set_title("unnormalised importance weights variance")
+    axs[1].plot(history["normalised_importance_weights_var"])
+    axs[1].set_yscale("log")
+    axs[1].set_title("normalised importance weights variance")
+    plt.tight_layout()
 
-def plot_history(history, bounds=None, running_chunk_n=30):
+def plot_history(history, bounds=None, running_chunk_n=15):
     figure, axs = plt.subplots(len(history), 1, figsize=(6, 10))
     for i, key in enumerate(history):
         data = pd.Series(history[key])
@@ -49,18 +47,22 @@ def plot_history(history, bounds=None, running_chunk_n=30):
         if key == "alpha_divergence":
             axs[i].set_yscale("log")
     plt.tight_layout()
-    return figure, axs
+
 
 def plot_samples(learnt_dist_manager: LearntDistributionManager, n_samples = 1000):
     samples_q = learnt_dist_manager.learnt_sampling_dist.sample((n_samples,))
-    samples_q = torch.clamp(samples_q , -100, 100).detach().cpu()
+    samples_q = torch.clamp(samples_q, -100, 100).detach().cpu()
     samples_p = learnt_dist_manager.target_dist.sample((n_samples, )).detach().cpu()
-    fig, axs = plt.subplots(1, 2, sharex="all", sharey="all")
-    axs[0].scatter(samples_q[:, 0], samples_q[:, 1])
-    axs[0].set_title("q(x) samples")
-    axs[1].scatter(samples_p[:, 0], samples_p[:, 1])
-    axs[1].set_title("p(x) samples")
-    return fig
+    rows = int(learnt_dist_manager.learnt_sampling_dist.dim / 2)
+    fig, axs = plt.subplots(rows, 2, sharex="all", sharey="all", figsize=(7, 3*rows))
+    for row in range(rows):
+        if len(axs.shape) == 1: # need another axis for slicing
+            axs = axs[np.newaxis, :]
+        axs[row, 0].scatter(samples_q[:, row], samples_q[:, row+1])
+        axs[row, 0].set_title(f"q(x) samples dim {row*2}-{row*2+1}")
+        axs[row, 1].scatter(samples_p[:, row], samples_p[:, row+1])
+        axs[row, 1].set_title(f"p(x) samples dim {row*2}-{row*2+1}")
+    plt.tight_layout()
 
 
 def plot_distributions(learnt_dist_manager: LearntDistributionManager, bounds=([-10, 10], [-10, 10]), n_points=100,
@@ -69,7 +71,7 @@ def plot_distributions(learnt_dist_manager: LearntDistributionManager, bounds=([
     if grid is True:
         x_points_dim1 = torch.linspace(bounds[0][0], bounds[0][1], n_points)
         x_points_dim2 = torch.linspace(bounds[1][0], bounds[1][1], n_points)
-        x_points_q = torch.tensor(list(itertools.product(x_points_dim1, x_points_dim2)))
+        x_points_q = torch.tensor(list(itertools.product(x_points_dim1, x_points_dim2))).to(learnt_dist_manager.device)
         x_points_p = x_points_q
         with torch.no_grad():
             log_q_x = learnt_dist_manager.learnt_sampling_dist.log_prob(x_points_q)
@@ -94,12 +96,17 @@ def plot_distributions(learnt_dist_manager: LearntDistributionManager, bounds=([
     if True in torch.isinf(q_x) or True in torch.isnan(q_x):
         print("Nan or inf encountered in q(x)")
         p_x[torch.isinf(q_x) & torch.isnan(q_x)] = 0    # prevent NaN from breaking plot
+
+    x_points_q = x_points_q.cpu()
+    x_points_p = x_points_p.cpu()
+    q_x = q_x.cpu()
+    p_x = p_x.cpu()
+
     fig = plt.figure(figsize=plt.figaspect(0.5))
     ax = fig.add_subplot(1, 2, 1, projection='3d')
     plot_3D(x_points_q, q_x, n_points, ax, title="q(x)")
     ax = fig.add_subplot(1, 2, 2, projection='3d')
     plot_3D(x_points_p, p_x, n_points, ax, title="p(x)")
-    return fig
 
 
 if __name__ == '__main__':

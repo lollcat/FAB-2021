@@ -10,10 +10,12 @@ class FlowModel(nn.Module, BaseLearntDistribution):
     we could add methods for p(z) if this comes into play
     """
     def __init__(self, x_dim, flow_type="IAF", n_flow_steps=3, scaling_factor=1.0, *flow_args, **flow_kwargs):
-        self.class_definition = (x_dim, flow_type, n_flow_steps, scaling_factor, *flow_args, *flow_kwargs)
-        self.dim = x_dim
         super(FlowModel, self).__init__()
-        self.register_buffer("scaling_factor", torch.tensor([scaling_factor]))
+        self.class_args = (x_dim, flow_type, n_flow_steps, scaling_factor, *flow_args)
+        self.class_kwargs = flow_kwargs
+        self.dim = x_dim
+        #self.register_buffer("scaling_factor", torch.tensor([scaling_factor]))
+        self.scaling_factor = nn.Parameter(torch.tensor([scaling_factor]))
         self.register_buffer("prior_mean", torch.zeros(x_dim))
         self.register_buffer("prior_covariance", torch.eye(x_dim))
 

@@ -17,15 +17,17 @@ class AIS_trainer(LearntDistributionManager):
     """
     def __init__(self, target_distribution, fitted_model,
                  n_distributions=10, n_updates_Metropolis=5, save_for_visualisation=False, save_spacing=20,
-                 loss_type="kl", alpha=2):
+                 loss_type="kl", noise_scaling=1.0, alpha=2, *args, **kwargs):
+        assert loss_type == "kl" # haven't got alternatives to this working
         self.AIS_train = AnnealedImportanceSampler(fitted_model, target_distribution,
                  n_distributions=n_distributions, n_updates_Metropolis=n_updates_Metropolis,
-                                        save_for_visualisation=save_for_visualisation, save_spacing=save_spacing)
+                                        save_for_visualisation=save_for_visualisation, save_spacing=save_spacing,
+                                                   noise_scaling=noise_scaling)
 
         # we could feed a different importance sampler for post training expectation estimation
         # TODO rewrite without using inheritence
         super(AIS_trainer, self).__init__(target_distribution, fitted_model, self.AIS_train,
-                 loss_type, alpha)
+                 loss_type, alpha, *args, **kwargs)
 
 
     def train(self, epochs=100, batch_size=1000):
@@ -40,7 +42,7 @@ class AIS_trainer(LearntDistributionManager):
             loss = self.loss(log_w)
             if torch.isnan(loss):
                 raise Exception("NaN loss encountered")
-            loss.z_to_x()
+            loss.backward()
             self.optimizer.step()
             # save info
             log_p_x = self.target_dist.log_prob(x_samples)
@@ -55,14 +57,65 @@ class AIS_trainer(LearntDistributionManager):
         kl = -log_w
         return torch.mean(kl)
 
-    def dreg_alpha_divergence_loss(self, log_w):
-        with torch.no_grad():
-            w_alpha_normalised_alpha = F.softmax(self.alpha*log_w, dim=-1)
-        #w_alpha_normalised_alpha[minus_inf_log_p_x_indicies] = 0  # do this to prevent nan
-        #log_w[minus_inf_log_p_x_indicies] = 0  # do this to prevent nan
-        return torch.sum(((1 + self.alpha) * w_alpha_normalised_alpha + self.alpha * w_alpha_normalised_alpha**2) * log_w)
 
 if __name__ == '__main__':
+    from FittedModels.Models.FlowModel import FlowModel
+    from FittedModels.utils import plot_history
+    import matplotlib.pyplot as plt
+    import torch
+    from TargetDistributions.MoG import MoG
+    from Utils.plotting_utils import plot_func2D, plot_distribution
+    from Utils.numerical_utils import MC_estimate_true_expectation
+    from Utils.numerical_utils import quadratic_function as expectation_function
+    from FittedModels.utils import plot_distributions, plot_samples
+
+    torch.manual_seed(2)
+    epochs = 1000
+    dim = 2
+    n_samples_estimation = int(1e4)
+    target = MoG(dim=dim, n_mixes=2, min_cov=1, loc_scaling=3)
+    true_expectation = MC_estimate_true_expectation(target, expectation_function, int(1e5))
+    fig = plot_distribution(target, bounds=[[-30, 20], [-20, 20]])
+    plt.show()
+    learnt_sampler = FlowModel(x_dim=dim, scaling_factor=3.0)  # , flow_type="RealNVP")
+    tester = AIS_trainer(target, learnt_sampler, n_distributions=3, n_updates_Metropolis=5,
+                         lr=1e-2, noise_scaling=2.0)
+    plot_samples(tester)
+    plt.show()
+    with torch.no_grad():
+        expectation, info_dict = tester.AIS_train.calculate_expectation(1000,
+                                                                        expectation_function=expectation_function)
+    print(f"true expectation is {true_expectation}, estimated expectation is {expectation}")
+    print(
+        f"ESS is {info_dict['effective_sample_size'] / 100}, "
+        f"var is {torch.var(info_dict['normalised_sampling_weights'])}")
+
+    plt.figure()
+    learnt_dist_samples = learnt_sampler.sample((1000,)).cpu().detach()
+    plt.scatter(learnt_dist_samples[:, 0], learnt_dist_samples[:, 1])
+    plt.title("approximating distribution samples")
+    plt.show()
+    plt.figure()
+    plt.scatter(info_dict["samples"][:, 0].cpu(), info_dict["samples"][:, 1].cpu())
+    plt.title("annealed samples")
+    plt.show()
+    plt.figure()
+    true_samples = target.sample((1000,)).cpu().detach()
+    plt.scatter(true_samples[:, 0], true_samples[:, 1])
+    plt.title("true samples")
+    plt.show()
+
+    history = tester.train(epochs, batch_size=100)
+    plot_history(history)
+    plt.show()
+    plot_samples(tester)
+    plt.show()
+
+
+
+
+
+    """
     from TargetDistributions.BayesianNN import PosteriorBNN
     from FittedModels.Models.FlowModel import FlowModel
     from FittedModels.utils import plot_history
@@ -76,6 +129,6 @@ if __name__ == '__main__':
     history = tester.train(epochs, batch_size=200)
     plot_history(history)
     plt.show()
-
+    """
 
 

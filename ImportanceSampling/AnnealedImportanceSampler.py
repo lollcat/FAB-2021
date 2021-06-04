@@ -14,7 +14,8 @@ class AnnealedImportanceSampler(BaseImportanceSampler):
     """
     def __init__(self, sampling_distribution, target_distribution,
                  n_distributions=200, n_updates_Metropolis=10, save_for_visualisation=True, save_spacing=20,
-                 distribution_spacing="geometric"):
+                 distribution_spacing="geometric", noise_scaling=1.0):
+        self.noise_scaling = noise_scaling
         self.sampling_distribution = sampling_distribution
         self.target_distribution = target_distribution
         self.n_distributions = n_distributions
@@ -36,9 +37,12 @@ class AnnealedImportanceSampler(BaseImportanceSampler):
             self.log_w_history = []
             self.samples_history = []
 
+    @property
+    def device(self):
+        return next(self.sampling_distribution.parameters()).device
 
     def run(self, n_runs):
-        log_w = torch.zeros(n_runs)  # log importance weight
+        log_w = torch.zeros(n_runs).to(self.device)  # log importance weight
         x_new, log_prob_p0 = self.sampling_distribution(n_runs)
         log_w += self.intermediate_unnormalised_log_prob(x_new, 1) - log_prob_p0
         for j in range(1, self.n_distributions-1):
@@ -54,12 +58,12 @@ class AnnealedImportanceSampler(BaseImportanceSampler):
 
     def Metropolis_transition(self, x, j):
         for n in range(self.n_updates_Metropolis):
-            x_proposed = x + torch.randn(x.shape)
+            x_proposed = x + torch.randn(x.shape).to(x.device) * self.noise_scaling
             x_proposed_log_prob = self.intermediate_unnormalised_log_prob(x_proposed, j)
             x_prev_log_prob = self.intermediate_unnormalised_log_prob(x, j)
             acceptance_probability = torch.exp(x_proposed_log_prob - x_prev_log_prob)
             # not that sometimes this will be greater than one, corresonding to 100% probability of acceptance
-            accept = (acceptance_probability > torch.rand(acceptance_probability.shape)).int()
+            accept = (acceptance_probability > torch.rand(acceptance_probability.shape).to(x.device)).int()
             accept = accept[:, None].repeat(1, x.shape[-1])
             x = accept*x_proposed + (1-accept)*x
         return x
