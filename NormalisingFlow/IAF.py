@@ -5,14 +5,14 @@ from NormalisingFlow.base import BaseFlow
 
 
 
-class IAF(nn.Module, BaseFlow):
-    def __init__(self, x_dim, nodes_per_x=10, n_hidden_layers=2, reversed=True, use_exp=False):
+class IAF(BaseFlow):
+    def __init__(self, x_dim, nodes_per_x=3, n_hidden_layers=1, reversed=True, use_exp=True, init_zeros=True):
         super(IAF, self).__init__()
         self.use_exp = use_exp
         self.x_dim = x_dim
         hidden_layer_width = nodes_per_x*x_dim  # this lets us enter the layer width default argument dependent on x_dim
         self.AutoregressiveNN = MADE_IAF(x_dim=x_dim, hidden_layer_width=hidden_layer_width,
-                                         n_hidden_layers=n_hidden_layers)
+                                         n_hidden_layers=n_hidden_layers, init_zeros=init_zeros)
         self.reversed = reversed
 
     def inverse(self, x):

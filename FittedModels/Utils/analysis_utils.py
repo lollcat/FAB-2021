@@ -1,5 +1,3 @@
-import torch
-import numpy as np
 from tqdm import tqdm
 
 def estimate_key_info(tester, max_n_samples=1e6, min_n_samples=10, n_runs_max=10):
@@ -31,15 +29,11 @@ def estimate_key_info(tester, max_n_samples=1e6, min_n_samples=10, n_runs_max=10
 
 if __name__ == '__main__':
     import torch
-    import matplotlib.pyplot as plt
-    import matplotlib as mpl
-    from FittedModels.utils import plot_distributions, plot_samples, plot_sampling_info, plot_divergences
+    from FittedModels.Utils.plotting_utils import plot_samples
 
     torch.manual_seed(5)
     from ImportanceSampling.VanillaImportanceSampler import VanillaImportanceSampling
     from FittedModels.train import LearntDistributionManager
-    from Utils.numerical_utils import MC_estimate_true_expectation
-    from Utils.numerical_utils import quadratic_function as expectation_function
     from FittedModels.Models.FlowModel import FlowModel
     from TargetDistributions.MoG import MoG
 
@@ -57,7 +51,16 @@ if __name__ == '__main__':
 
     alpha_2_grads_1_list, alpha_2_grads_2_list, kl_DReG_grads_1_list, \
     kl_DReG_grads_2_list, kl_grads_1_list, kl_grads_2_list, n_points_space  = \
-        estimate_key_info(tester, max_n_samples=1e3, min_n_samples=100, n_runs_max=3)
+        estimate_key_info(tester, max_n_samples=1e4, min_n_samples=100, n_runs_max=4)
     print(alpha_2_grads_1_list[0].shape)
     print(kl_grads_2_list[0].shape)
     print(kl_DReG_grads_1_list[0].shape)
+
+    # maximums
+    print([np.max(item) for item in alpha_2_grads_2_list])
+    print([np.max(item) for item in alpha_2_grads_1_list])
+    print([np.max(item) for item in kl_DReG_grads_1_list])
+    print([np.max(item) for item in kl_DReG_grads_2_list])
+    print([np.max(item) for item in kl_grads_1_list])
+    print([np.max(item) for item in kl_grads_2_list])
+

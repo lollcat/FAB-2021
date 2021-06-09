@@ -3,10 +3,13 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 class MiddleLayer(nn.Module):
-    def __init__(self, latent_dim, layer_width):
+    def __init__(self, latent_dim, layer_width, weight_norm=False):
         super(MiddleLayer, self).__init__()
-        self.layer_to_layer = torch.nn.utils.weight_norm(
-            MiddleLayerMask(latent_dim=latent_dim, layer_width=layer_width))
+        if weight_norm:
+            self.layer_to_layer = torch.nn.utils.weight_norm(
+                MiddleLayerMask(latent_dim=latent_dim, layer_width=layer_width))
+        else:
+            self.layer_to_layer = MiddleLayerMask(latent_dim=latent_dim, layer_width=layer_width)
 
     def forward(self, x):
         return self.layer_to_layer(x)

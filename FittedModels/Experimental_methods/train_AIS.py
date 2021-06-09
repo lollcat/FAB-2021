@@ -1,6 +1,3 @@
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
 Notebook = False
 if Notebook:
     from tqdm import tqdm_notebook as tqdm
@@ -60,14 +57,14 @@ class AIS_trainer(LearntDistributionManager):
 
 if __name__ == '__main__':
     from FittedModels.Models.FlowModel import FlowModel
-    from FittedModels.utils import plot_history
+    from FittedModels.Utils.plotting_utils import plot_history
     import matplotlib.pyplot as plt
     import torch
     from TargetDistributions.MoG import MoG
-    from Utils.plotting_utils import plot_func2D, plot_distribution
+    from Utils.plotting_utils import plot_distribution
     from Utils.numerical_utils import MC_estimate_true_expectation
     from Utils.numerical_utils import quadratic_function as expectation_function
-    from FittedModels.utils import plot_distributions, plot_samples
+    from FittedModels.Utils.plotting_utils import plot_samples
 
     torch.manual_seed(2)
     epochs = 1000

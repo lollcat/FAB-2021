@@ -3,22 +3,29 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 class FinalLayer(nn.Module):
-    def __init__(self, latent_dim, layer_width):
+    def __init__(self, latent_dim, layer_width, weight_norm=False, init_zeros=True):
         super(FinalLayer, self).__init__()
-        self.layer_to_m = torch.nn.utils.weight_norm(
-            FinalLayerMask(latent_dim=latent_dim, layer_width=layer_width))
-        self.layer_to_s = torch.nn.utils.weight_norm(
-            FinalLayerMask(latent_dim=latent_dim, layer_width=layer_width))
+        if weight_norm:
+            self.layer_to_m = torch.nn.utils.weight_norm(
+                FinalLayerMask(latent_dim=latent_dim, layer_width=layer_width, init_zeros=init_zeros))
+            self.layer_to_s = torch.nn.utils.weight_norm(
+                FinalLayerMask(latent_dim=latent_dim, layer_width=layer_width, init_zeros=init_zeros))
+        else:
+            self.layer_to_m = FinalLayerMask(latent_dim=latent_dim, layer_width=layer_width, init_zeros=init_zeros)
+            self.layer_to_s = FinalLayerMask(latent_dim=latent_dim, layer_width=layer_width, init_zeros=init_zeros)
 
     def forward(self, x):
         return self.layer_to_m(x), self.layer_to_s(x)
 
 class FinalLayerMask(nn.Module):
-    def __init__(self, latent_dim, layer_width):
+    def __init__(self, latent_dim, layer_width, init_zeros):
         super(FinalLayerMask, self).__init__()
         weight = torch.Tensor(layer_width, latent_dim)
         self.weight = nn.Parameter(weight)
-        nn.init.kaiming_normal_(self.weight)
+        if init_zeros is False:
+            nn.init.kaiming_normal_(self.weight)
+        else:
+            nn.init.zeros_(self.weight)
 
         bias = torch.Tensor(latent_dim)
         self.bias = nn.Parameter(bias)

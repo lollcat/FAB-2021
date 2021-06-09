@@ -10,16 +10,21 @@ class MADE_IAF(nn.Module):
     """
     MADE network with at least 1 hidden layer
     Outputs m, s as is assumed to be used with IAF transform (could generlise this)
+    option to include weight norm, as per original IAF paper (but seems to potentially make things more unstable
+    - from underflow when we divide by grad norm)
     """
-    def __init__(self, x_dim, hidden_layer_width, n_hidden_layers=2):
+    def __init__(self, x_dim, hidden_layer_width, n_hidden_layers=2, weight_norm=False,
+                 init_zeros=True):
         super(MADE_IAF, self).__init__()
-        self.FirstLayer = FirstLayer(x_dim, layer_width=hidden_layer_width)
+        self.FirstLayer = FirstLayer(x_dim, layer_width=hidden_layer_width, weight_norm=weight_norm)
         self.MiddleLayers = nn.ModuleList()
         for i in range(n_hidden_layers):
-            self.MiddleLayers.append(MiddleLayer(latent_dim=x_dim, layer_width=hidden_layer_width))
-        self.FinalLayer = FinalLayer(latent_dim=x_dim, layer_width=hidden_layer_width)
-        self.m_SkipLayer = SkipLayer(latent_dim=x_dim)
-        self.s_SkipLayer = SkipLayer(latent_dim=x_dim)
+            self.MiddleLayers.append(MiddleLayer(latent_dim=x_dim, layer_width=hidden_layer_width,
+                                                 weight_norm=weight_norm))
+        self.FinalLayer = FinalLayer(latent_dim=x_dim, layer_width=hidden_layer_width, weight_norm=weight_norm,
+                                     init_zeros=init_zeros)
+        self.m_SkipLayer = SkipLayer(latent_dim=x_dim, weight_norm=weight_norm, init_zeros=init_zeros)
+        self.s_SkipLayer = SkipLayer(latent_dim=x_dim, weight_norm=weight_norm, init_zeros=init_zeros)
 
     def forward(self, input):
         x = self.FirstLayer(input)

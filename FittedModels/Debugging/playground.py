@@ -1,18 +1,11 @@
 import torch
-import torch.nn as nn
-import numpy as np
-import matplotlib.pyplot as plt
-import matplotlib as mpl
-from FittedModels.utils import plot_distributions, plot_samples, plot_sampling_info, plot_divergences, plot_history
+
 torch.manual_seed(5)
 from ImportanceSampling.VanillaImportanceSampler import VanillaImportanceSampling
-from FittedModels.utils import plot_distributions
+from FittedModels.Utils.plotting_utils import plot_distributions
 from FittedModels.train import LearntDistributionManager
-from Utils.plotting_utils import plot_func2D, plot_distribution, plot_samples_single_dist
-from Utils.numerical_utils import MC_estimate_true_expectation
 from Utils.numerical_utils import quadratic_function as expectation_function
 from FittedModels.Models.FlowModel import FlowModel
-import matplotlib.pyplot as plt
 from TargetDistributions.MoG import Triangle_MoG
 
 if __name__ == '__main__':

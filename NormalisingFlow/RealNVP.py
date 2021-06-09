@@ -4,8 +4,8 @@ import torch.nn.functional as F
 from NormalisingFlow.Nets.MLP import MLP
 from NormalisingFlow.base import BaseFlow
 
-class RealNVP(nn.Module, BaseFlow):
-    def __init__(self, x_dim, nodes_per_x=10, n_hidden_layers=3, reversed=False, use_exp=False):
+class RealNVP(BaseFlow):
+    def __init__(self, x_dim, nodes_per_x=2, n_hidden_layers=1, reversed=False, use_exp=True):
         super(RealNVP, self).__init__()
         self.use_exp = use_exp
         self.d = x_dim // 2  # elements copied from input to output
@@ -14,52 +14,49 @@ class RealNVP(nn.Module, BaseFlow):
         self.MLP = MLP(self.d, self.D_minus_d*2, hidden_layer_width, n_hidden_layers=n_hidden_layers)
         self.reversed = reversed
 
-    def inverse(self, x):
-        """return samples and log | dy / dx |"""
-        if self.reversed:
-            x = x.flip(dims=(-1,))
-        x_1_to_d = x[:, 0:self.d]
-        x_d_plus_1_to_D = x[:, self.d:]
-        y_1_to_d = x_1_to_d
-        st = self.MLP(x_1_to_d)
+
+    def inverse(self, z):
+        z_1_to_d = z[:, 0:self.d]
+        z_d_plus_1_to_D = z[:, self.d:]
+        x_1_to_d = z_1_to_d
+        st = self.MLP(z_1_to_d)
         s, t = st.split(self.D_minus_d, dim=-1)
         t, s = self.reparameterise_s(t, s)
         if self.use_exp:
-            y_d_plus_1_to_D = x_d_plus_1_to_D * torch.exp(s) + t
-            log_determinant = torch.sum(s, dim=-1)
-        else:
-            sigma = torch.sigmoid(s)
-            y_d_plus_1_to_D = x_d_plus_1_to_D * sigma + t
-            log_determinant = torch.sum(torch.log(sigma), dim=-1)
-
-        y = torch.cat([y_1_to_d, y_d_plus_1_to_D], dim=-1)
-
-        if self.reversed:
-            y = y.flip(dims=(-1,))
-        return y, log_determinant
-
-    def forward(self, y):
-        if self.reversed:
-            y = y.flip(dims=(-1,))
-        y_1_to_d = y[:, 0:self.d]
-        y_d_plus_1_to_D = y[:, self.d:]
-        x_1_to_d = y_1_to_d
-        st = self.MLP(y_1_to_d)
-        s, t = st.split(self.D_minus_d, dim=-1)
-        t, s = self.reparameterise_s(t, s)
-        if self.use_exp:
-            x_d_plus_1_to_D = (y_d_plus_1_to_D - t) * torch.exp(-s)
+            x_d_plus_1_to_D = (z_d_plus_1_to_D - t) * torch.exp(-s)
             log_determinant = -torch.sum(s, dim=-1)
         else:
             sigma = torch.sigmoid(s)
-            x_d_plus_1_to_D = (y_d_plus_1_to_D - t) / sigma
+            x_d_plus_1_to_D = (z_d_plus_1_to_D - t) / sigma
             log_determinant = -torch.sum(torch.log(sigma), dim=-1)
         x = torch.cat([x_1_to_d, x_d_plus_1_to_D], dim=-1)
         if self.reversed:
             x = x.flip(dims=(-1,))
         return x, log_determinant
 
-    def reparameterise_s(self, t: torch.tensor, s: torch.tensor) -> torch.tensor:
+    def forward(self, x):
+        """return z and log | dx / dz |"""
+        if self.reversed:
+            x = x.flip(dims=(-1,))
+        x_1_to_d = x[:, 0:self.d]
+        x_d_plus_1_to_D = x[:, self.d:]
+        z_1_to_d = x_1_to_d
+        st = self.MLP(x_1_to_d)
+        s, t = st.split(self.D_minus_d, dim=-1)
+        t, s = self.reparameterise_s(t, s)
+        if self.use_exp:
+            z_d_plus_1_to_D = x_d_plus_1_to_D * torch.exp(s) + t
+            log_determinant = torch.sum(s, dim=-1)
+        else:
+            sigma = torch.sigmoid(s)
+            z_d_plus_1_to_D = x_d_plus_1_to_D * sigma + t
+            log_determinant = torch.sum(torch.log(sigma), dim=-1)
+
+        z = torch.cat([z_1_to_d, z_d_plus_1_to_D], dim=-1)
+        return z, log_determinant
+
+
+    def reparameterise_s(self, t: torch.tensor, s: torch.tensor) -> (torch.tensor, torch.tensor):
         if self.use_exp:
             return t/10, s / 10
         else:  # if sigmoid reparameterise s to be close to 1.5

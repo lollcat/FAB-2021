@@ -17,6 +17,11 @@ class BaseLearntDistribution(abc.ABC):
         """returns log probability of samples x"""
 
 
+    def set_requires_grad(self, requires_grad_option):
+        for param in self.parameters():
+            param.requires_grad = requires_grad_option
+
+
     def batch_log_prob(self, x: torch.tensor, inner_batch_size=int(1e5)) -> torch.tensor:
         outer_batch_size = x.shape[0]
         if outer_batch_size < inner_batch_size:

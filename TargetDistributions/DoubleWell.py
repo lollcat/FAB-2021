@@ -43,9 +43,27 @@ class DoubleWellEnergy(Energy, nn.Module):
     def log_prob(self, x):
         return torch.squeeze(-self.energy(x))
 
+class QuadrupleWellEnergy(DoubleWellEnergy):
+    def __init__(self, dim=2, *args, **kwargs):
+        super(QuadrupleWellEnergy, self).__init__(dim=dim, *args, **kwargs)
+
+    def log_prob(self, x):
+        return super(QuadrupleWellEnergy, self).log_prob(x[:, 0:2]) + \
+               super(QuadrupleWellEnergy, self).log_prob(x[:, 2:4])
+
+    def log_prob_2D(self, x):
+        # for plotting, given 2D x
+        return super(QuadrupleWellEnergy, self).log_prob(x)
+
+
+
 if __name__ == '__main__':
     from Utils.plotting_utils import plot_distribution
     import matplotlib.pyplot as plt
     target = DoubleWellEnergy(2, a=-0.5, b=-6)
     dist = plot_distribution(target, bounds=[[-3, 3], [-3, 3]], n_points=100)
     plt.show()
+
+    target = QuadrupleWellEnergy(2, a=-0.5, b=-6)
+    log_prob = target.log_prob(torch.ones((1, 4)))
+    print(log_prob)

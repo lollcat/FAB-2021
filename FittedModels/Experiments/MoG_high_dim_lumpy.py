@@ -1,12 +1,12 @@
 import torch
-from FittedModels.utils import plot_samples, plot_sampling_info, plot_divergences
+from FittedModels.Utils.plotting_utils import plot_samples, plot_sampling_info, plot_divergences
 torch.manual_seed(5)
 from ImportanceSampling.VanillaImportanceSampler import VanillaImportanceSampling
 from FittedModels.train import LearntDistributionManager
 from Utils.numerical_utils import MC_estimate_true_expectation
 from Utils.numerical_utils import quadratic_function as expectation_function
 from FittedModels.Models.FlowModel import FlowModel
-from FittedModels.utils import plot_history
+from FittedModels.Utils.plotting_utils import plot_history
 import matplotlib.pyplot as plt
 from TargetDistributions.MoG import MoG
 
@@ -14,14 +14,16 @@ if __name__ == '__main__':
     torch.set_default_dtype(torch.float64)
     torch.manual_seed(1)
     # ******************* Parameters *******************
-    dim = 3
+    dim = 4
     epochs = int(1e3)
     n_samples_estimation = int(1e5)
-    batch_size = int(1e2)
+    batch_size = int(1e3)
     lr = 1e-3
     optimizer = "Adamax"
+    loss_type = "DReG" # "kl"  #
     initial_flow_scaling = 10.0
     n_flow_steps = 5
+    annealing = True
 
     print(f"batch size {batch_size} \n"
           f"epochs {epochs} \n"
@@ -34,13 +36,14 @@ if __name__ == '__main__':
     true_expectation = MC_estimate_true_expectation(target, expectation_function, int(1e6))
     torch.manual_seed(1)
     learnt_sampler = FlowModel(x_dim=dim, n_flow_steps=n_flow_steps, scaling_factor=initial_flow_scaling) # , flow_type="RealNVP", use_exp=True
-    tester = LearntDistributionManager(target, learnt_sampler, VanillaImportanceSampling, loss_type="DReG",
-                                       lr=lr, optimizer=optimizer)
+    tester = LearntDistributionManager(target, learnt_sampler, VanillaImportanceSampling, loss_type=loss_type,
+                                       lr=lr, optimizer=optimizer, annealing=annealing)
     expectation_before, info_before = tester.estimate_expectation(n_samples_estimation, expectation_function)
 
     samples_fig_before = plot_samples(tester)  # this just looks at 2 dimensions
     plt.show()
-    history = tester.train(epochs, batch_size=batch_size, clip_grad_norm=True, max_grad_norm=1)
+    history = tester.train(epochs, batch_size=batch_size, clip_grad_norm=True, max_grad_norm=1,
+                           intermediate_plots=True)
     samples_fig_AFTER = plot_samples(tester)  # this just looks at 2 dimensions
     plt.show()
     plot_history(history)

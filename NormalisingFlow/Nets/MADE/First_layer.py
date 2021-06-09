@@ -3,10 +3,13 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 class FirstLayer(nn.Module):
-    def __init__(self, input_dim, layer_width):
+    def __init__(self, input_dim, layer_width, weight_norm=False):
         super(FirstLayer, self).__init__()
-        self.latent_to_layer = torch.nn.utils.weight_norm(
-            FirstLayerMask(latent_dim=input_dim, layer_width=layer_width))
+        if weight_norm:
+            self.latent_to_layer = torch.nn.utils.weight_norm(
+                FirstLayerMask(latent_dim=input_dim, layer_width=layer_width))
+        else:
+            self.latent_to_layer = FirstLayerMask(latent_dim=input_dim, layer_width=layer_width)
 
     def forward(self, x):
         x = self.latent_to_layer(x)

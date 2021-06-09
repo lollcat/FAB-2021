@@ -1,12 +1,12 @@
 import torch
-from FittedModels.utils import plot_samples, plot_sampling_info, plot_divergences
+from FittedModels.Utils.plotting_utils import plot_samples, plot_sampling_info, plot_divergences
 torch.manual_seed(5)
 from ImportanceSampling.VanillaImportanceSampler import VanillaImportanceSampling
 from FittedModels.train import LearntDistributionManager
 from Utils.numerical_utils import MC_estimate_true_expectation
 from Utils.numerical_utils import quadratic_function as expectation_function
 from FittedModels.Models.FlowModel import FlowModel
-from FittedModels.utils import plot_history
+from FittedModels.Utils.plotting_utils import plot_history
 import matplotlib.pyplot as plt
 from TargetDistributions.MoG import MoG
 import pathlib

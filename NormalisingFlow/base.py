@@ -1,16 +1,26 @@
 import abc
 import torch
+import torch.nn as nn
 
-class BaseFlow(abc.ABC):
 
-    @abc.abstractmethod
-    def inverse(self, batch_size: int) -> (torch.tensor, torch.tensor):
-        """inverse flow, from z to x, i.e. if combined with prior, is used for sampling
-        return x and det(dy/dz)"""
+class BaseFlow(nn.Module):
+    def __init__(self):
+        super(BaseFlow, self).__init__()
 
-    @abc.abstractmethod
+
+    def inverse(self, z: torch.tensor) -> (torch.tensor, torch.tensor):
+        """
+        Inverse flow, from z to x, i.e. if combined with prior, is used for sampling
+        return x and log det(dx/dz)
+        """
+        raise NotImplementedError
+
+
     def forward(self, x: torch.tensor) -> (torch.tensor, torch.tensor):
-        """computes z, and det(dz/dy) given x, useful for density evaluation"""
+        """
+        Computes z, and log det(dz/dx) useful for density evaluation
+        """
+        raise NotImplementedError
 
 
 

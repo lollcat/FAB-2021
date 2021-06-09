@@ -20,8 +20,10 @@ def f(z, phi):
     phi.requires_grad = True
     return w
 
+
 if __name__ == '__main__':
-    phi = torch.randn((3,1))
+    # this shows vincent is correct
+    phi = torch.randn((3, 1), requires_grad=True)
     z = g(phi)
     w = f(z, phi)
     print(torch.autograd.grad(w, phi))
