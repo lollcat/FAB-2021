@@ -1,10 +1,10 @@
 import torch
-from FittedModels.Utils.plotting_utils import plot_samples
+from FittedModels.utils.plotting_utils import plot_samples
 
 torch.manual_seed(5)
 from ImportanceSampling.VanillaImportanceSampler import VanillaImportanceSampling
 from FittedModels.train import LearntDistributionManager
-from FittedModels.Utils.plotting_utils import plot_history
+from FittedModels.utils.plotting_utils import plot_history
 from Utils.plotting_utils import plot_distribution
 from Utils.numerical_utils import MC_estimate_true_expectation
 from Utils.numerical_utils import quadratic_function as expectation_function

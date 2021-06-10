@@ -19,7 +19,7 @@ class ActNorm(BaseFlow):
         if self.initialised == False:
             self.loc.data = torch.mean(z, dim=0)
             self.scale.data = torch.log(torch.std(z, dim=0))
-            self.inialised = torch.tensor(True)
+            self.initialised.data = torch.tensor(True)
         return (z - self.loc) / torch.exp(self.scale), -torch.sum(self.scale)
 
 
@@ -32,6 +32,9 @@ if __name__ == '__main__':
     actnorm = ActNorm(2)
     x, log_det = actnorm.inverse(z)
     print(torch.std(x, dim=0), torch.mean(x, dim=0))
+    assert actnorm.initialised == True
+    x, log_det = actnorm.inverse(z)
+
 
 
 

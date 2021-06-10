@@ -189,7 +189,7 @@ if __name__ == '__main__':
                                  ,linear_activations=True, fixed_variance=True, use_bias=True)
     
     assert posterior_bnn.n_parameters == 2
-    from Utils import plot_distribution
+    from utils import plot_distribution
     import matplotlib.pyplot as plt
     plot_distribution(posterior_bnn, n_points=100)
     plt.show()

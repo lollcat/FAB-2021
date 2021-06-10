@@ -70,7 +70,7 @@ class FlowModel(nn.Module, BaseLearntDistribution):
         Sample from z, transform to give x
         log p(x) = log p(z) - log |dx/dz|
         """
-        x = self.prior.sample((batch_size,))
+        x = self.prior.rsample((batch_size,))
         log_prob = self.prior.log_prob(x)
         for flow_step in self.flow_blocks:
             x, log_determinant = flow_step.inverse(x)
@@ -111,7 +111,7 @@ class FlowModel(nn.Module, BaseLearntDistribution):
         log p(x) = log p(z) - log |dx/dz|
         """
         # first let's go forward
-        z = self.prior.sample((n,))
+        z = self.prior.rsample((n,))
         x = z
         prior_prob = self.prior.log_prob(x)
         log_prob = prior_prob.detach().clone() # use clone otherwise prior prob get's values get changed
@@ -151,7 +151,7 @@ class FlowModel(nn.Module, BaseLearntDistribution):
     def check_normalisation_constant(self, n=int(1e6)):
         """This should be approximately one if things are working correctly, check with importance sampling"""
         normal_dist = torch.distributions.MultivariateNormal(torch.zeros(self.dim), 5*torch.eye(self.dim))
-        x_samples = normal_dist.sample((n,))
+        x_samples = normal_dist.rsample((n,))
         log_prob_normal = normal_dist.log_prob(x_samples)
         log_prob_backward = self.log_prob(x_samples)
         importance_weights = torch.exp(log_prob_backward - log_prob_normal)

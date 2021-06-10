@@ -22,5 +22,5 @@ class MLP(nn.Module):
 
     def forward(self, x):
         for hidden_layer in self.hidden_layers:
-            x = F.elu(hidden_layer(x))
+            x = F.leaky_relu(hidden_layer(x))
         return self.output_layer(x)

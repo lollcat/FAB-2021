@@ -29,7 +29,7 @@ def estimate_key_info(tester, max_n_samples=1e6, min_n_samples=10, n_runs_max=10
 
 if __name__ == '__main__':
     import torch
-    from FittedModels.Utils.plotting_utils import plot_samples
+    from FittedModels.utils.plotting_utils import plot_samples
 
     torch.manual_seed(5)
     from ImportanceSampling.VanillaImportanceSampler import VanillaImportanceSampling

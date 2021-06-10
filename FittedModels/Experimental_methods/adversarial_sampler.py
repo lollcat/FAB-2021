@@ -57,7 +57,7 @@ class LearntDistributionManager:
             if True in torch.isnan(log_g_x) or True in torch.isinf(log_g_x):
                 print("NaN/-inf loss encountered in log_g_x")
             if torch.isnan(loss_q) or torch.isinf(loss_q):
-                from FittedModels.Utils.plotting_utils import plot_history
+                from FittedModels.utils.plotting_utils import plot_history
                 import matplotlib.pyplot as plt
                 plot_history(history)
                 plt.show()
@@ -102,7 +102,7 @@ class LearntDistributionManager:
 
 
 def plot_distributions(learnt_dist_manager: LearntDistributionManager, range=10, n_points=100, title=""):
-    from FittedModels.Utils.plotting_utils import plot_3D
+    from FittedModels.utils.plotting_utils import plot_3D
     import itertools
     import matplotlib.pyplot as plt
     x_min = -range/2
@@ -143,7 +143,7 @@ def plot_samples(learnt_dist_manager: LearntDistributionManager):
 if __name__ == '__main__':
     import torch
     import matplotlib.pyplot as plt
-    from FittedModels.Utils.plotting_utils import plot_history
+    from FittedModels.utils.plotting_utils import plot_history
     #from FittedModels.utils import plot_distributions
     torch.manual_seed(5)
     from ImportanceSampling.VanillaImportanceSampler import VanillaImportanceSampling

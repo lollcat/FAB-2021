@@ -2,7 +2,7 @@ import torch
 
 torch.manual_seed(5)
 from ImportanceSampling.VanillaImportanceSampler import VanillaImportanceSampling
-from FittedModels.Utils.plotting_utils import plot_distributions
+from FittedModels.utils.plotting_utils import plot_distributions
 from FittedModels.train import LearntDistributionManager
 from Utils.numerical_utils import quadratic_function as expectation_function
 from FittedModels.Models.FlowModel import FlowModel

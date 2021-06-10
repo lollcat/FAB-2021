@@ -3,11 +3,11 @@ import torch
 torch.manual_seed(5)
 from ImportanceSampling.VanillaImportanceSampler import VanillaImportanceSampling
 from TargetDistributions.MoG import MoG
-from FittedModels.Utils.plotting_utils import plot_distributions
+from FittedModels.utils.plotting_utils import plot_distributions
 from FittedModels.train import LearntDistributionManager
 from Utils.plotting_utils import plot_func2D
 from FittedModels.Models.FlowModel import FlowModel
-from FittedModels.Utils.plotting_utils import plot_history
+from FittedModels.utils.plotting_utils import plot_history
 import matplotlib.pyplot as plt
 import torch
 

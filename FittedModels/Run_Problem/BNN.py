@@ -5,7 +5,7 @@ torch.manual_seed(5)
 from ImportanceSampling.VanillaImportanceSampler import VanillaImportanceSampling
 from TargetDistributions.BayesianNN import PosteriorBNN
 from FittedModels.Models.FlowModel import FlowModel
-from FittedModels.Utils.plotting_utils import plot_history, plot_sampling_info, plot_divergences
+from FittedModels.utils.plotting_utils import plot_history, plot_sampling_info, plot_divergences
 from FittedModels.train import LearntDistributionManager
 from Utils.numerical_utils import expectation_function
 

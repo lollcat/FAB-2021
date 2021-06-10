@@ -4,6 +4,22 @@ from mpl_toolkits.mplot3d import axes3d
 import matplotlib.pyplot as plt
 import matplotlib as mpl
 
+from matplotlib.backends.backend_pdf import PdfPages
+
+
+
+def multipage(filename, figs=None, dpi=200):
+    """
+    https://stackoverflow.com/questions/26368876/saving-all-open-matplotlib-figures-in-one-file-at-once
+    """
+    pp = PdfPages(filename)
+    if figs is None:
+        figs = [plt.figure(n) for n in plt.get_fignums()]
+    for fig in figs:
+        fig.savefig(pp, format='pdf', dpi=dpi)
+    pp.close()
+
+
 def plot_samples_single_dist(distribution, n_samples = 1000):
     samples_q = distribution.sample((n_samples,)).detach().cpu()
     fig, axs = plt.subplots(1)

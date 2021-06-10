@@ -218,7 +218,7 @@ if __name__ == '__main__':
     from ImportanceSampling.VanillaImportanceSampler import VanillaImportanceSampling
     from TargetDistributions.MoG import MoG
     from FittedModels.Models.FlowModel import FlowModel
-    from FittedModels.Utils.plotting_utils import plot_samples
+    from FittedModels.utils.plotting_utils import plot_samples
     import matplotlib.pyplot as plt
 
     dim = 6

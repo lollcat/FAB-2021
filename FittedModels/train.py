@@ -3,7 +3,7 @@ import torch.nn.functional as F
 import numpy as np
 import matplotlib.pyplot as plt
 from FittedModels.Models.base import BaseLearntDistribution
-from FittedModels.Utils.plotting_utils import plot_samples
+from FittedModels.utils.plotting_utils import plot_samples
 
 Notebook = False
 if Notebook:
@@ -25,12 +25,7 @@ class LearntDistributionManager:
         self.learnt_sampling_dist = fitted_model.to(self.device)
         self.target_dist = target_distribution.to(self.device)
         self.loss_type = loss_type
-        if optimizer == "Adam":
-            torch_optimizer = torch.optim.Adam
-        elif optimizer == "Adamax":
-                torch_optimizer = torch.optim.Adamax
-        else:
-            raise Exception(f"optimizer type: '{optimizer}' not recognised")
+        torch_optimizer = getattr(torch.optim, optimizer)
         self.optimizer = torch_optimizer(self.learnt_sampling_dist.parameters(), lr=lr, weight_decay=weight_decay)
         self.setup_loss(loss_type=loss_type, alpha=alpha, k=k, annealing=annealing)
 
@@ -62,7 +57,8 @@ class LearntDistributionManager:
               clip_grad_norm=False, max_grad_norm=1, clip_grad_max=False,
               max_grad_value=0.5,
               KPI_batch_size=int(1e4), intermediate_plots=False,
-              plotting_func=plot_samples):
+              plotting_func=plot_samples,
+              n_plots=10):
         """
         :param epochs:
         :param batch_size:
@@ -81,7 +77,7 @@ class LearntDistributionManager:
         epoch_per_print = min(max(int(epochs / 100), 1), 100)  # max 100 epoch, min 1 epoch
         epoch_per_save = max(int(epochs / 100), 1)
         if intermediate_plots is True:
-            epoch_per_plot = max(int(epochs / 10), 1)
+            epoch_per_plot = max(int(epochs / n_plots), 1)
         history = {"loss": [],
                    "log_p_x": [],
                    "log_q_x": []}
@@ -128,8 +124,7 @@ class LearntDistributionManager:
                 history["effective_sample_size"].append(ESS)
             if intermediate_plots:
                 if self.current_epoch % epoch_per_plot == 0:
-                    plotting_func(self, n_samples=1000)
-                    plt.show()
+                    plotting_func(self, n_samples=1000, title=f"training epoch {self.current_epoch}")
         return history
 
     def to(self, device):
@@ -300,13 +295,12 @@ class LearntDistributionManager:
 if __name__ == '__main__':
     import torch
     import matplotlib.pyplot as plt
-    from FittedModels.Utils.plotting_utils import plot_distributions
     torch.manual_seed(0)
     from ImportanceSampling.VanillaImportanceSampler import VanillaImportanceSampling
     from TargetDistributions.Guassian_FullCov import Guassian_FullCov
     from FittedModels.Models.DiagonalGaussian import DiagonalGaussian
-    from FittedModels.Utils.plotting_utils import plot_distributions
-    from Utils.numerical_utils import quadratic_function as expectation_function
+    from utils.numerical_utils import quadratic_function as expectation_function
+
     epochs = 500
     dim = 2
     target = Guassian_FullCov(dim=dim)
@@ -314,32 +308,8 @@ if __name__ == '__main__':
     tester = LearntDistributionManager(target, learnt_sampler, VanillaImportanceSampling, loss_type="DReG",
                                        weight_decay=1e-5)
     tester.train_prior(epochs=100, batch_size=100)
-    
-    if dim == 2:
-        fig_before = fig_before_train = plot_distributions(tester)
-    expectation_before, sampling_weights_before = tester.estimate_expectation(int(1e5),
-                                                                expectation_function=expectation_function)
-    plt.show()
-
     history = tester.train(epochs, intermediate_plots=True)
-    expectation, expectation_info = tester.estimate_expectation(int(1e5),
-                                                                expectation_function=expectation_function)
 
-
-    print(f"estimate before training is {expectation_before} \n"
-          f"estimate after training is {expectation}")
-
-    if dim == 2:
-        fig_after_train = plot_distributions(tester)
-        plt.show()
-
-    figure, axs = plt.subplots(len(history), 1, figsize=(6, 10))
-    for i, key in enumerate(history):
-        axs[i].plot(history[key])
-        axs[i].set_title(key)
-        if key == "alpha_divergence":
-            axs[i].set_yscale("log")
-    plt.show()
 
 
 

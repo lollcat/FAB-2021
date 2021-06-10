@@ -1,8 +1,8 @@
 import torch
-from FittedModels.Utils.plotting_utils import plot_samples, plot_sampling_info, plot_divergences, plot_history
+from FittedModels.utils.plotting_utils import plot_samples, plot_sampling_info, plot_divergences, plot_history
 torch.manual_seed(5)
 from ImportanceSampling.VanillaImportanceSampler import VanillaImportanceSampling
-from FittedModels.Utils.plotting_utils import plot_distributions
+from FittedModels.utils.plotting_utils import plot_distributions
 from FittedModels.train import LearntDistributionManager
 from Utils.plotting_utils import plot_distribution
 from Utils.numerical_utils import MC_estimate_true_expectation

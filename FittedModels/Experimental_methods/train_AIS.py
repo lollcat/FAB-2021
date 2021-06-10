@@ -57,14 +57,14 @@ class AIS_trainer(LearntDistributionManager):
 
 if __name__ == '__main__':
     from FittedModels.Models.FlowModel import FlowModel
-    from FittedModels.Utils.plotting_utils import plot_history
+    from FittedModels.utils.plotting_utils import plot_history
     import matplotlib.pyplot as plt
     import torch
     from TargetDistributions.MoG import MoG
     from Utils.plotting_utils import plot_distribution
     from Utils.numerical_utils import MC_estimate_true_expectation
     from Utils.numerical_utils import quadratic_function as expectation_function
-    from FittedModels.Utils.plotting_utils import plot_samples
+    from FittedModels.utils.plotting_utils import plot_samples
 
     torch.manual_seed(2)
     epochs = 1000

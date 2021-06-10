@@ -1,5 +1,5 @@
 import torch
-from FittedModels.Utils.plotting_utils import plot_samples
+from FittedModels.utils.plotting_utils import plot_samples
 
 torch.manual_seed(5)
 from ImportanceSampling.VanillaImportanceSampler import VanillaImportanceSampling

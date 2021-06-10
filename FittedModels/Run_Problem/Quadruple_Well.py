@@ -1,60 +1,65 @@
+from TargetDistributions.DoubleWell import QuadrupleWellEnergy
 import torch
-from FittedModels.Utils.plotting_utils import plot_sampling_info, plot_divergences
+from FittedModels.utils.plotting_utils import plot_sampling_info, plot_divergences
 torch.manual_seed(5)
 from ImportanceSampling.VanillaImportanceSampler import VanillaImportanceSampling
 from FittedModels.train import LearntDistributionManager
 from Utils.numerical_utils import quadratic_function as expectation_function
 from FittedModels.Models.FlowModel import FlowModel
-from FittedModels.Utils.plotting_utils import plot_history
+from FittedModels.utils.plotting_utils import plot_history
 import matplotlib.pyplot as plt
-from TargetDistributions.VincentTargets import TwoModes
-from FittedModels.Utils.plotting_utils import plot_samples_vs_contours
-from FittedModels.Utils.plotting_utils import plot_distributions
+from FittedModels.utils.plotting_utils import plot_samples_vs_contours_quadruple_well
+
+
 
 if __name__ == '__main__':
     torch.manual_seed(1)
     torch.set_default_dtype(torch.float64)
     # ******************* Parameters *******************
-    # using the same as Vincent's code so we have a fair comparison
-    dim = 2
-    epochs = int(5e3)
+    dim = 4
+    epochs = int(1e4)
     n_samples_estimation = int(1e5)
-    batch_size = int(1e2)  # 20
-    lr = 4e-4
+    batch_size = int(512)
+    lr = 1e-3
     train_prior = False
     weight_decay = 1e-6
+    clip_grad_norm = False
     optimizer = "Adamax"
     flow_type = "RealNVP"  # "IAF"
-    loss_type = "kl"  # "DReG" # "kl"  #    #
-    initial_flow_scaling = 1.0
+    loss_type = "DReG" # "kl"  #    #
+    initial_flow_scaling = 1.5
     n_flow_steps = 64
     annealing = True
-    #*******************************************************
-    target = TwoModes(2.0, 0.1)
 
-    torch.manual_seed(1)  # 0
+    def plotter(*args, **kwargs):
+        # wrap plotting function like this so it displays during training
+        plot_samples_vs_contours_quadruple_well(*args, **kwargs)
+        plt.show()
+    n_plots = 20
+    #*******************************************************
+
+    target = QuadrupleWellEnergy(a=-0.5, b=-6)
+    torch.manual_seed(0)  # 0
     learnt_sampler = FlowModel(x_dim=dim, n_flow_steps=n_flow_steps,
                                scaling_factor=initial_flow_scaling, flow_type=flow_type)
     tester = LearntDistributionManager(target, learnt_sampler, VanillaImportanceSampling, loss_type=loss_type,
                                        lr=lr, optimizer=optimizer, annealing=annealing, weight_decay=weight_decay)
 
-    plot_samples_vs_contours(tester)
+    plotter(tester)
     plt.show()
     expectation_before, info_before = tester.estimate_expectation(n_samples_estimation, expectation_function)
 
     if train_prior:
-        history_prior = tester.train_prior(epochs=200, batch_size=batch_size, lr=0.01)
+        history_prior = tester.train_prior(epochs=200, batch_size=batch_size, lr=5e-3)
         plot_history(history_prior)
         plt.show()
-        plot_samples_vs_contours(tester)
+        plotter(tester)
         plt.show()
         expectation_prior_trained, info_prior = tester.estimate_expectation(n_samples_estimation, expectation_function)
 
 
-
-
-    history = tester.train(epochs, batch_size=batch_size, clip_grad_norm=True, max_grad_norm=1,
-                           intermediate_plots=True, plotting_func=plot_samples_vs_contours)
+    history = tester.train(epochs, batch_size=batch_size, clip_grad_norm=clip_grad_norm, max_grad_norm=1,
+                           intermediate_plots=True, plotting_func=plotter, n_plots=n_plots)
     plot_history(history)
     plt.show()
     plot_divergences(history)
@@ -74,11 +79,11 @@ if __name__ == '__main__':
         print(f"estimate after prior training is {expectation_prior_trained} \n"
             f"effective sample size trained prior is {info_prior['effective_sample_size'] / n_samples_estimation}\n")
 
-    plot_samples_vs_contours(tester, n_samples=1000)
+    plotter(tester, n_samples=1000)
     plt.show()
 
-    plot_distributions(tester, bounds=[[-3, 3], [-3, 3]], n_points=100)
-    plt.show()
+
+
 
 
 

@@ -3,10 +3,10 @@ import torch
 torch.manual_seed(5)
 from ImportanceSampling.VanillaImportanceSampler import VanillaImportanceSampling
 from TargetDistributions.Guassian_FullCov import Guassian_FullCov
-from FittedModels.Utils.plotting_utils import plot_distributions
+from FittedModels.utils.plotting_utils import plot_distributions
 from FittedModels.train import LearntDistributionManager
 from FittedModels.Models.FlowModel import FlowModel
-from FittedModels.Utils.plotting_utils import plot_history
+from FittedModels.utils.plotting_utils import plot_history
 import matplotlib.pyplot as plt
 import torch
 # setup expectation function

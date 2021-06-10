@@ -18,7 +18,7 @@ class IAF(BaseFlow):
     def inverse(self, x):
         log_determinant = torch.zeros(x.shape[0]).to(x.device)
         m, s = self.AutoregressiveNN(x)
-        m, s = self.reparameterise_s(m, s)
+        m, s = self.reparameterise(m, s)
         if self.use_exp:
             x = torch.exp(s) * x + m
             log_determinant += torch.sum(s, dim=1)
@@ -31,11 +31,11 @@ class IAF(BaseFlow):
             x = x.flip(dims=(-1,))
         return x, log_determinant
 
-    def reparameterise_s(self, m, s):
+    def reparameterise(self, m, s):
         # make s start relatively close to 0, and exp(s) close to 1, and m close to 0
         # this helps the flow start of not overly funky!
         if self.use_exp:
-            return m/10, s/10
+            return m, s
         else:  # if sigmoid reparameterise s to be close to 1.5
             return m/10, s/10 + 1.5
 
@@ -47,7 +47,7 @@ class IAF(BaseFlow):
             x = x.flip(dims=(-1,))
         for i in range(self.x_dim):
             m, s = self.AutoregressiveNN(z.clone())
-            m, s = self.reparameterise_s(m, s)
+            m, s = self.reparameterise(m, s)
             if self.use_exp is True:
                 z[:, i] = (x[:, i] - m[:, i])*torch.exp(-s[:, i])
                 log_determinant -= s[:, i]

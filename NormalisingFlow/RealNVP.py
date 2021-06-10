@@ -21,7 +21,7 @@ class RealNVP(BaseFlow):
         x_1_to_d = z_1_to_d
         st = self.MLP(z_1_to_d)
         s, t = st.split(self.D_minus_d, dim=-1)
-        t, s = self.reparameterise_s(t, s)
+        t, s = self.reparameterise(t, s)
         if self.use_exp:
             x_d_plus_1_to_D = (z_d_plus_1_to_D - t) * torch.exp(-s)
             log_determinant = -torch.sum(s, dim=-1)
@@ -43,7 +43,7 @@ class RealNVP(BaseFlow):
         z_1_to_d = x_1_to_d
         st = self.MLP(x_1_to_d)
         s, t = st.split(self.D_minus_d, dim=-1)
-        t, s = self.reparameterise_s(t, s)
+        t, s = self.reparameterise(t, s)
         if self.use_exp:
             z_d_plus_1_to_D = x_d_plus_1_to_D * torch.exp(s) + t
             log_determinant = torch.sum(s, dim=-1)
@@ -56,9 +56,9 @@ class RealNVP(BaseFlow):
         return z, log_determinant
 
 
-    def reparameterise_s(self, t: torch.tensor, s: torch.tensor) -> (torch.tensor, torch.tensor):
+    def reparameterise(self, t: torch.tensor, s: torch.tensor) -> (torch.tensor, torch.tensor):
         if self.use_exp:
-            return t/10, s / 10
+            return t, s
         else:  # if sigmoid reparameterise s to be close to 1.5
             return t/10, s / 10 + 1.5
 

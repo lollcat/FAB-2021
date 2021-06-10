@@ -1,8 +1,8 @@
 import torch
-from FittedModels.Utils.plotting_utils import plot_samples, plot_sampling_info, plot_divergences, plot_history
+from FittedModels.utils.plotting_utils import plot_samples, plot_sampling_info, plot_divergences, plot_history
 torch.manual_seed(5)
 from ImportanceSampling.VanillaImportanceSampler import VanillaImportanceSampling
-from FittedModels.Utils.plotting_utils import plot_distributions
+from FittedModels.utils.plotting_utils import plot_distributions
 from FittedModels.train import LearntDistributionManager
 from Utils.plotting_utils import plot_distribution
 from Utils.numerical_utils import MC_estimate_true_expectation
@@ -31,6 +31,10 @@ if __name__ == '__main__':
     KPI_n_samples = int(1e4)
     flow_type = "RealNVP"
     loss_type = "kl"
+    def plotter(*args, **kwargs):
+        # wrap plotting function like this so it displays during training
+        plot_samples_vs_contours_quadruple_well(*args, **kwargs)
+        plt.show()
 
     torch.manual_seed(1)
     learnt_sampler = FlowModel(x_dim=dim, n_flow_steps=5, scaling_factor=4.0, flow_type=flow_type)
