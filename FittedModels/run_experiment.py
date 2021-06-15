@@ -1,6 +1,6 @@
 import pathlib
 
-from TargetDistributions.DoubleWell import QuadrupleWellEnergy
+from TargetDistributions.DoubleWell import ManyWellEnergy
 import torch
 from FittedModels.utils.plotting_utils import plot_sampling_info, plot_divergences
 from ImportanceSampling.VanillaImportanceSampler import VanillaImportanceSampling
@@ -45,7 +45,7 @@ def run_experiment(save_path,
     elif target_type == "QuadrupleWell":
         from FittedModels.utils.plotting_utils import plot_samples_vs_contours_quadruple_well
         dim = 4
-        target = QuadrupleWellEnergy(a=-0.5, b=-6)
+        target = ManyWellEnergy(a=-0.5, b=-6)
         plotter = plot_samples_vs_contours_quadruple_well
 
     elif target_type[0:3] == "MoG":  # e.g. MoG_3D

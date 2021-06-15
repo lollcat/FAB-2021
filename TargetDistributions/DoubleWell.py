@@ -43,17 +43,21 @@ class DoubleWellEnergy(Energy, nn.Module):
     def log_prob(self, x):
         return torch.squeeze(-self.energy(x))
 
-class QuadrupleWellEnergy(DoubleWellEnergy):
-    def __init__(self, dim=2, *args, **kwargs):
-        super(QuadrupleWellEnergy, self).__init__(dim=dim, *args, **kwargs)
+class ManyWellEnergy(DoubleWellEnergy):
+    def __init__(self, dim=4, *args, **kwargs):
+        assert dim % 2 == 0
+        self.n_wells = dim // 2
+        super(ManyWellEnergy, self).__init__(dim=2, *args, **kwargs)
 
     def log_prob(self, x):
-        return super(QuadrupleWellEnergy, self).log_prob(x[:, 0:2]) + \
-               super(QuadrupleWellEnergy, self).log_prob(x[:, 2:4])
+        return torch.sum(
+            torch.stack(
+                [super(ManyWellEnergy, self).log_prob(x[:, i*2:i*2+2]) for i in range(self.n_wells)]),
+            dim=0)
 
     def log_prob_2D(self, x):
         # for plotting, given 2D x
-        return super(QuadrupleWellEnergy, self).log_prob(x)
+        return super(ManyWellEnergy, self).log_prob(x)
 
 
 
@@ -64,6 +68,6 @@ if __name__ == '__main__':
     dist = plot_distribution(target, bounds=[[-3, 3], [-3, 3]], n_points=100)
     plt.show()
 
-    target = QuadrupleWellEnergy(2, a=-0.5, b=-6)
-    log_prob = target.log_prob(torch.ones((1, 4)))
+    target = ManyWellEnergy(4, a=-0.5, b=-6)
+    log_prob = target.log_prob(torch.randn((7, 4)))
     print(log_prob)

@@ -11,7 +11,7 @@ import torch
 import torch.nn.functional as F
 import torch.nn as nn
 import matplotlib.pyplot as plt
-
+import numpy as np
 
 class AIS_trainer(LearntDistributionManager):
     """
@@ -19,8 +19,8 @@ class AIS_trainer(LearntDistributionManager):
     """
     def __init__(self, target_distribution, fitted_model,
                  n_distributions=10, n_steps_transition_operator=5, save_for_visualisation=False, save_spacing=20,
-                 loss_type="kl", step_size=1.0, train_AIS_params=True, alpha=2, importance_param_lr=1e-2,
-                 transition_operator="Metropolis", HMC_inner_steps=3,
+                 loss_type="kl", step_size=1.0, train_AIS_params=True, alpha=2, importance_param_lr=1e-3,
+                 transition_operator="Metropolis", HMC_inner_steps=3, maximise_log_prob_annealed = True,
                  learnt_dist_kwargs={}, AIS_kwargs={}):
         assert loss_type in ["kl", "DReG", "var"]
         self.AIS_train = AnnealedImportanceSampler(loss_type, train_AIS_params, fitted_model, target_distribution,
@@ -31,6 +31,7 @@ class AIS_trainer(LearntDistributionManager):
         super(AIS_trainer, self).__init__(target_distribution, fitted_model, self.AIS_train,
                  loss_type, alpha, **learnt_dist_kwargs)
         self.train_AIS_params = train_AIS_params
+        self.maximise_log_prob_annealed = maximise_log_prob_annealed  # add to loss function
         if train_AIS_params:
             self.noise_optimizer = torch.optim.Adam([self.AIS_train.log_step_size], lr=importance_param_lr)
 
@@ -64,9 +65,9 @@ class AIS_trainer(LearntDistributionManager):
 
 
     def train(self, epochs=100, batch_size=1000, intermediate_plots=False,
-              plotting_func=plot_samples, n_plots=10,
-              KPI_batch_size=int(1e4)):
-        epoch_per_print = max(int(epochs / 10), 1)
+              plotting_func=plot_samples, n_plots=3,
+              KPI_batch_size=int(1e4), allow_low_support=True):
+        epoch_per_print = min(max(int(epochs / 100), 1), 100)  # max 100 epoch, min 1 epoch
         epoch_per_save = max(int(epochs / 100), 1)
         if "DReG" in self.loss_type and self.k is None:
             self.k = batch_size
@@ -74,36 +75,57 @@ class AIS_trainer(LearntDistributionManager):
             epoch_per_plot = max(int(epochs / n_plots), 1)
         history = {"loss": [],
                    "log_p_x_after_AIS": [],
-                   "log_w": []}
+                   "log_w": [],
+                   "kl": [],
+                   "alpha_2_divergence": [],
+                   "log_q_AIS_x": [],
+                   "ESS": [],
+                   }
         if self.train_AIS_params is True:
             history.update({"noise_scaling": []})
-        history.update({
-           "kl": [],
-           "alpha_2_divergence": []
-        })
         pbar = tqdm(range(epochs))
         for self.current_epoch in pbar:
             self.optimizer.zero_grad()
-            x_samples, log_w = self.AIS_train.run(batch_size)
-            loss = self.loss(log_w)
-            if torch.isnan(loss) or torch.isinf(loss):
-                raise Exception("NaN loss encountered")
-            loss.backward()
-            self.optimizer.step()
-            if self.train_AIS_params:
-                self.noise_optimizer.step()
+            try:
+                x_samples, log_w = self.AIS_train.run(batch_size)
+                loss_1 = self.loss(log_w)
+                if self.train_AIS_params:
+                    self.noise_optimizer.zero_grad()
+                    loss_2 = torch.clone(loss_1)
+                    loss_2.backward(retain_graph=True)
+                    self.noise_optimizer.step()
+                if self.maximise_log_prob_annealed:
+                    loss_1 -= self.log_prob_annealed_samples(x_samples)
+                if torch.isnan(loss_1) or torch.isinf(loss_1):
+                    raise Exception("NaN loss encountered")
+                loss_1.backward()
+                self.optimizer.step()
+            except ValueError as exception:
+                if allow_low_support:
+                    print(exception)
+                else:
+                    raise exception
             # save info
-            log_p_x = self.target_dist.log_prob(x_samples)
-            history["loss"].append(loss.item())
+            try:
+                log_p_x = self.target_dist.log_prob(x_samples)
+            except:
+                print("Couldn't calculate log prob over target distribution")
+            history["loss"].append(loss_1.item())
             history["log_p_x_after_AIS"].append(torch.mean(log_p_x).item())
             history["log_w"].append(torch.mean(log_w).item())
+            history["ESS"].append(
+                self.AIS_train.effective_sample_size_unnormalised_log_weights(log_w).item() / log_w.shape[0])
+
             if self.train_AIS_params is True:
                 history["noise_scaling"].append(self.AIS_train.step_size.item())
-            if self.current_epoch % epoch_per_print == 0 or self.current_epoch == epochs:
-                pbar.set_description(f"loss: {history['loss'][-1]}, mean log p_x {torch.mean(log_p_x)}")
+            if (self.current_epoch % epoch_per_print == 0 or self.current_epoch == epochs) and self.current_epoch > 0:
+                pbar.set_description(f"loss: {np.mean(history['loss'][-epoch_per_print:])},   "
+                                     f"log_p_x_post_AIS {np.mean(history['log_p_x_after_AIS'][-epoch_per_print:])}, "
+                                     f"ESS {np.mean(history['ESS'][-epoch_per_print:])}")
             if self.current_epoch % epoch_per_save == 0 or self.current_epoch == epochs:
                 history["kl"].append(self.kl_MC_estimate(KPI_batch_size))
                 history["alpha_2_divergence"].append(self.alpha_divergence_MC_estimate(KPI_batch_size))
+                history["log_q_AIS_x"].append(self.log_prob_annealed_samples(x_samples).item())
             if intermediate_plots:
                 if self.current_epoch % epoch_per_plot == 0:
                     plotting_func(self, n_samples=1000, title=f"training epoch, samples from flow {self.current_epoch}")
@@ -117,7 +139,7 @@ class AIS_trainer(LearntDistributionManager):
                             ax = axs[row]
                         if row == 0:
                             ax.set_title("plot of samples")
-                        ax.scatter(x_samples[:, row], x_samples[:, row + 1])
+                        ax.scatter(x_samples[:, row], x_samples[:, row + 1], alpha=0.5)
                         ax.set_title(f"q(x) samples after AIS dim {row * 2}-{row * 2 + 1}")
                     plt.show()
         return history
@@ -142,6 +164,8 @@ class AIS_trainer(LearntDistributionManager):
     def var_loss(self, log_w):
         return torch.var(torch.exp(log_w))
 
+    def log_prob_annealed_samples(self, x_samples):
+        return torch.mean(self.learnt_sampling_dist.log_prob(x_samples))
 
 if __name__ == '__main__':
     from FittedModels.Models.FlowModel import FlowModel
@@ -154,7 +178,8 @@ if __name__ == '__main__':
     from FittedModels.utils.plotting_utils import plot_samples
 
     torch.manual_seed(2)
-    epochs = 5
+    epochs = 200
+    batch_size = int(1e4)
     dim = 2
     n_samples_estimation = int(1e4)
     target = MoG(dim=dim, n_mixes=2, min_cov=1, loc_scaling=3)
@@ -162,7 +187,7 @@ if __name__ == '__main__':
     fig = plot_distribution(target, bounds=[[-30, 20], [-20, 20]])
     plt.show()
     learnt_sampler = FlowModel(x_dim=dim, scaling_factor=3.0)  # , flow_type="RealNVP")
-    tester = AIS_trainer(target, learnt_sampler, n_distributions=3, n_steps_transition_operator=3,
+    tester = AIS_trainer(target, learnt_sampler, n_distributions=3, n_steps_transition_operator=2,
                          step_size=1.0, train_AIS_params=True, loss_type="kl",
                          transition_operator="HMC")
     plot_samples(tester)
@@ -190,7 +215,7 @@ if __name__ == '__main__':
     plt.title("true samples")
     plt.show()
 
-    history = tester.train(epochs, batch_size=2000, intermediate_plots=True)
+    history = tester.train(epochs, batch_size=batch_size, intermediate_plots=True)
     plot_history(history)
     plt.show()
     plot_samples(tester)

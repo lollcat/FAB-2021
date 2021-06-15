@@ -1,4 +1,4 @@
-from TargetDistributions.DoubleWell import QuadrupleWellEnergy
+from TargetDistributions.DoubleWell import ManyWellEnergy
 import torch
 from FittedModels.utils.plotting_utils import plot_sampling_info, plot_divergences
 torch.manual_seed(5)
@@ -38,7 +38,7 @@ if __name__ == '__main__':
     n_plots = 20
     #*******************************************************
 
-    target = QuadrupleWellEnergy(a=-0.5, b=-6)
+    target = ManyWellEnergy(a=-0.5, b=-6)
     torch.manual_seed(0)  # 0
     learnt_sampler = FlowModel(x_dim=dim, n_flow_steps=n_flow_steps,
                                scaling_factor=initial_flow_scaling, flow_type=flow_type)
