@@ -6,14 +6,14 @@ if __name__ == '__main__':
     problem_number = 2
     target_types = ["DoubleWell", "QuadrupleWell", "TwoModes", "MoG_2D", "MoG_4D"]
     target_type = target_types[problem_number]
-    save_path_base = f"Experiment_results/{target_type}__ThirdExperiment__{current_time}/"
+    save_path_base = f"Experiment_results/{target_type}__FourthExperiment__{current_time}/"
 
     epochs = int(2e4)
     batch_size = 100
     n_flow_steps = 64
     initial_flow_scalings = [2.0, 2.0, 1.2]
     initial_flow_scaling = initial_flow_scalings[problem_number]
-    lrs = [6e-4, 4e-4, 2e-4, 1e-4, 5e-5]
+    lrs = [1e-3, 5e-4, 1e-4]
     optimizers = ["Adam"] # , "Adamax", "AdamW"]
     loss_types = ["kl", "DReG"]
     annealing_options = [True, False]

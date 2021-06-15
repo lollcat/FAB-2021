@@ -14,7 +14,7 @@ else:
 
 class LearntDistributionManager:
     def __init__(self, target_distribution, fitted_model, importance_sampler,
-                 loss_type="DReG", alpha=2, lr=1e-3, weight_decay=1e-6, k=None, use_GPU=True, optimizer="Adamax",
+                 loss_type="DReG", alpha=2, lr=1e-3, weight_decay=1e-6, k=None, use_GPU=True, optimizer="Adam",
                  annealing=False):
         if use_GPU is True:
             self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -22,12 +22,13 @@ class LearntDistributionManager:
             self.device = "cpu"
         self.importance_sampler = importance_sampler
         self.learnt_sampling_dist: BaseLearntDistribution
-        self.learnt_sampling_dist = fitted_model.to(self.device)
-        self.target_dist = target_distribution.to(self.device)
+        self.learnt_sampling_dist = fitted_model
+        self.target_dist = target_distribution
         self.loss_type = loss_type
         torch_optimizer = getattr(torch.optim, optimizer)
         self.optimizer = torch_optimizer(self.learnt_sampling_dist.parameters(), lr=lr, weight_decay=weight_decay)
         self.setup_loss(loss_type=loss_type, alpha=alpha, k=k, annealing=annealing)
+        self.to(device=self.device)
 
 
 
@@ -53,12 +54,13 @@ class LearntDistributionManager:
         if new_lr is not None:
             self.optimizer.param_groups[0]["lr"] = new_lr
 
-    def train(self, epochs=100, batch_size=256, extra_info=True,
+    def train(self, epochs=100, batch_size=256,
               clip_grad_norm=False, max_grad_norm=1, clip_grad_max=False,
               max_grad_value=0.5,
               KPI_batch_size=int(1e4), intermediate_plots=False,
               plotting_func=plot_samples,
-              n_plots=10):
+              n_plots=10,
+              allow_ignore_nan_loss=True):
         """
         :param epochs:
         :param batch_size:
@@ -81,15 +83,14 @@ class LearntDistributionManager:
         history = {"loss": [],
                    "log_p_x": [],
                    "log_q_x": []}
-        if extra_info is True:
-            history.update({
-               "kl": [],
-               "alpha_2_divergence": [],
-               "importance_weights_var": [],
-               "normalised_importance_weights_var": [],
-                "effective_sample_size": []})
-            if hasattr(self.target_dist, "sample"):
-                history.update({"alpha_2_divergence_over_p": []})
+        history.update({
+           "kl": [],
+           "alpha_2_divergence": [],
+           "importance_weights_var": [],
+           "normalised_importance_weights_var": [],
+            "effective_sample_size": []})
+        if hasattr(self.target_dist, "sample"):
+            history.update({"alpha_2_divergence_over_p": []})
 
         pbar = tqdm(range(epochs), position=0, leave=True)
         for self.current_epoch in pbar:
@@ -98,8 +99,12 @@ class LearntDistributionManager:
             log_p_x = self.target_dist.log_prob(x_samples)
             loss = self.loss(x_samples, log_q_x, log_p_x)
             if torch.isnan(loss) or torch.isinf(loss):
-                raise Exception("Nan/Inf loss encountered")
-            loss.backward()
+                if allow_ignore_nan_loss:
+                    print("Nan/Inf loss encountered")
+                else:
+                    raise Exception("Nan/Inf loss encountered")
+            else:
+                loss.backward()
             if clip_grad_max is True:
                 torch.nn.utils.clip_grad_value_(self.learnt_sampling_dist.parameters(), max_grad_value)
             if clip_grad_norm is True:

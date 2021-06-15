@@ -2,7 +2,7 @@ import torch
 from TargetDistributions.base import BaseTargetDistribution
 import torch.nn as nn
 
-class Guassian_FullCov(BaseTargetDistribution, nn.Module):
+class Guassian_FullCov(BaseTargetDistribution):
     def __init__(self, dim=5, scale_covariance=1):
         super(Guassian_FullCov, self).__init__()
         # scale_covariance just multiplies covariance by a constant, giving us the ability to make the distribution

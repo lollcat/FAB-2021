@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 from TargetDistributions.base import BaseTargetDistribution
 
-class custom_MoG(BaseTargetDistribution, nn.Module):
+class custom_MoG(BaseTargetDistribution):
     # Mog with hard coded mean and cov
     def __init__(self, dim=2, loc_scaling=1, cov_scaling=1, locs_=(-1, 1)):
         super(custom_MoG, self).__init__()
@@ -19,6 +19,11 @@ class custom_MoG(BaseTargetDistribution, nn.Module):
         self.register_buffer("locs", locs)
         self.register_buffer("covs", covs)
         self.register_buffer("cat_probs", torch.tensor([0.6, 0.4]))
+        self.distribution = self.get_distribution
+
+    def to(self, device):
+        super(custom_MoG, self).to(device)
+        self.distribution = self.get_distribution
 
     @property
     def get_distribution(self):
@@ -27,15 +32,17 @@ class custom_MoG(BaseTargetDistribution, nn.Module):
         return torch.distributions.MixtureSameFamily(mixture_distribution=mix, component_distribution=com)
 
     def log_prob(self, x):
-        return self.get_distribution.log_prob(x)
+        return self.distribution.log_prob(x)
 
     def sample(self, shape=(1,)):
-        return self.get_distribution.sample(shape)
+        return self.distribution.sample(shape)
 
 
-class MoG(BaseTargetDistribution, nn.Module):
+
+class MoG(BaseTargetDistribution):
     # mog with random mean and var
-    def __init__(self, dim=2, n_mixes=5, min_cov=0.5, loc_scaling=3.0):
+    def __init__(self, dim : int =2, n_mixes: int =5,
+                 min_cov: float=0.5, loc_scaling: float=3.0):
         super(MoG, self).__init__()
         self.dim = dim
         self.n_mixes = n_mixes
@@ -54,6 +61,11 @@ class MoG(BaseTargetDistribution, nn.Module):
         self.register_buffer("cat_probs", torch.rand(n_mixes))
         self.register_buffer("locs", locs)
         self.register_buffer("covs", covs)
+        self.distribution = self.get_distribution
+
+    def to(self, device):
+        super(MoG, self).to(device)
+        self.distribution = self.get_distribution
 
     @property
     def get_distribution(self):
@@ -61,13 +73,13 @@ class MoG(BaseTargetDistribution, nn.Module):
         com = torch.distributions.MultivariateNormal(self.locs, self.covs)
         return torch.distributions.MixtureSameFamily(mixture_distribution=mix, component_distribution=com)
 
-    def log_prob(self, x):
-        return self.get_distribution.log_prob(x)
+    def log_prob(self, x: torch.Tensor):
+        return self.distribution.log_prob(x)
 
     def sample(self, shape=(1,)):
-        return self.get_distribution.sample(shape)
+        return self.distribution.sample(shape)
 
-class Triangle_MoG(BaseTargetDistribution, nn.Module):
+class Triangle_MoG(BaseTargetDistribution):
     # Mog with hard coded mean and cov to form a triangle
     def __init__(self, loc_scaling=5, cov_scaling=1):
         super(Triangle_MoG, self).__init__()
@@ -77,6 +89,12 @@ class Triangle_MoG(BaseTargetDistribution, nn.Module):
         self.register_buffer("locs", locs)
         self.register_buffer("covs", covs)
         self.register_buffer("cat_probs", torch.tensor([0.2, 0.6, 0.2]))
+        self.distribution = self.get_distribution
+
+    def to(self, device):
+        super(Triangle_MoG, self).to(device)
+        self.distribution = self.get_distribution
+
 
     @property
     def get_distribution(self):
@@ -85,12 +103,12 @@ class Triangle_MoG(BaseTargetDistribution, nn.Module):
         return torch.distributions.MixtureSameFamily(mixture_distribution=mix, component_distribution=com)
 
     def log_prob(self, x):
-        return self.get_distribution.log_prob(x)
+        return self.distribution.log_prob(x)
 
     def sample(self, shape=(1,)):
-        return self.get_distribution.sample(shape)
+        return self.distribution.sample(shape)
 
-class Difficult_MoG(BaseTargetDistribution, nn.Module):
+class Difficult_MoG(BaseTargetDistribution):
     # Mog with hard coded mean and cov to form a triangle
     def __init__(self, loc_scaling=5, cov_scaling=1):
         super(Difficult_MoG, self).__init__()
@@ -108,6 +126,11 @@ class Difficult_MoG(BaseTargetDistribution, nn.Module):
         self.register_buffer("locs", locs)
         self.register_buffer("covs", covs)
         self.register_buffer("cat_probs", torch.tensor([0.5, 0.1, 0.2, 0.2]))
+        self.distribution = self.get_distribution
+
+    def to(self, device):
+        super(MoG, self).to(device)
+        self.distribution = self.get_distribution
 
     @property
     def get_distribution(self):
@@ -116,10 +139,10 @@ class Difficult_MoG(BaseTargetDistribution, nn.Module):
         return torch.distributions.MixtureSameFamily(mixture_distribution=mix, component_distribution=com)
 
     def log_prob(self, x):
-        return self.get_distribution.log_prob(x)
+        return self.distribution.log_prob(x)
 
     def sample(self, shape=(1,)):
-        return self.get_distribution.sample(shape)
+        return self.distribution.sample(shape)
 
 
 if __name__ == '__main__':

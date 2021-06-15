@@ -2,7 +2,6 @@ import torch
 import torch.nn.functional as F
 from ImportanceSampling.base import BaseImportanceSampler
 from FittedModels.Models.base import BaseLearntDistribution
-from collections.abc import Callable
 
 class VanillaImportanceSampling(BaseImportanceSampler):
     def __init__(self, sampling_distribution, target_distribution):
@@ -24,10 +23,13 @@ class VanillaImportanceSampling(BaseImportanceSampler):
         return expectation, info_dict
 
     @torch.no_grad()
-    def generate_samples_and_weights(self, n_samples:int=1000):
+    def generate_samples_and_weights(self, n_samples:int=1000, drop_nan_and_infs=True):
         x_samples, log_q_x = self.sampling_distribution(n_samples)
         log_p_x = self.target_distribution.log_prob(x_samples)
-        normalised_sampling_weights = F.softmax(log_p_x - log_q_x, dim=-1)
+        log_w = log_p_x - log_q_x
+        if drop_nan_and_infs:
+            log_w = torch.masked_select(log_w, ~torch.isinf(log_w) & ~torch.isnan(log_w))
+        normalised_sampling_weights = F.softmax(log_w, dim=-1)
         return x_samples, normalised_sampling_weights
 
 if __name__ == '__main__':

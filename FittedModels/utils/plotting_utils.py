@@ -23,7 +23,7 @@ def plot_samples_vs_contours(learnt_dist_manager, n_samples=1000, bounds=([-3, 3
     fig, axs = plt.subplots(1, 2, figsize=(7, 4), sharex=True, sharey=True)
     if title is not None:
         axs[0].set_title(title)
-    axs[0].plot(samples_q[:, 0], samples_q[:, 1], "o")
+    axs[0].plot(samples_q[:, 0], samples_q[:, 1], "o", alpha=0.5)
     axs[1].contour(x_points_dim1, x_points_dim2, p_x)
     plt.tight_layout()
 
@@ -40,14 +40,14 @@ def plot_samples_vs_contours_quadruple_well(learnt_dist_manager, n_samples=1000,
         p_x = torch.exp(learnt_dist_manager.target_dist.log_prob_2D(x_points.to(learnt_dist_manager.device)))
         p_x = p_x.cpu().detach().numpy()
         p_x = p_x.reshape((n_points_contour, n_points_contour))
-        x_points_dim1 = x_points_dim1.numpy()
-        x_points_dim2 = x_points_dim2.numpy()
+        x_points_dim1 = x_points[:, 0].reshape((n_points_contour, n_points_contour)).numpy()
+        x_points_dim2 = x_points[:, 1].reshape((n_points_contour, n_points_contour)).numpy()
     fig, axs = plt.subplots(2, 2, figsize=(7, 3 * 2), sharex="row", sharey="row")
     if title is not None:
         axs[0, 0].set_title(title)
-    axs[0, 0].plot(samples_q[:, 0], samples_q[:, 1], "o")
+    axs[0, 0].plot(samples_q[:, 0], samples_q[:, 1], "o", alpha=0.5)
     axs[0, 1].contourf(x_points_dim1, x_points_dim2, p_x)
-    axs[1, 0].plot(samples_q[:, 2], samples_q[:, 3], "o")
+    axs[1, 0].plot(samples_q[:, 2], samples_q[:, 3], "o", alpha=0.5)
     axs[1, 1].contourf(x_points_dim1, x_points_dim2, p_x)
     plt.tight_layout()
 
@@ -152,9 +152,9 @@ def plot_samples(learnt_dist_manager, n_samples=1000, title=None):
             axs = axs[np.newaxis, :]
         if title is not None:
             axs[0, 0].set_title(title)
-        axs[row, 0].scatter(samples_q[:, row], samples_q[:, row + 1])
+        axs[row, 0].scatter(samples_q[:, row], samples_q[:, row + 1], alpha=0.5)
         axs[row, 0].set_title(f"q(x) samples dim {row * 2}-{row * 2 + 1}")
-        axs[row, 1].scatter(samples_p[:, row], samples_p[:, row + 1])
+        axs[row, 1].scatter(samples_p[:, row], samples_p[:, row + 1], alpha=0.5)
         axs[row, 1].set_title(f"p(x) samples dim {row * 2}-{row * 2 + 1}")
     plt.tight_layout()
 

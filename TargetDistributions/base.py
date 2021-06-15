@@ -1,9 +1,13 @@
-import abc
 import torch
+import torch.nn as nn
 
-class BaseTargetDistribution(abc.ABC):
-    @abc.abstractmethod
+class BaseTargetDistribution(nn.Module):
+    def __init__(self):
+        super(BaseTargetDistribution, self).__init__()
+
     def log_prob(self, x: torch.tensor) -> torch.tensor:
         """returns (unnormalised) log probability of samples x"""
+        raise NotImplementedError
+
 
 

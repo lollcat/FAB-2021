@@ -22,22 +22,23 @@ if __name__ == '__main__':
     width = 8
     fig = plot_distribution(target, bounds=[[-width, width], [-width, width]])
 
-    epochs = 5000
-    lr = 4e-4
+    epochs = int(1e4)
+    lr = 5e-4
     weight_decay = 1e-3
     batch_size = int(1e2)
     dim = 2
+    n_flow_steps = 64
     n_samples_estimation = int(1e6)
     KPI_n_samples = int(1e4)
     flow_type = "RealNVP"
-    loss_type = "kl"
+    loss_type = "DReG" # "kl"
     def plotter(*args, **kwargs):
         # wrap plotting function like this so it displays during training
-        plot_samples_vs_contours_quadruple_well(*args, **kwargs)
+        plot_samples(*args, **kwargs)
         plt.show()
 
     torch.manual_seed(1)
-    learnt_sampler = FlowModel(x_dim=dim, n_flow_steps=5, scaling_factor=4.0, flow_type=flow_type)
+    learnt_sampler = FlowModel(x_dim=dim, n_flow_steps=n_flow_steps, scaling_factor=4.0, flow_type=flow_type)
     tester = LearntDistributionManager(target, learnt_sampler, VanillaImportanceSampling, loss_type=loss_type,
                                        lr=lr, weight_decay=weight_decay)
     # unstable with lr=1e-3
@@ -48,7 +49,8 @@ if __name__ == '__main__':
 
     samples_fig_before = plot_samples(tester)
 
-    history = tester.train(epochs, batch_size=batch_size, KPI_batch_size=KPI_n_samples, intermediate_plots=True)
+    history = tester.train(epochs, batch_size=batch_size, KPI_batch_size=KPI_n_samples, intermediate_plots=True,
+                           plotting_func=plotter)
                            #clip_grad_norm=True, max_grad_norm=1, intermediate_plots=True)
 
     tester.learnt_sampling_dist.check_forward_backward_consistency()

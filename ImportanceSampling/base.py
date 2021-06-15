@@ -1,6 +1,6 @@
 import abc
 import torch
-from collections.abc import Callable
+
 class BaseImportanceSampler(abc.ABC):
 
     @abc.abstractmethod

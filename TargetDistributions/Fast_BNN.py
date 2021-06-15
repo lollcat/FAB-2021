@@ -128,7 +128,7 @@ class Target(nn.Module):
         y = self.model(x)
         return x, y
 
-class FastPosteriorBNN(BaseTargetDistribution, nn.Module):
+class FastPosteriorBNN(BaseTargetDistribution):
     """
      p(w | X, Y) proportional to p(w) p(Y | X, w)
      where we generate X, Y datasets using the Target class

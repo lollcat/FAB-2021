@@ -3,6 +3,7 @@ import itertools
 from mpl_toolkits.mplot3d import axes3d
 import matplotlib.pyplot as plt
 import matplotlib as mpl
+import numpy as np
 
 from matplotlib.backends.backend_pdf import PdfPages
 
@@ -25,6 +26,22 @@ def plot_samples_single_dist(distribution, n_samples = 1000):
     fig, axs = plt.subplots(1)
     axs.scatter(samples_q[:, 0], samples_q[:, 1])
     axs.set_title("q(x) samples")
+
+def plot_samples(distributions, n_samples=1000, title=None):
+    samples = []
+    for distribution in distributions:
+        samples.append(distribution.sample((n_samples,)))
+    rows = int(distributions[0].dim / 2)
+    fig, axs = plt.subplots(rows, len(distributions), sharex="all", sharey="all", figsize=(7, 3 * rows))
+    for row in range(rows):
+        if len(axs.shape) == 1:  # need another axis for slicing
+            axs = axs[np.newaxis, :]
+        if title is not None:
+            axs[0, 0].set_title(title)
+        for i, sample_set in enumerate(samples):
+            axs[row, i].scatter(sample_set[:, row], sample_set[:, row + 1])
+            axs[row, i].set_title(f"distribution {i} samples dim {row * 2}-{row * 2 + 1}")
+    plt.tight_layout()
 
 
 def plot_3D(x, z, n, ax, title=None):

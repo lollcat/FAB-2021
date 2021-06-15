@@ -13,13 +13,15 @@ class AnnealedImportanceSampler(BaseImportanceSampler):
     where 0 = b_0 < b_1 ... < b_d = 1
     """
     def __init__(self, sampling_distribution, target_distribution,
-                 n_distributions=200, n_updates_Metropolis=10, save_for_visualisation=True, save_spacing=20,
-                 distribution_spacing="geometric", noise_scaling=1.0):
-        self.noise_scaling = noise_scaling
+                 n_distributions=200, n_steps_transition_operator=10, save_for_visualisation=True, save_spacing=20,
+                 distribution_spacing="geometric",
+                 step_size=1.0, transition_operator="Metropolis", HMC_inner_steps=5):
+        # this changes meaning depending on algorithm, for Metropolis it scales noise, for HMC it is step size
+        self.step_size = torch.tensor([step_size])
         self.sampling_distribution = sampling_distribution
         self.target_distribution = target_distribution
         self.n_distributions = n_distributions
-        self.n_updates_Metropolis = n_updates_Metropolis
+        self.n_steps_transition_operator = n_steps_transition_operator
         n_linspace_points = int(n_distributions/5) # rough heuristic, copying ratio used in example in AIS paper
         n_geomspace_points = n_distributions - n_linspace_points
         if distribution_spacing == "geometric":
@@ -36,6 +38,22 @@ class AnnealedImportanceSampler(BaseImportanceSampler):
             self.save_spacing = save_spacing
             self.log_w_history = []
             self.samples_history = []
+        # Metropolis_transition(x, n_updates, p_x_func, noise_scaling)
+        if transition_operator == "Metropolis":
+            from ImportanceSampling.SamplingAlgorithms.Metropolis import Metropolis_transition
+            self.transition_operator = lambda x, j: \
+                Metropolis_transition(x=x,
+                                      log_p_x_func=lambda x_new: self.intermediate_unnormalised_log_prob(x_new, j),
+                                      n_updates=self.n_steps_transition_operator,
+                                      noise_scalings=self.step_size)
+        elif transition_operator == "HMC":
+            from ImportanceSampling.SamplingAlgorithms.HamiltonianMonteCarlo import HMC
+            self.transition_operator = lambda x, j: \
+                HMC(log_q_x=lambda x_new: self.intermediate_unnormalised_log_prob(x_new, j),
+                    epsilon=self.step_size, n_outer=n_steps_transition_operator, L=HMC_inner_steps,
+                    current_q=x, grad_log_q_x=None)
+        else:
+            raise NotImplementedError(f"Sampling method {transition_operator} not implemented")
 
     @property
     def device(self):
@@ -46,7 +64,7 @@ class AnnealedImportanceSampler(BaseImportanceSampler):
         x_new, log_prob_p0 = self.sampling_distribution(n_runs)
         log_w += self.intermediate_unnormalised_log_prob(x_new, 1) - log_prob_p0
         for j in range(1, self.n_distributions-1):
-            x_new = self.Metropolis_transition(x_new, j)
+            x_new = self.transition_operator(x_new, j)
             log_w += self.intermediate_unnormalised_log_prob(x_new, j+1) - \
                      self.intermediate_unnormalised_log_prob(x_new, j)
             if self.save_for_visualisation:
@@ -54,19 +72,6 @@ class AnnealedImportanceSampler(BaseImportanceSampler):
                     self.log_w_history.append(log_w)
                     self.samples_history.append(x_new)
         return x_new, log_w
-
-
-    def Metropolis_transition(self, x, j):
-        for n in range(self.n_updates_Metropolis):
-            x_proposed = x + torch.randn(x.shape).to(x.device) * self.noise_scaling
-            x_proposed_log_prob = self.intermediate_unnormalised_log_prob(x_proposed, j)
-            x_prev_log_prob = self.intermediate_unnormalised_log_prob(x, j)
-            acceptance_probability = torch.exp(x_proposed_log_prob - x_prev_log_prob)
-            # not that sometimes this will be greater than one, corresonding to 100% probability of acceptance
-            accept = (acceptance_probability > torch.rand(acceptance_probability.shape).to(x.device)).int()
-            accept = accept[:, None].repeat(1, x.shape[-1])
-            x = accept*x_proposed + (1-accept)*x
-        return x
 
 
     def intermediate_unnormalised_log_prob(self, x, j):
@@ -91,13 +96,31 @@ class AnnealedImportanceSampler(BaseImportanceSampler):
 
 
 if __name__ == '__main__':
-    from TargetDistributions.Guassian_FullCov import Guassian_FullCov
+    from TargetDistributions.MoG import MoG
     from FittedModels.Models.DiagonalGaussian import DiagonalGaussian
-    from Utils.numerical_utils import expectation_function, MC_estimate_true_expectation
-    dim = 5
-    target = Guassian_FullCov(dim=dim)
+    from Utils.numerical_utils import MC_estimate_true_expectation
+    from Utils.numerical_utils import quadratic_function as expectation_function
+    import matplotlib.pyplot as plt
+
+    dim = 2
+    n_samples = 1000
+    target = MoG(dim=dim)
     learnt_sampler = DiagonalGaussian(dim=dim)
-    test = AnnealedImportanceSampler(sampling_distribution=learnt_sampler, target_distribution=target)
+    test = AnnealedImportanceSampler(sampling_distribution=learnt_sampler, target_distribution=target,
+                                     transition_operator="HMC", n_steps_transition_operator=4,
+                                     n_distributions=20)
     true_expectation = MC_estimate_true_expectation(target, expectation_function, int(1e4))
-    expectation, info_dict = test.calculate_expectation(5000, expectation_function=expectation_function)
+    expectation, info_dict = test.calculate_expectation(n_samples , expectation_function=expectation_function)
     print(true_expectation, expectation)
+
+    sampler_samples = learnt_sampler.sample((n_samples,)).cpu().detach()
+    plt.plot(sampler_samples[:, 0], sampler_samples[:, 1], "o")
+    plt.title("sampler samples")
+    plt.show()
+    plt.plot(info_dict["samples"][:, 0], info_dict["samples"][:, 1], "o")
+    plt.title("annealed samples")
+    plt.show()
+    true_samples = target.sample((n_samples, )).cpu().detach()
+    plt.plot(true_samples[:, 0], true_samples[:, 1], "o")
+    plt.title("true samples")
+    plt.show()
