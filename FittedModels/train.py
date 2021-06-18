@@ -151,7 +151,7 @@ class LearntDistributionManager:
             return 1.0
         else:
             annealing_period = int(self.total_epochs/2)  #  anneal during first half of training
-            return min(1.0, 0.001 + self.current_epoch/annealing_period)
+            return min(1.0, 0.01 + self.current_epoch/annealing_period)
 
     def dreg_alpha_divergence_loss(self, x_samples, log_q_x_not_used, log_p_x):
         self.learnt_sampling_dist.set_requires_grad(False)

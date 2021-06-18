@@ -25,6 +25,12 @@ class VanillaImportanceSampling(BaseImportanceSampler):
     @torch.no_grad()
     def generate_samples_and_weights(self, n_samples:int=1000, drop_nan_and_infs=True):
         x_samples, log_q_x = self.sampling_distribution(n_samples)
+        if drop_nan_and_infs:
+            contains_neg_infs = torch.isinf(log_q_x) | torch.isnan(log_q_x)
+            n_valid_samples = torch.sum(~contains_neg_infs)
+            log_q_x = torch.masked_select(log_q_x, ~contains_neg_infs)
+            x_flat = torch.masked_select(x_samples, ~contains_neg_infs[:, None].repeat(1, x_samples.shape[-1]))
+            x_samples = x_flat.unflatten(dim=0, sizes=(n_valid_samples, x_samples.shape[-1]))
         log_p_x = self.target_distribution.log_prob(x_samples)
         log_w = log_p_x - log_q_x
         if drop_nan_and_infs:

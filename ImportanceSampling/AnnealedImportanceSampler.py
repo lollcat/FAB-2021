@@ -88,9 +88,9 @@ class AnnealedImportanceSampler(BaseImportanceSampler):
         function_values = expectation_function(samples)
         expectation = normalised_importance_weights.T @ function_values
         effective_sample_size = self.effective_sample_size(normalised_importance_weights)
-        info_dict = {"effective_sample_size": effective_sample_size,
-                     "normalised_sampling_weights": normalised_importance_weights.detach(),
-                     "samples": samples.detach()}
+        info_dict = {"effective_sample_size": effective_sample_size.cpu().detach(),
+                     "normalised_sampling_weights": normalised_importance_weights.cpu().detach(),
+                     "samples": samples.cpu().detach()}
         return expectation, info_dict
 
 

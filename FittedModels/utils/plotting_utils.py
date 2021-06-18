@@ -143,8 +143,9 @@ def plot_history(history, bounds=None, running_chunk_n=15):
     plt.tight_layout()
 
 
-def plot_samples(learnt_dist_manager, n_samples=1000, title=None):
-    samples_q = learnt_dist_manager.learnt_sampling_dist.sample((n_samples,))
+def plot_samples(learnt_dist_manager, n_samples=1000, title=None, samples_q=None):
+    if samples_q is None:
+        samples_q = learnt_dist_manager.learnt_sampling_dist.sample((n_samples,))
     samples_q = torch.clamp(samples_q, -100, 100).detach().cpu()
     samples_p = learnt_dist_manager.target_dist.sample((n_samples,)).detach().cpu()
     rows = int(learnt_dist_manager.learnt_sampling_dist.dim / 2)

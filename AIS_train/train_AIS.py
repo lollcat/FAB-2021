@@ -19,7 +19,7 @@ class AIS_trainer(LearntDistributionManager):
     """
     def __init__(self, target_distribution, fitted_model,
                  n_distributions=10, n_steps_transition_operator=5, save_for_visualisation=False, save_spacing=20,
-                 loss_type="kl", step_size=1.0, train_AIS_params=True, alpha=2, importance_param_lr=1e-1,
+                 loss_type="kl", step_size=1.0, train_AIS_params=False, alpha=2, importance_param_lr=1e-1,
                  transition_operator="Metropolis", HMC_inner_steps=3, maximise_log_prob_annealed=True,
                  learnt_dist_kwargs={}, AIS_kwargs={}):
         assert loss_type in ["kl", "DReG", "var", "ESS"]
@@ -146,7 +146,7 @@ class AIS_trainer(LearntDistributionManager):
                     plotting_func(self, n_samples=1000,
                                   title=f"training epoch, samples from flow {self.current_epoch}")
                     # make sure plotting func has option to enter x_samples directly
-                    plotting_func(self, n_samples=None,
+                    plotting_func(self, n_samples=1000,
                                   title=f"training epoch, samples from AIS {self.current_epoch}",
                                   samples_q=x_samples)
         return history
