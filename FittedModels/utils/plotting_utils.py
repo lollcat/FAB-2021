@@ -7,9 +7,10 @@ from Utils.plotting_utils import plot_3D
 
 
 def plot_samples_vs_contours(learnt_dist_manager, n_samples=1000, bounds=([-3, 3], [-3, 3]),
-                             n_points_contour=100, title=None):
+                             n_points_contour=100, title=None, samples_q=None):
     # when we can't sample from target distribution
-    samples_q = learnt_dist_manager.learnt_sampling_dist.sample((n_samples,))
+    if samples_q is None:
+        samples_q = learnt_dist_manager.learnt_sampling_dist.sample((n_samples,))
     samples_q = torch.clamp(samples_q, -100, 100).cpu().detach().numpy()
     x_points_dim1 = torch.linspace(bounds[0][0], bounds[0][1], n_points_contour)
     x_points_dim2 = torch.linspace(bounds[1][0], bounds[1][1], n_points_contour)
@@ -28,11 +29,12 @@ def plot_samples_vs_contours(learnt_dist_manager, n_samples=1000, bounds=([-3, 3
     plt.tight_layout()
 
 
-def plot_samples_vs_contours_quadruple_well(learnt_dist_manager, n_samples=1000, bounds=([-3, 3], [-3, 3]),
-                                            n_points_contour=100, title=None):
+def plot_samples_vs_contours_many_well(learnt_dist_manager, n_samples=1000, bounds=([-3, 3], [-3, 3]),
+                                       n_points_contour=100, title=None, samples_q=None):
     # when we can't sample from target distribution
-    samples_q = learnt_dist_manager.learnt_sampling_dist.sample((n_samples,))
-    samples_q = torch.clamp(samples_q, -100, 100).cpu().detach().numpy()
+    if samples_q is None:
+        samples_q = learnt_dist_manager.learnt_sampling_dist.sample((n_samples,))
+    samples_q = samples_q.cpu().detach().numpy()
     x_points_dim1 = torch.linspace(bounds[0][0], bounds[0][1], n_points_contour)
     x_points_dim2 = torch.linspace(bounds[1][0], bounds[1][1], n_points_contour)
     x_points = torch.tensor(list(itertools.product(x_points_dim1, x_points_dim2)))
@@ -42,14 +44,15 @@ def plot_samples_vs_contours_quadruple_well(learnt_dist_manager, n_samples=1000,
         p_x = p_x.reshape((n_points_contour, n_points_contour))
         x_points_dim1 = x_points[:, 0].reshape((n_points_contour, n_points_contour)).numpy()
         x_points_dim2 = x_points[:, 1].reshape((n_points_contour, n_points_contour)).numpy()
-    fig, axs = plt.subplots(2, 2, figsize=(7, 3 * 2), sharex="row", sharey="row")
+    fig, axs = plt.subplots(learnt_dist_manager.target_dist.n_wells, 2, figsize=(7, 3 * learnt_dist_manager.target_dist.n_wells), sharex="row", sharey="row")
     if title is not None:
         axs[0, 0].set_title(title)
-    axs[0, 0].plot(samples_q[:, 0], samples_q[:, 1], "o", alpha=0.5)
-    axs[0, 1].contourf(x_points_dim1, x_points_dim2, p_x)
-    axs[1, 0].plot(samples_q[:, 2], samples_q[:, 3], "o", alpha=0.5)
-    axs[1, 1].contourf(x_points_dim1, x_points_dim2, p_x)
+    for i in range(learnt_dist_manager.target_dist.n_wells):
+        axs[i, 0].plot(samples_q[:, i*2], samples_q[:, i*2+1], "o", alpha=0.2)
+        axs[i, 1].contourf(x_points_dim1, x_points_dim2, p_x)
     plt.tight_layout()
+
+
 
 
 def plot_distributions(learnt_dist_manager, bounds=([-10, 10], [-10, 10]), n_points=100,
@@ -130,7 +133,6 @@ def plot_history(history, bounds=None, running_chunk_n=15):
             data = data.dropna()
             print(f"NaN encountered in {key} history")
         axs[i].plot(data)
-        axs[i].plot(data.rolling(rolling_interval).mean())
         axs[i].set_title(key)
         if bounds is not None:
             mini = max(bounds[0], data.min())

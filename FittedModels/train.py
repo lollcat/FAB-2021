@@ -30,8 +30,6 @@ class LearntDistributionManager:
         self.setup_loss(loss_type=loss_type, alpha=alpha, k=k, annealing=annealing)
         self.to(device=self.device)
 
-
-
     def setup_loss(self, loss_type, alpha=2, k=None, new_lr=None, annealing=False):
         self.annealing = annealing
         self.k = k # if DReG then k is number of samples that going inside the log sum, if none then put all of them inside
@@ -130,6 +128,8 @@ class LearntDistributionManager:
             if intermediate_plots:
                 if self.current_epoch % epoch_per_plot == 0:
                     plotting_func(self, n_samples=1000, title=f"training epoch {self.current_epoch}")
+                    if self.current_epoch > 0:
+                        print(f"ESS is {np.mean(history['effective_sample_size'][-epoch_per_plot:])}")
         return history
 
     def to(self, device):
@@ -170,26 +170,6 @@ class LearntDistributionManager:
         dreg_loss = torch.mean(DreG_for_each_batch_dim)
         return dreg_loss
 
-    def dreg_alpha_divergence_loss_prior_training(self, x_samples, log_q_x_not_used, log_p_x):
-        self.learnt_sampling_dist.set_requires_grad(False)
-        log_q_x = self.learnt_sampling_dist.log_prob(x_samples)
-        self.learnt_sampling_dist.set_requires_grad(True)
-        # flow params must remain false when we are training only the prior
-        self.learnt_sampling_dist.set_flow_requires_grad(False)
-        log_w = log_p_x - log_q_x
-        outside_dim = log_q_x.shape[0]/self.k  # this is like a batch dimension that we average DReG estimation over
-        assert outside_dim % 1 == 0  # always make k & n_samples work together nicely for averaging
-        outside_dim = int(outside_dim)
-        log_w = log_w.reshape((outside_dim, self.k))
-        with torch.no_grad():
-            w_alpha_normalised_alpha = F.softmax(self.alpha*log_w, dim=-1)
-        DreG_for_each_batch_dim = - self.alpha_one_minus_alpha_sign * \
-                    torch.sum(((1 - self.alpha) * w_alpha_normalised_alpha + self.alpha * w_alpha_normalised_alpha**2)
-                              * log_w, dim=-1)
-        dreg_loss = torch.mean(DreG_for_each_batch_dim)
-        return dreg_loss
-
-
     def dreg_kl_loss(self, x_samples, log_q_x_not_used, log_p_x):
         self.learnt_sampling_dist.set_requires_grad(False)
         log_q_x = self.learnt_sampling_dist.log_prob(x_samples)
@@ -204,25 +184,6 @@ class LearntDistributionManager:
         DreG_for_each_batch_dim = - torch.sum(w_normalised_squared * log_w, dim=-1)
         dreg_loss = torch.mean(DreG_for_each_batch_dim)
         return dreg_loss
-
-    def train_prior(self, epochs, batch_size, loss_type="DReG", lr=0.005):
-        loss_kwargs = {"loss_type": self.loss_type,
-                       "alpha": self.alpha,
-                       "k": self.k,
-                       "new_lr": self.optimizer.param_groups[0]["lr"],
-                       "annealing": self.annealing}  # save so we can reset this after prior training
-        self.loss_type = loss_type + "prior"
-        # first let's train just the prior
-        if loss_type == "DReG":
-            self.loss = self.dreg_alpha_divergence_loss_prior_training
-            self.alpha = 2  # alpha for alpha-divergence
-            self.alpha_one_minus_alpha_sign = torch.sign(torch.tensor(self.alpha * (1 - self.alpha)))
-        self.optimizer.param_groups[0]["lr"] = lr
-        self.learnt_sampling_dist.set_flow_requires_grad(False)
-        history = self.train(epochs, batch_size=int(batch_size))
-        self.learnt_sampling_dist.set_flow_requires_grad(True)
-        self.setup_loss(**loss_kwargs)
-        return history
 
     def importance_weights_key_info(self, batch_size=1000):
         x_samples, log_q_x = self.learnt_sampling_dist(batch_size)

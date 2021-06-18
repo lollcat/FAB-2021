@@ -6,7 +6,7 @@ from NormalisingFlow.base import BaseFlow
 
 
 class IAF(BaseFlow):
-    def __init__(self, x_dim, nodes_per_x=3, n_hidden_layers=1, reversed=True, use_exp=True, init_zeros=True):
+    def __init__(self, x_dim, nodes_per_x=3, n_hidden_layers=1, reversed=True, use_exp=False, init_zeros=True):
         super(IAF, self).__init__()
         self.use_exp = use_exp
         self.x_dim = x_dim
@@ -18,7 +18,6 @@ class IAF(BaseFlow):
     def inverse(self, x):
         log_determinant = torch.zeros(x.shape[0]).to(x.device)
         m, s = self.AutoregressiveNN(x)
-        m, s = self.reparameterise(m, s)
         if self.use_exp:
             x = torch.exp(s) * x + m
             log_determinant += torch.sum(s, dim=1)
@@ -31,13 +30,6 @@ class IAF(BaseFlow):
             x = x.flip(dims=(-1,))
         return x, log_determinant
 
-    def reparameterise(self, m, s):
-        # make s start relatively close to 0, and exp(s) close to 1, and m close to 0
-        # this helps the flow start of not overly funky!
-        if self.use_exp:
-            return m, s
-        else:  # if sigmoid reparameterise s to be close to 1.5
-            return m/10, s/10 + 1.5
 
     def forward(self, x):
         # found https://github.com/karpathy/pytorch-normalizing-flows/blob/master/nflib/flows.py useful for this
@@ -47,7 +39,6 @@ class IAF(BaseFlow):
             x = x.flip(dims=(-1,))
         for i in range(self.x_dim):
             m, s = self.AutoregressiveNN(z.clone())
-            m, s = self.reparameterise(m, s)
             if self.use_exp is True:
                 z[:, i] = (x[:, i] - m[:, i])*torch.exp(-s[:, i])
                 log_determinant -= s[:, i]

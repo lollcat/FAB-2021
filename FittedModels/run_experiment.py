@@ -43,10 +43,10 @@ def run_experiment(save_path,
         plotter = plot_samples_vs_contours
 
     elif target_type == "QuadrupleWell":
-        from FittedModels.utils.plotting_utils import plot_samples_vs_contours_quadruple_well
+        from FittedModels.utils.plotting_utils import plot_samples_vs_contours_many_well
         dim = 4
         target = ManyWellEnergy(a=-0.5, b=-6)
-        plotter = plot_samples_vs_contours_quadruple_well
+        plotter = plot_samples_vs_contours_many_well
 
     elif target_type[0:3] == "MoG":  # e.g. MoG_3D
         from TargetDistributions.MoG import MoG

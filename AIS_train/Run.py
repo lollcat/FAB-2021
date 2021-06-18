@@ -8,32 +8,63 @@ from TargetDistributions.MoG import MoG
 from Utils.plotting_utils import plot_distribution
 from Utils.numerical_utils import MC_estimate_true_expectation
 from Utils.numerical_utils import quadratic_function as expectation_function
+
+
+
 torch.set_default_dtype(torch.float64)
 if __name__ == '__main__':
     get_useful_info_before_train = False  # compare to vanilla IS before, plot stuff
-
+    problem = "ManyWell"    # "TwoMode" # "MoG"
     torch.manual_seed(2)
     epochs = 100
-    dim = 2
+    dim = 12
     n_samples_estimation = int(1e4)
     n_samples_expectation = int(1e6)
-    n_samples = int(1e3)
-    flow_scaling = 2.0
+    n_samples = int(1e2)
+    step_size = 0.5
+    transition_operator = "HMC"
+    use_exp = True
+    n_distributions = 3
+    n_steps_transition_operator=1
+    train_AIS_param=False
 
-    def plotter(*args, **kwargs):
-        plot_samples(*args, **kwargs)
-        plt.show()
+    if problem == "ManyWell":
+        from TargetDistributions.DoubleWell import ManyWellEnergy
+        from FittedModels.utils.plotting_utils import plot_samples_vs_contours_many_well
+        target = ManyWellEnergy(dim=dim, a=-0.5, b=-6)
+        scaling_factor = 3.0
+        def plotter(*args, **kwargs):
+            # wrap plotting function like this so it displays during training
+            plot_samples_vs_contours_many_well(*args, **kwargs)
+            plt.show()
+    elif problem == "TwoMode":
+        from TargetDistributions.VincentTargets import TwoModes
+        assert dim == 2
+        from FittedModels.utils.plotting_utils import plot_samples_vs_contours
+        scaling_factor = 5.0
+        target = TwoModes(2.0, 0.1)
+        def plotter(*args, **kwargs):
+            # wrap plotting function like this so it displays during training
+            plot_samples_vs_contours(*args, **kwargs)
+            plt.show()
 
 
-    target = MoG(dim=dim, n_mixes=10, min_cov=1, loc_scaling=5)
-    if dim == 2:
-        fig = plot_distribution(target, bounds=[[-30, 20], [-20, 20]])
+    elif problem == "MoG":
+        target = MoG(dim=dim, n_mixes=10, min_cov=1, loc_scaling=5)
+        def plotter(*args, **kwargs):
+            plot_samples(*args, **kwargs)
+            plt.show()
+    else:
+        raise NotImplementedError
+        scaling_factor = 5.0
 
-    learnt_sampler = FlowModel(x_dim=dim, scaling_factor=5.0, flow_type="RealNVP", n_flow_steps=64)
-    tester = AIS_trainer(target, learnt_sampler, loss_type="DReG", n_distributions=10, n_steps_transition_operator=3,
-                         step_size=1.0, transition_operator="HMC", train_AIS_params=True,
+    learnt_sampler = FlowModel(x_dim=dim, scaling_factor=scaling_factor, flow_type="RealNVP", n_flow_steps=64,
+                               use_exp = use_exp)
+    tester = AIS_trainer(target, learnt_sampler, loss_type="DReG", n_distributions=n_distributions,
+                         n_steps_transition_operator=n_steps_transition_operator,
+                         step_size=step_size, transition_operator=transition_operator, train_AIS_params=train_AIS_param,
                          learnt_dist_kwargs={"lr": 1e-3})
-
+    tester.loss = lambda x: torch.zeros(1).to(x.device)  # train likelihood only
 
     if get_useful_info_before_train:
         true_expectation = MC_estimate_true_expectation(target, expectation_function, int(1e6))

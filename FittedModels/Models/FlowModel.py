@@ -10,20 +10,15 @@ class FlowModel(nn.Module, BaseLearntDistribution):
     we are also assuming that we are only interested in p(x), so return this for both forwards and backwards,
     we could add methods for p(z) if this comes into play
     """
-    def __init__(self, x_dim, flow_type="IAF", n_flow_steps=3, scaling_factor=1.0,
-                 trainable_prior=True, *flow_args, **flow_kwargs):
+    def __init__(self, x_dim, flow_type="RealNVP", n_flow_steps=10, scaling_factor=1.0,
+                 *flow_args, **flow_kwargs):
         super(FlowModel, self).__init__()
         self.class_args = (x_dim, flow_type, n_flow_steps, scaling_factor, *flow_args)
         self.class_kwargs = flow_kwargs
         self.dim = x_dim
         self.scaling_factor = nn.Parameter(torch.tensor([scaling_factor]))
-
-        if trainable_prior:
-            self.prior_mean = nn.Parameter(torch.zeros(x_dim))
-            self.log_prior_covariance_diag = nn.Parameter(torch.zeros(x_dim))
-        else:
-            self.register_buffer("prior_mean", torch.zeros(x_dim))
-            self.register_buffer("log_prior_covariance_diag", torch.zeros(x_dim))
+        self.register_buffer("prior_mean", torch.zeros(x_dim))
+        self.register_buffer("covariance_matrix", torch.eye(x_dim))
 
         if flow_type == "IAF":
             from NormalisingFlow.IAF import IAF
@@ -39,16 +34,22 @@ class FlowModel(nn.Module, BaseLearntDistribution):
             flow_block = flow(x_dim, reversed=reversed, *flow_args, **flow_kwargs)
             self.flow_blocks.append(flow_block)
             self.flow_blocks.append(ActNorm(x_dim))
+        self.prior = self.get_prior()
+
+    def to(self, device):
+        super(FlowModel, self).to(device)
+        self.prior = self.get_prior()
+
 
     def set_flow_requires_grad(self, requires_grad):
         for parameter in self.flow_blocks.parameters():
             parameter.requires_grad = requires_grad
 
-    @property
-    def prior(self):
-        covariance_matrix = torch.diag(torch.sigmoid(self.log_prior_covariance_diag)*2)
-        return torch.distributions.MultivariateNormal(loc=self.prior_mean,
-                                                                covariance_matrix=covariance_matrix)
+    def get_prior(self):
+        prior = torch.distributions.MultivariateNormal(loc=self.prior_mean,
+                                                                covariance_matrix=self.covariance_matrix)
+        prior.set_default_validate_args(False)
+        return prior
 
     def forward(self, batch_size=1):
         # for the forward pass of the model we generate x samples
@@ -70,7 +71,7 @@ class FlowModel(nn.Module, BaseLearntDistribution):
         Sample from z, transform to give x
         log p(x) = log p(z) - log |dx/dz|
         """
-        x = self.prior.rsample((batch_size,))
+        x = self.prior.sample((batch_size,))
         log_prob = self.prior.log_prob(x)
         for flow_step in self.flow_blocks:
             x, log_determinant = flow_step.inverse(x)
@@ -94,6 +95,33 @@ class FlowModel(nn.Module, BaseLearntDistribution):
         log_prob += prior_prob
         z = x
         return z, log_prob
+
+    def x_to_z_with_check(self, x):
+        """
+        log prob but checks if samples have support
+        """
+        log_prob = torch.zeros(x.shape[0], device=x.device)
+        x, log_det = self.un_widen(x)
+        log_prob += log_det
+        for flow_step in self.flow_blocks[::-1]:
+            x, log_determinant = flow_step.forward(x)
+            log_prob += log_determinant
+        valid_samples = self.prior.support.check(x)
+        if not valid_samples.all():
+            n_valid_samples = torch.sum(valid_samples)
+            print(f"\ndiscarding samples too far out prior {valid_samples.shape[0] - n_valid_samples} out of "
+                  f"{valid_samples.shape[0] }\n")
+            x_flat = torch.masked_select(x, valid_samples[:, None].repeat(1, self.dim))
+            x = x_flat.unflatten(dim=0, sizes=(n_valid_samples, self.dim))
+            log_prob = torch.masked_select(log_prob, valid_samples)
+        prior_prob = self.prior.log_prob(x)
+        log_prob += prior_prob
+        z = x
+        return z, log_prob, valid_samples
+
+    def log_prob_checked(self, x):
+        z, log_prob, valid_samples = self.x_to_z_with_check(x)
+        return log_prob, valid_samples
 
     def log_prob(self, x):
         x, log_prob = self.x_to_z(x)

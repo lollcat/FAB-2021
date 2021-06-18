@@ -5,7 +5,7 @@ from NormalisingFlow.Nets.MLP import MLP
 from NormalisingFlow.base import BaseFlow
 
 class RealNVP(BaseFlow):
-    def __init__(self, x_dim, nodes_per_x=2, n_hidden_layers=1, reversed=False, use_exp=True):
+    def __init__(self, x_dim, nodes_per_x=2, n_hidden_layers=1, reversed=False, use_exp=False):
         super(RealNVP, self).__init__()
         self.use_exp = use_exp
         self.d = x_dim // 2  # elements copied from input to output
@@ -21,7 +21,6 @@ class RealNVP(BaseFlow):
         x_1_to_d = z_1_to_d
         st = self.MLP(z_1_to_d)
         s, t = st.split(self.D_minus_d, dim=-1)
-        t, s = self.reparameterise(t, s)
         if self.use_exp:
             x_d_plus_1_to_D = (z_d_plus_1_to_D - t) * torch.exp(-s)
             log_determinant = -torch.sum(s, dim=-1)
@@ -43,7 +42,6 @@ class RealNVP(BaseFlow):
         z_1_to_d = x_1_to_d
         st = self.MLP(x_1_to_d)
         s, t = st.split(self.D_minus_d, dim=-1)
-        t, s = self.reparameterise(t, s)
         if self.use_exp:
             z_d_plus_1_to_D = x_d_plus_1_to_D * torch.exp(s) + t
             log_determinant = torch.sum(s, dim=-1)
@@ -55,12 +53,6 @@ class RealNVP(BaseFlow):
         z = torch.cat([z_1_to_d, z_d_plus_1_to_D], dim=-1)
         return z, log_determinant
 
-
-    def reparameterise(self, t: torch.tensor, s: torch.tensor) -> (torch.tensor, torch.tensor):
-        if self.use_exp:
-            return t, s
-        else:  # if sigmoid reparameterise s to be close to 1.5
-            return t/10, s / 10 + 1.5
 
 
 if __name__ == '__main__':

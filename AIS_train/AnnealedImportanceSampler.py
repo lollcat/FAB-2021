@@ -42,11 +42,11 @@ class AnnealedImportanceSampler(BaseAIS):
             self.samples_history = []
 
         self.train_parameters = train_parameters
-        if train_parameters is True:
-            self.log_step_size = nn.parameter.Parameter(torch.log(torch.tensor([step_size])))
-        else:
-            self.log_step_size = torch.log(torch.tensor([step_size]))
 
+        self.min_step_size = torch.tensor([0.05])
+        self.log_step_size = torch.log(torch.tensor([step_size]) - self.min_step_size)
+        if train_parameters is True:
+            self.log_step_size = nn.parameter.Parameter(self.log_step_size)
         # Metropolis_transition(x, n_updates, p_x_func, noise_scaling)
         if transition_operator == "Metropolis":
             from ImportanceSampling.SamplingAlgorithms.Metropolis import Metropolis_transition
@@ -65,6 +65,14 @@ class AnnealedImportanceSampler(BaseAIS):
             raise NotImplementedError(f"Sampling method {transition_operator} not implemented")
 
 
+    def to(self, device):
+        if self.train_parameters:
+            self.log_step_size = nn.Parameter(self.log_step_size.to(device))
+        else:
+            self.log_step_size = self.log_step_size.to(device)
+        self.min_step_size = self.min_step_size.to(device)
+
+
     def run(self, n_runs):
         log_w = torch.zeros(n_runs).to(self.device)  # log importance weight
         x_new, log_prob_p0 = self.sampling_distribution(n_runs)
@@ -73,9 +81,7 @@ class AnnealedImportanceSampler(BaseAIS):
             log_prob_p0 = self.sampling_distribution.log_prob(x_new)
         log_w += self.intermediate_unnormalised_log_prob(x_new, 1) - log_prob_p0
         for j in range(1, self.n_distributions-1):
-            x_new = self.transition_operator(x_new, j)
-            log_w += self.intermediate_unnormalised_log_prob(x_new, j+1) - \
-                     self.intermediate_unnormalised_log_prob(x_new, j)
+            x_new, log_w = self.perform_update_standard(x_new, log_w, j)
             if self.save_for_visualisation:
                 if (j+1) % self.save_spacing == 0:
                     self.log_w_history.append(log_w)
@@ -84,9 +90,37 @@ class AnnealedImportanceSampler(BaseAIS):
             self.sampling_distribution.set_requires_grad(True)
         return x_new, log_w
 
+    def perform_update_standard(self, x_new, log_w, j):
+        x_new = self.transition_operator(x_new, j)
+        log_w = log_w + self.intermediate_unnormalised_log_prob(x_new, j + 1) - \
+                 self.intermediate_unnormalised_log_prob(x_new, j)
+        return x_new, log_w
+
     @property
     def step_size(self):
-        return torch.exp(self.log_step_size)
+        return torch.exp(self.log_step_size) + self.min_step_size
+
+    def intermediate_unnormalised_log_prob(self, x, j):
+        # j is the step of the algorithm, and corresponds which intermediate distribution that we are sampling from
+        # j = 0 is the sampling distribution, j=N is the target distribution
+        beta = self.B_space[j]
+        return (1-beta)*self.sampling_distribution.log_prob(x) + beta*self.target_distribution.log_prob(x)
+
+    def perform_update_safe(self, x, log_w, j):
+        # if we are worried about
+        x_new = self.transition_operator(x, j)
+        beta = self.B_space[j]
+        log_prob_sampler, valid_samples = self.sampling_distribution.log_prob_checked(x_new)
+        if valid_samples.all(): # all safe
+            log_w += (1-beta)*log_prob_sampler+ beta*self.target_distribution.log_prob(x_new)
+        else:
+            n_valid_samples = torch.sum(valid_samples)
+            x_flat = torch.masked_select(x_new, valid_samples[:, None].repeat(1, self.sampling_distribution.dim))
+            x_new = x_flat.unflatten(dim=0, sizes=(n_valid_samples, self.sampling_distribution.dim))
+            log_w = torch.masked_select(log_w, valid_samples)
+            log_w += (1 - beta) * log_prob_sampler + beta * self.target_distribution.log_prob(x_new)
+        return x_new, log_w
+
 
 
 
