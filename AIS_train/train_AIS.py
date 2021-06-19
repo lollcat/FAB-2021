@@ -107,7 +107,7 @@ class AIS_trainer(LearntDistributionManager):
                     grad_norm = torch.nn.utils.clip_grad_norm_(self.learnt_sampling_dist.parameters(), max_grad_norm)
                 self.noise_optimizer.step()
             if self.maximise_log_prob_annealed:
-                loss_1 -= self.log_prob_annealed_samples(x_samples)
+                loss_1 -= self.log_prob_annealed_samples(x_samples, log_w)
             if torch.isnan(loss_1) or torch.isinf(loss_1):
                 if allow_ignore_nan_loss:
                     print("Nan/Inf loss encountered in loss_1")
@@ -140,7 +140,7 @@ class AIS_trainer(LearntDistributionManager):
             if self.current_epoch % epoch_per_save == 0 or self.current_epoch == epochs:
                 history["kl"].append(self.kl_MC_estimate(KPI_batch_size))
                 history["alpha_2_divergence"].append(self.alpha_divergence_MC_estimate(KPI_batch_size))
-                history["log_q_AIS_x"].append(self.log_prob_annealed_samples(x_samples).item())
+                history["log_q_AIS_x"].append(self.log_prob_annealed_samples(x_samples, log_w).item())
             if intermediate_plots:
                 if self.current_epoch % epoch_per_plot == 0:
                     plotting_func(self, n_samples=1000,
@@ -176,16 +176,17 @@ class AIS_trainer(LearntDistributionManager):
         return torch.var(torch.exp(log_w))
 
 
-    def log_prob_annealed_samples(self, x_samples):
-        log_probs = self.learnt_sampling_dist.log_prob(x_samples.detach())
+    def log_prob_annealed_samples(self, x_samples, log_w):
+        batch_size = x_samples.shape[0]
+        indx = torch.multinomial(torch.softmax(log_w, dim=0), num_samples=batch_size, replacement=True)
+        x_samples = x_samples.detach()[indx, :]
+        log_probs = self.learnt_sampling_dist.log_prob(x_samples)
         valid_indices = ~torch.isinf(log_probs) & ~torch.isnan(log_probs)
         if valid_indices.all():
             return self.log_prob_annealed_scaling_factor*torch.mean(log_probs)
         else:  # placing no log_prob by some of the samples
-            n_valid_samples = torch.sum(valid_indices)
-            x_flat = torch.masked_select(x_samples, valid_indices[:, None].repeat(1, x_samples.shape[-1]))
-            x_samples = x_flat.unflatten(dim=0, sizes=(n_valid_samples, x_samples.shape[-1]))
-            log_probs = self.learnt_sampling_dist.log_prob(x_samples.detach())
+            x_samples = x_samples[valid_indices, :]
+            log_probs = self.learnt_sampling_dist.log_prob(x_samples)  # have to recalculate otherwise get grad issues
             return self.log_prob_annealed_scaling_factor * torch.mean(log_probs)
 
 if __name__ == '__main__':
