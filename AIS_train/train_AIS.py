@@ -177,16 +177,26 @@ class AIS_trainer(LearntDistributionManager):
 
 
     def log_prob_annealed_samples(self, x_samples, log_w):
+        # first remove samples that have inf/nan log w
+        valid_indices = ~torch.isinf(log_w) & ~torch.isnan(log_w)
+        if valid_indices.all():
+            pass
+        else:
+            log_w = log_w[valid_indices]
+            x_samples = x_samples[valid_indices, :]
+
         batch_size = x_samples.shape[0]
         indx = torch.multinomial(torch.softmax(log_w, dim=0), num_samples=batch_size, replacement=True)
-        x_samples = x_samples.detach()[indx, :]
-        log_probs = self.learnt_sampling_dist.log_prob(x_samples)
+        x_samples = x_samples[indx, :]
+        log_probs = self.learnt_sampling_dist.log_prob(x_samples.detach())
+
+        # also check that we have valid log probs
         valid_indices = ~torch.isinf(log_probs) & ~torch.isnan(log_probs)
         if valid_indices.all():
             return self.log_prob_annealed_scaling_factor*torch.mean(log_probs)
         else:  # placing no log_prob by some of the samples
             x_samples = x_samples[valid_indices, :]
-            log_probs = self.learnt_sampling_dist.log_prob(x_samples)  # have to recalculate otherwise get grad issues
+            log_probs = self.learnt_sampling_dist.log_prob(x_samples.detach())  # have to recalculate otherwise get grad issues
             return self.log_prob_annealed_scaling_factor * torch.mean(log_probs)
 
 if __name__ == '__main__':

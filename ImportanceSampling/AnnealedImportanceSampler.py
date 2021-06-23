@@ -81,13 +81,26 @@ class AnnealedImportanceSampler(BaseImportanceSampler):
         return (1-beta)*self.sampling_distribution.log_prob(x) + beta*self.target_distribution.log_prob(x)
 
 
-    def calculate_expectation(self, n_samples: int, expectation_function)\
+    def calculate_expectation(self, n_samples: int, expectation_function, batch_size=None)\
             -> (torch.tensor, dict):
-        samples, log_w = self.run(n_runs=n_samples)
-        normalised_importance_weights = F.softmax(log_w, dim=-1)
-        function_values = expectation_function(samples)
-        expectation = normalised_importance_weights.T @ function_values
-        effective_sample_size = self.effective_sample_size(normalised_importance_weights)
+        if batch_size is None:
+            samples, log_w = self.run(n_runs=n_samples)
+        else:
+            assert n_samples % batch_size == 0.0
+            n_batches = int(n_samples / batch_size)
+            samples = []
+            log_w = []
+            for i in range(n_batches):
+                sample_batch, log_w_batch = self.run(n_runs=batch_size)
+                samples.append(sample_batch.detach())
+                log_w.append(log_w_batch.detach())
+            samples = torch.cat(samples, dim=0)
+            log_w = torch.cat(log_w, dim=0)
+        with torch.no_grad():
+            normalised_importance_weights = F.softmax(log_w, dim=-1)
+            function_values = expectation_function(samples)
+            expectation = normalised_importance_weights.T @ function_values
+            effective_sample_size = self.effective_sample_size(normalised_importance_weights)
         info_dict = {"effective_sample_size": effective_sample_size.cpu().detach(),
                      "normalised_sampling_weights": normalised_importance_weights.cpu().detach(),
                      "samples": samples.cpu().detach()}
@@ -110,7 +123,8 @@ if __name__ == '__main__':
                                      transition_operator="HMC", n_steps_transition_operator=4,
                                      n_distributions=20)
     true_expectation = MC_estimate_true_expectation(target, expectation_function, int(1e4))
-    expectation, info_dict = test.calculate_expectation(n_samples , expectation_function=expectation_function)
+    expectation, info_dict = test.calculate_expectation(n_samples , expectation_function=expectation_function,
+                                                        batch_size=10)
     print(true_expectation, expectation)
 
     sampler_samples = learnt_sampler.sample((n_samples,)).cpu().detach()

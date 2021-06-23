@@ -74,16 +74,17 @@ if __name__ == '__main__':
     from TargetDistributions.MoG import MoG
     from FittedModels.Models.DiagonalGaussian import DiagonalGaussian
     import matplotlib.pyplot as plt
-    n_samples = 2000
+    n_samples = 4000
     dim = 2
     torch.manual_seed(2)
     target = MoG(dim=dim, n_mixes=5, loc_scaling=5)
-    learnt_sampler = DiagonalGaussian(dim=dim, log_std_initial_scaling=2.0)
+    learnt_sampler = DiagonalGaussian(dim=dim, log_std_initial_scaling=6.0)
     sampler_samples = learnt_sampler(n_samples)[0]
-    x_HMC = HMC(log_q_x=target.log_prob, n_outer=10, epsilon=torch.tensor([1.0]), L=2, current_q=sampler_samples
+    x_HMC = HMC(log_q_x=target.log_prob, n_outer=40, epsilon=torch.tensor([0.1]), L=6, current_q=sampler_samples
                 , grad_log_q_x=None)
 
     sampler_samples = sampler_samples.cpu().detach()
+    x_HMC = x_HMC.cpu().detach()
     plt.plot(sampler_samples[:, 0], sampler_samples[:, 1], "o", alpha=0.5)
     plt.title("sampler samples")
     plt.show()
@@ -94,12 +95,3 @@ if __name__ == '__main__':
     plt.plot(true_samples[:, 0], true_samples[:, 1], "o", alpha=0.5)
     plt.title("true samples")
     plt.show()
-
-
-
-
-
-
-
-
-

@@ -26,7 +26,7 @@ if __name__ == '__main__':
     use_exp = True
     n_distributions = 3
     n_steps_transition_operator=1
-    train_AIS_param=False
+    train_AIS_param = False
 
     if problem == "ManyWell":
         from TargetDistributions.DoubleWell import ManyWellEnergy
@@ -103,7 +103,7 @@ if __name__ == '__main__':
         plot_samples(tester)
         plt.show()
 
-    history = tester.train(epochs, batch_size=int(1e4), intermediate_plots=True, n_plots=3, plotting_func=plotter)
+    history = tester.train(epochs, batch_size=int(1e3), intermediate_plots=True, n_plots=3, plotting_func=plotter)
 
     plot_history(history)
     plt.show()
