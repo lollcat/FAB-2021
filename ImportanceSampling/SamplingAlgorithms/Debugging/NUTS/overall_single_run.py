@@ -6,8 +6,9 @@ import torch
 import matplotlib.pyplot as plt
 
 if __name__ == '__main__':
+    torch.manual_seed(0)
     M = 100
-    Madapt = 10
+    Madapt = int(M/2)
     NUTTER = NUTS(2, correlated_normal_torch)
     theta_init = torch.randn((1,2), requires_grad=True)
     #theta_out = NUTTER.run(theta_init, M=5, M_adapt=2)
@@ -16,7 +17,7 @@ if __name__ == '__main__':
     samples_torch = NUTTER.run_all_samples(theta_init, M=M, M_adapt=Madapt, print_please=True)
 
     #print(samples)
-    samples_torch = np.clip(samples_torch, -10, 10)
+    #samples_torch = np.clip(samples_torch, -10, 10)
     plt.plot(samples_torch[:, 0], samples_torch[:, 1], "o-b")
     plt.show()
 

@@ -5,6 +5,7 @@ torch.set_default_dtype(torch.float64)
 class NUTS:
     """
     https://arxiv.org/pdf/1111.4246.pdf
+    Also found eye-balling https://github.com/mfouesneau/NUTS/blob/master/nuts/nuts.py useful
     """
     def __init__(self, dim, log_q_x, sigma=0.6):
         self.dim = dim
@@ -148,6 +149,7 @@ class NUTS:
 
         theta_m = theta_0.clone()
         for m in range(1, M+1):
+            theta_m_minus_1 = theta_m.clone() # from previous iteration
             r_0 = torch.randn_like(theta_m_minus_1)
             log_u = torch.log(torch.rand_like(epsilon)) + self.joint_unnormalised_log_prob(theta_m_minus_1, r_0)[:, None]
             s = torch.ones_like(epsilon)
@@ -156,16 +158,15 @@ class NUTS:
             r_minus = r_0.clone()
             r_plus = r_0.clone()
             j = 0
-            theta_m = theta_m_minus_1.clone()
             n = torch.ones_like(epsilon)
 
             s_equals_1 = torch.squeeze(s == 1, dim=-1)
 
-            theta_dash = torch.tensor(float("nan")).expand(theta_m_minus_1.shape)
-            n_dash = torch.tensor(float("nan")).expand(n.shape)
-            s_dash = torch.tensor(float("nan")).expand(s.shape)
-            a = torch.tensor(float("nan")).expand(epsilon.shape)
-            n_a = torch.tensor(float("nan")).expand(epsilon.shape)
+            theta_dash = torch.empty_like(theta_m_minus_1)
+            n_dash = torch.empty_like(n)
+            s_dash = torch.empty_like(s)
+            a = torch.empty_like(epsilon)
+            n_a = torch.empty_like(epsilon)
             while s_equals_1.any():
                 # note inside this loop we only only updates indices for which s == 1
 
@@ -188,8 +189,10 @@ class NUTS:
                 s_dash_equals_1 = (s_dash == 1).squeeze(dim=-1)
                 s_dash_equals_1[~s_equals_1] = False  # these indices aren't partaking
                 if s_dash_equals_1.any():
-                    update_theta = torch.squeeze((n_dash/n > torch.rand_like(n_dash))[s_dash_equals_1])
-                    theta_m[s_dash_equals_1][update_theta] = theta_dash[s_dash_equals_1][update_theta]
+                    update_theta = torch.squeeze((n_dash/n > torch.rand_like(n_dash))[s_dash_equals_1], dim=-1)
+                    double_mask_theta_m = s_dash_equals_1
+                    double_mask_theta_m[~update_theta] = False  # only pick values for which update theta is true
+                    theta_m[double_mask_theta_m] = theta_dash[double_mask_theta_m]
                 n[s_equals_1] = n[s_equals_1] + n_dash[s_equals_1]
                 s[s_equals_1] = s_dash[s_equals_1]*(
                         torch.einsum("ik,ik->i",
@@ -214,12 +217,13 @@ class NUTS:
 
     def run_all_samples(self, theta_0, M, M_adapt, delta=0.65, print_please=False):
         """
-        theta: params
-        M: number of iter
-        M_adapt: number of iter in which we allow adaption of epsilon
+        More typical version of NUTS run function that returns samples generated over whole period instead of just
+        the last sample
         """
         assert theta_0.shape[0] == 1
         samples = np.empty((M, theta_0.shape[-1]))
+
+        theta_m_minus_1 = theta_0.clone()
         epsilon = self.FindReasonableEpsilon(theta_0)
         print(f"found epsilon = {epsilon}")
         mu = torch.log10(epsilon)
@@ -231,11 +235,12 @@ class NUTS:
 
         theta_m = theta_0.clone()
         for m in range(1, M+1):
-            r_0 = torch.randn_like(theta_m)
+            theta_m_minus_1 = theta_m.clone()
+            r_0 = torch.randn_like(theta_m_minus_1)
             log_u = torch.log(torch.rand_like(epsilon)) + self.joint_unnormalised_log_prob(theta_m_minus_1, r_0)[:, None]
             s = torch.ones_like(epsilon)
-            theta_minus = theta_m.clone()
-            theta_plus = theta_m.clone()
+            theta_minus = theta_m_minus_1.clone()
+            theta_plus = theta_m_minus_1.clone()
             r_minus = r_0.clone()
             r_plus = r_0.clone()
             j = 0
@@ -243,11 +248,11 @@ class NUTS:
 
             s_equals_1 = torch.squeeze(s == 1, dim=-1)
 
-            theta_dash = torch.tensor(float("nan")).expand(theta_m_minus_1.shape)
-            n_dash = torch.tensor(float("nan")).expand(n.shape)
-            s_dash = torch.tensor(float("nan")).expand(s.shape)
-            a = torch.tensor(float("nan")).expand(epsilon.shape)
-            n_a = torch.tensor(float("nan")).expand(epsilon.shape)
+            theta_dash = torch.empty_like(theta_m_minus_1)
+            n_dash = torch.empty_like(n)
+            s_dash = torch.empty_like(s)
+            a = torch.empty_like(epsilon)
+            n_a = torch.empty_like(epsilon)
             while s_equals_1.any():
                 # note inside this loop we only only updates indices for which s == 1
 
@@ -270,8 +275,10 @@ class NUTS:
                 s_dash_equals_1 = (s_dash == 1).squeeze(dim=-1)
                 s_dash_equals_1[~s_equals_1] = False  # these indices aren't partaking
                 if s_dash_equals_1.any():
-                    update_theta = torch.squeeze((n_dash/n > torch.rand_like(n_dash))[s_dash_equals_1])
-                    theta_m[s_dash_equals_1][update_theta] = theta_dash[s_dash_equals_1][update_theta]
+                    update_theta = torch.squeeze((n_dash/n > torch.rand_like(n_dash))[s_dash_equals_1], dim=-1)
+                    double_mask_theta_m = s_dash_equals_1
+                    double_mask_theta_m[~update_theta] = False # only pick values for which update theta is true
+                    theta_m[double_mask_theta_m] = theta_dash[double_mask_theta_m]
                 n[s_equals_1] = n[s_equals_1] + n_dash[s_equals_1]
                 s[s_equals_1] = s_dash[s_equals_1]*(
                         torch.einsum("ik,ik->i",
@@ -282,7 +289,7 @@ class NUTS:
                            >= 0)[:, None]
                 j = j + 1
                 s_equals_1 = torch.squeeze(s == 1, dim=-1)
-            samples[m, :] = theta_m.detach().cpu().numpy()
+            samples[m-1, :] = theta_m.detach().cpu().numpy()
             if m <= M_adapt:
                 H_bar = (1 - 1/(m + t_0))*H_bar + 1/(m + t_0)*(delta - a / n_a)
                 log_epsilon = mu - np.sqrt(m)/gamma * H_bar
