@@ -153,6 +153,7 @@ class LearntDistributionManager:
             annealing_period = int(self.total_epochs/2)  #  anneal during first half of training
             return min(1.0, 0.01 + self.current_epoch/annealing_period)
 
+
     def dreg_alpha_divergence_loss(self, x_samples, log_q_x_not_used, log_p_x):
         self.learnt_sampling_dist.set_requires_grad(False)
         log_q_x = self.learnt_sampling_dist.log_prob(x_samples)
@@ -169,6 +170,12 @@ class LearntDistributionManager:
                               * log_w, dim=-1)
         dreg_loss = torch.mean(DreG_for_each_batch_dim)
         return dreg_loss
+
+    def alpha_divergence_loss(self, x_samples_not_used, log_q_x, log_p_x):
+        # no DReG
+        log_w = log_p_x - log_q_x
+        return - self.alpha_one_minus_alpha_sign * (torch.logsumexp(self.alpha * log_w, dim=0) -
+                                                    np.log(log_q_x.shape[0]))
 
     def dreg_kl_loss(self, x_samples, log_q_x_not_used, log_p_x):
         self.learnt_sampling_dist.set_requires_grad(False)
@@ -265,7 +272,7 @@ if __name__ == '__main__':
     from ImportanceSampling.VanillaImportanceSampler import VanillaImportanceSampling
     from TargetDistributions.Guassian_FullCov import Guassian_FullCov
     from FittedModels.Models.DiagonalGaussian import DiagonalGaussian
-    from utils.numerical_utils import quadratic_function as expectation_function
+    from Utils.numerical_utils import quadratic_function as expectation_function
 
     epochs = 500
     dim = 2

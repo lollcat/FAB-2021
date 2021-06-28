@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 
 if __name__ == '__main__':
     torch.manual_seed(0)
-    M = 100
+    M = 30
     Madapt = int(M/2)
     NUTTER = NUTS(2, correlated_normal_torch)
     theta_init = torch.randn((1,2), requires_grad=True)

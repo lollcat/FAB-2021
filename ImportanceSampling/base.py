@@ -14,6 +14,9 @@ class BaseImportanceSampler(abc.ABC):
         # effective sample size, see https://arxiv.org/abs/1602.03572
         return 1 / torch.sum(normalised_sampling_weights ** 2)
 
-    def effective_sample_size_unnormalised_log_weights(self, unnormalised_sampling_log_weights):
+    def effective_sample_size_unnormalised_log_weights(self, unnormalised_sampling_log_weights, drop_nan=False):
+        if drop_nan:
+            unnormalised_sampling_log_weights = unnormalised_sampling_log_weights[~(
+            torch.isnan(unnormalised_sampling_log_weights) | torch.isinf(unnormalised_sampling_log_weights))]
         normalised_sampling_weights = F.softmax(unnormalised_sampling_log_weights, dim=-1)
         return self.effective_sample_size(normalised_sampling_weights)

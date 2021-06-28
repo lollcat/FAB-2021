@@ -56,7 +56,6 @@ def plot_3D(x, z, n, ax, title=None):
     ax.set_zlim(offset, z.max())
     if title is not None:
         ax.set_title(title)
-    return
 
 
 def plot_distribution(distribution, bounds=([-10, 10], [-10, 10]), n_points=100, grid=True):
@@ -77,7 +76,7 @@ def plot_distribution(distribution, bounds=([-10, 10], [-10, 10]), n_points=100,
     fig = plt.figure(figsize=plt.figaspect(0.5))
     ax = fig.add_subplot(1, 1, 1, projection='3d')
     plot_3D(x_points, p_x, n_points, ax, title="p(x)")
-    return fig
+
 
 def plot_func2D(function, range=10, n_points=100):
     x_min = -range/2
@@ -92,7 +91,7 @@ def plot_func2D(function, range=10, n_points=100):
     fig = plt.figure(figsize=plt.figaspect(0.5))
     ax = fig.add_subplot(1, 1, 1, projection='3d')
     plot_3D(x_points, f_x, n_points, ax, title="f(x)")
-    return fig
+
 
 
 

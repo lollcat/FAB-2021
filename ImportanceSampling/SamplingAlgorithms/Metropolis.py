@@ -1,16 +1,52 @@
 import torch
+import torch.nn as nn
+from ImportanceSampling.SamplingAlgorithms.base import BaseTransitionModel
 
-def Metropolis_transition(x, n_updates, log_p_x_func, noise_scalings):
-    """
-    :param x: initial x
-    :param n_updates: number of metropolis updates
-    :param log_p_x_func: (potentiall unnormalised target function)
-    :param noise_scalings: can be sequence e.g. e.g. tensor([2.0, 1.0, 0.1])
-    :return: x sample from p_x_func
-    """
-    for noise_scaling in noise_scalings:
-        for n in range(n_updates):
-            x_proposed = x + torch.randn(x.shape).to(x.device) * noise_scaling
+class Metropolis(BaseTransitionModel):
+    def __init__(self, n_transitions, n_updates, step_size=1.0,
+                 trainable=False, auto_adjust=True):
+        """
+        Designed for use in annealed importance sampler
+        :param n_updates: number of metropolis updates
+        :param noise_scalings: can be sequence e.g. e.g. tensor([2.0, 1.0, 0.1])
+        """
+        super(Metropolis, self).__init__()
+        step_size = torch.tensor([step_size])
+        if auto_adjust:
+            assert trainable == False
+        self.n_distributions = n_transitions
+        self.n_updates = n_updates
+        self.trainable = trainable
+        self.register_buffer("step_size", step_size)
+        if trainable:
+            self.noise_scaling_ratios = nn.Parameter(torch.linspace(3.0, 0.5, n_updates).repeat(
+                (n_transitions, 1)))
+        else:
+            self.register_buffer("noise_scaling_ratios", torch.linspace(3.0, 0.5, n_updates).repeat(
+                (n_transitions, 1)))
+            self.register_buffer("original_step_size", step_size)
+        self.auto_adjust = auto_adjust
+        self.target_p_accept = 0.1
+
+    def interesting_info(self):
+        interesting_dict = {}
+        interesting_dict[f"noise_scaling_0_0"] = self.noise_scaling_ratios[0, 0].cpu().item()
+        interesting_dict[f"noise_scaling_0_-1"] = self.noise_scaling_ratios[0, -1].cpu().item()
+        return interesting_dict
+
+    @property
+    def noise_scalings(self):
+        return self.noise_scaling_ratios*self.step_size
+
+    def run(self, x, log_p_x_func, i):
+        """
+        :param x: initial x
+        :param log_p_x_func: (potentially unnormalised target function)
+
+        :return: x sample from p_x_func
+        """
+        for n in range(self.n_updates):
+            x_proposed = x + torch.randn(x.shape).to(x.device) * self.noise_scalings[i, n]
             x_proposed_log_prob = log_p_x_func(x_proposed)
             x_prev_log_prob = log_p_x_func(x)
             acceptance_probability = torch.exp(x_proposed_log_prob - x_prev_log_prob)
@@ -18,7 +54,13 @@ def Metropolis_transition(x, n_updates, log_p_x_func, noise_scalings):
             accept = (acceptance_probability > torch.rand(acceptance_probability.shape).to(x.device)).int()
             accept = accept[:, None].repeat(1, x.shape[-1])
             x = accept * x_proposed + (1 - accept) * x
-    return x
+            if self.auto_adjust:
+                p_accept = torch.mean(torch.clamp_max(acceptance_probability, 1))
+                if p_accept > self.target_p_accept: # to much accept
+                    self.noise_scaling_ratios[i, n] = self.noise_scaling_ratios[i, n] * 1.1
+                else:
+                    self.noise_scaling_ratios[i, n] = self.noise_scaling_ratios[i, n] * 0.9
+        return x
 
 
 if __name__ == '__main__':
@@ -32,8 +74,9 @@ if __name__ == '__main__':
     target = MoG(dim=dim)
     learnt_sampler = DiagonalGaussian(dim=dim)
     sampler_samples = learnt_sampler.sample((5000,)).cpu().detach()
-    x_metropolis = Metropolis_transition(sampler_samples, n_updates=100, log_p_x_func=target.log_prob,
-                                         noise_scalings=torch.tensor([1.0, 0.1]))
+    tester = Metropolis(n_updates=10, n_transitions=3)
+    x_metropolis = tester.run(sampler_samples, log_p_x_func=target.log_prob, i=0)
+    x_metropolis = tester.run(sampler_samples, log_p_x_func=target.log_prob, i=2)
     plt.plot(sampler_samples[:, 0], sampler_samples[:, 1], "o")
     plt.title("sampler samples")
     plt.show()
@@ -44,3 +87,5 @@ if __name__ == '__main__':
     plt.plot(true_samples[:, 0], true_samples[:, 1], "o")
     plt.title("true samples")
     plt.show()
+
+    print(tester.interesting_info())

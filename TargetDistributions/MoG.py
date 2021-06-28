@@ -9,8 +9,8 @@ class custom_MoG(BaseTargetDistribution):
         self.dim = dim
         locs = []
         covs = []
-        for i in range(2):
-            loc = torch.ones(dim)*locs_[i]*loc_scaling
+        for loc_ in locs_:
+            loc = torch.ones(dim)*loc_*loc_scaling
             covariance = torch.eye(dim)*cov_scaling
             locs.append(loc[None, :])
             covs.append(covariance[None, :, :])
@@ -18,7 +18,7 @@ class custom_MoG(BaseTargetDistribution):
         covs = torch.cat(covs)
         self.register_buffer("locs", locs)
         self.register_buffer("covs", covs)
-        self.register_buffer("cat_probs", torch.tensor([0.6, 0.4]))
+        self.register_buffer("cat_probs", torch.ones(len(locs_))/len(locs_))
         self.distribution = self.get_distribution
 
     def to(self, device):

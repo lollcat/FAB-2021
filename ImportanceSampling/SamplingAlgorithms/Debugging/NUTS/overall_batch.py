@@ -10,10 +10,10 @@ if __name__ == '__main__':
     M = 10
     Madapt = int(M/2)
     NUTTER = NUTS(2, correlated_normal_torch)
-    theta_init = torch.randn((100,2), requires_grad=True)
+    theta_init = torch.randn((30,2), requires_grad=True)
 
-    samples_torch = NUTTER.run(theta_init, M=M, M_adapt=Madapt, print_please=False)
-
-    plt.plot(samples_torch[:, 0], samples_torch[:, 1], "o-b")
+    samples_torch = NUTTER.run(theta_init, M=M)
+    samples_torch = samples_torch.detach().cpu()
+    plt.plot(samples_torch[:, 0], samples_torch[:, 1], "ob")
     plt.show()
 

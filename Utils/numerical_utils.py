@@ -18,6 +18,9 @@ def quadratic_function(x, seed=0):
 def Rosenbrock_function(x):
     return torch.sum(100.0*(x[:, 1:] - x[:, :-1]**2.0)**2.0 + (1 - x[:, :-1])**2.0, dim=-1)
 
+def running_mean(new_point, running_mean, i):
+    return running_mean + (new_point - running_mean) / (i + 1)
+
 if __name__ == '__main__':
     from Utils.plotting_utils import plot_func2D
     import matplotlib.pyplot as plt

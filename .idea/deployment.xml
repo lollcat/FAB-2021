@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
-  <component name="PublishConfigData" autoUpload="Always" serverName="loll@52.191.141.94:22" remoteFilesAllowedToDisappearOnAutoupload="false">
+  <component name="PublishConfigData" autoUpload="Always" serverName="loll@52.183.80.156:22" remoteFilesAllowedToDisappearOnAutoupload="false">
     <serverData>
       <paths name="CAM_cluster">
         <serverdata>
@@ -13,6 +13,13 @@
         <serverdata>
           <mappings>
             <mapping local="$PROJECT_DIR$" web="/" />
+          </mappings>
+        </serverdata>
+      </paths>
+      <paths name="loll@52.183.80.156:22">
+        <serverdata>
+          <mappings>
+            <mapping deploy="/home/loll/ToyProblems" local="$PROJECT_DIR$" />
           </mappings>
         </serverdata>
       </paths>

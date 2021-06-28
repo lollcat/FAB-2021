@@ -38,22 +38,28 @@ class AnnealedImportanceSampler(BaseImportanceSampler):
             self.save_spacing = save_spacing
             self.log_w_history = []
             self.samples_history = []
-        # Metropolis_transition(x, n_updates, p_x_func, noise_scaling)
         if transition_operator == "Metropolis":
-            from ImportanceSampling.SamplingAlgorithms.Metropolis import Metropolis_transition
-            self.transition_operator = lambda x, j: \
-                Metropolis_transition(x=x,
-                                      log_p_x_func=lambda x_new: self.intermediate_unnormalised_log_prob(x_new, j),
-                                      n_updates=self.n_steps_transition_operator,
-                                      noise_scalings=self.step_size)
+            from ImportanceSampling.SamplingAlgorithms.Metropolis import Metropolis
+            self.transition_operator_class = Metropolis(n_updates=self.n_steps_transition_operator,
+                                      step_size=self.step_size)
         elif transition_operator == "HMC":
             from ImportanceSampling.SamplingAlgorithms.HamiltonianMonteCarlo import HMC
+            # TODO
+            raise NotImplementedError(f"Sampling method {transition_operator} not implemented")
             self.transition_operator = lambda x, j: \
                 HMC(log_q_x=lambda x_new: self.intermediate_unnormalised_log_prob(x_new, j),
                     epsilon=self.step_size, n_outer=n_steps_transition_operator, L=HMC_inner_steps,
                     current_q=x, grad_log_q_x=None)
+        elif transition_operator == "NUTS":
+            from ImportanceSampling.SamplingAlgorithms.NUTS import NUTS
+            raise NotImplementedError(f"Sampling method {transition_operator} not implemented")
         else:
             raise NotImplementedError(f"Sampling method {transition_operator} not implemented")
+
+
+        self.transition_operator = lambda x, j: \
+            self.transition_operator_class.run(
+                x=x, log_p_x_func=lambda x_new: self.intermediate_unnormalised_log_prob(x_new, j))
 
     @property
     def device(self):

@@ -17,15 +17,17 @@ if __name__ == '__main__':
     problem = "ManyWell"    # "TwoMode" # "MoG"
     torch.manual_seed(2)
     epochs = 100
-    dim = 12
+    dim = 8
     n_samples_estimation = int(1e4)
     n_samples_expectation = int(1e6)
     n_samples = int(1e2)
-    step_size = 0.5
+    step_size = 1.0
     transition_operator = "HMC"
+    loss_1 = False
+    loss_2 = "alpha_2"
     use_exp = True
     n_distributions = 3
-    n_steps_transition_operator=1
+    n_steps_transition_operator = 3
     train_AIS_param = False
 
     if problem == "ManyWell":
@@ -37,6 +39,7 @@ if __name__ == '__main__':
             # wrap plotting function like this so it displays during training
             plot_samples_vs_contours_many_well(*args, **kwargs)
             plt.show()
+
     elif problem == "TwoMode":
         from TargetDistributions.VincentTargets import TwoModes
         assert dim == 2
@@ -60,7 +63,7 @@ if __name__ == '__main__':
 
     learnt_sampler = FlowModel(x_dim=dim, scaling_factor=scaling_factor, flow_type="RealNVP", n_flow_steps=64,
                                use_exp = use_exp)
-    tester = AIS_trainer(target, learnt_sampler, loss_type="DReG", n_distributions=n_distributions,
+    tester = AIS_trainer(target, learnt_sampler, loss_type=loss_1, loss_type_2=loss_2, n_distributions=n_distributions,
                          n_steps_transition_operator=n_steps_transition_operator,
                          step_size=step_size, transition_operator=transition_operator, train_AIS_params=train_AIS_param,
                          learnt_dist_kwargs={"lr": 1e-3})
