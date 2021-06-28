@@ -24,7 +24,7 @@ class AIS_trainer(LearntDistributionManager):
                  transition_operator="Metropolis", inner_loop_steps=3, loss_type_2=False,
                  anneal_step_size=False,
                  learnt_dist_kwargs={}, AIS_kwargs={}):
-        assert loss_type in [False, "kl", "DReG", "var", "ESS"]
+        assert loss_type in [False, "kl", "DReG", "var", "ESS", "alpha_2_non_DReG"]
         assert loss_type_2 in [False, "kl", "alpha_2", "alpha_2_resample"]
         self.AIS_train = AnnealedImportanceSampler(loss_type, train_AIS_params, fitted_model, target_distribution,
                                                    transition_operator=transition_operator,
@@ -33,8 +33,7 @@ class AIS_trainer(LearntDistributionManager):
         self.log_prob_annealed_scaling_factor = torch.tensor(1.0)
         super(AIS_trainer, self).__init__(target_distribution, fitted_model, self.AIS_train,
                  loss_type, alpha, **learnt_dist_kwargs)
-        self.train_AIS_params = train_AIS_params
-        self.use_2nd_loss = loss_type_2  # add to loss function
+        self.use_2nd_loss = loss_type_2   # add to loss function
         if loss_type_2 is not False:
             if loss_type_2 == "kl":
                 self.loss_2 = self.log_prob_annealed_samples_loss_resample
@@ -51,13 +50,6 @@ class AIS_trainer(LearntDistributionManager):
                 # currently sharing a self.alpha param between losses so need to check for consistency here
                 assert loss_type in [False, "DReG"]
 
-        self.anneal_step_size = anneal_step_size
-        if anneal_step_size:
-            assert train_AIS_params == False
-        if train_AIS_params:
-            self.transition_optimizer = torch.optim.Adam(self.AIS_train.transition_operator_class.parameters()
-                                                         , lr=transition_param_lr)
-
     def to(self, device):
         """device is cuda or cpu"""
         self.device = device
@@ -66,13 +58,11 @@ class AIS_trainer(LearntDistributionManager):
         if hasattr(self, "fixed_learnt_sampling_dist"):
             self.fixed_learnt_sampling_dist.to(self.device)
         self.AIS_train.to(device)
-        self.log_prob_annealed_scaling_factor = self.log_prob_annealed_scaling_factor.to(device)
 
 
     def setup_loss(self, loss_type, alpha=2, k=None, new_lr=None, annealing=False):
         self.AIS_train.loss_type = loss_type
         self.annealing = annealing
-        self.k = k  # if DReG then k is number of samples that going inside the log sum, if none then put all of them inside
         if loss_type == "kl":
             self.loss = self.KL_loss
             self.alpha = 1
@@ -84,6 +74,10 @@ class AIS_trainer(LearntDistributionManager):
             self.loss = self.var_loss
         elif loss_type == "ESS":
             self.loss = self.ESS_loss
+        elif loss_type == "alpha_2_non_DReG":
+            self.loss = self.alpha_divergence_loss
+            self.alpha = 2
+            self.alpha_one_minus_alpha_sign = torch.sign(torch.tensor(self.alpha * (1 - self.alpha)))
         elif loss_type == False:
             self.loss = lambda x: torch.zeros(1).to(x.device)  # train likelihood only
         else:
@@ -99,8 +93,6 @@ class AIS_trainer(LearntDistributionManager):
               max_grad_norm=1):
         epoch_per_print = min(max(int(epochs / 100), 1), 100)  # max 100 epoch, min 1 epoch
         epoch_per_save = max(int(epochs / 100), 1)
-        if "DReG" == self.loss_type and self.k is None:
-            self.k = batch_size
         if intermediate_plots is True:
             epoch_per_plot = max(int(epochs / n_plots), 1)
         history = {"loss": [],
@@ -119,17 +111,6 @@ class AIS_trainer(LearntDistributionManager):
                 self.AIS_train.transition_operator_class.anneal_step_size(self.current_epoch, epochs)
             x_samples, log_w = self.AIS_train.run(batch_size)
             loss_1 = self.loss(log_w)
-            if self.train_AIS_params:
-                if torch.isnan(loss_1) or torch.isinf(loss_1):
-                    if allow_ignore_nan_loss:
-                        print("Nan/Inf loss_2 encountered")
-                        continue
-                    else:
-                        raise Exception("Nan/Inf loss_2 encountered")
-                loss_1.backward(retain_graph=True)
-                if clip_grad_norm is True:
-                    grad_norm = torch.nn.utils.clip_grad_norm_(self.learnt_sampling_dist.parameters(), max_grad_norm)
-                self.transition_optimizer.step()
             if self.use_2nd_loss:
                 loss_2, re_sampled_x = self.loss_2(x_samples, log_w)
                 loss_1 = loss_1 + loss_2
@@ -182,11 +163,9 @@ class AIS_trainer(LearntDistributionManager):
                                       samples_q=re_sampled_x)
         return history
 
-    def dreg_alpha_divergence_loss(self, log_w):
-        outside_dim = log_w.shape[0]/self.k  # this is like a batch dimension that we average DReG estimation over
-        assert outside_dim % 1 == 0  # always make k & n_samples work together nicely for averaging
-        outside_dim = int(outside_dim)
-        log_w = log_w.reshape((outside_dim, self.k))
+    def dreg_alpha_divergence_loss(self, log_w, drop_nans_and_infs=True):
+        if drop_nans_and_infs:
+            log_w = log_w[~(torch.isinf(log_w) | torch.isnan(log_w))]
         with torch.no_grad():
             w_alpha_normalised_alpha = F.softmax(self.alpha*log_w, dim=-1)
         DreG_for_each_batch_dim = - self.alpha_one_minus_alpha_sign * \
@@ -195,12 +174,16 @@ class AIS_trainer(LearntDistributionManager):
         dreg_loss = torch.mean(DreG_for_each_batch_dim)
         return dreg_loss
 
-    def alpha_divergence_loss(self, log_w):
+    def alpha_divergence_loss(self, log_w, drop_nans_and_infs=True):
+        if drop_nans_and_infs:
+            log_w = log_w[~(torch.isinf(log_w) | torch.isnan(log_w))]
         # no DReG
         return - self.alpha_one_minus_alpha_sign * (torch.logsumexp(self.alpha * log_w, dim=0) -
                                                     np.log(log_w.shape[0]))
 
-    def KL_loss(self, log_w):
+    def KL_loss(self, log_w, drop_nans_and_infs=True):
+        if drop_nans_and_infs:
+            log_w = log_w[~(torch.isinf(log_w) | torch.isnan(log_w))]
         kl = -log_w
         return torch.mean(kl)
 
@@ -213,6 +196,7 @@ class AIS_trainer(LearntDistributionManager):
 
 
     def log_prob_annealed_samples_loss_resample(self, x_samples, log_w):
+        batch_size = x_samples.shape[0]
         # not we return - log_prob_annealed to get the loss
         # first remove samples that have inf/nan log w
         valid_indices = ~torch.isinf(log_w) & ~torch.isnan(log_w)
@@ -221,8 +205,6 @@ class AIS_trainer(LearntDistributionManager):
         else:
             log_w = log_w[valid_indices]
             x_samples = x_samples[valid_indices, :]
-
-        batch_size = x_samples.shape[0]
         indx = torch.multinomial(torch.softmax(log_w, dim=0), num_samples=batch_size, replacement=True)
         x_samples = x_samples[indx, :]
         log_probs = self.learnt_sampling_dist.log_prob(x_samples.detach())
@@ -233,7 +215,7 @@ class AIS_trainer(LearntDistributionManager):
             return -self.log_prob_annealed_scaling_factor*torch.mean(log_probs), x_samples
         else:  # placing no log_prob by some of the samples
             x_samples = x_samples[valid_indices, :]
-            log_probs = self.learnt_sampling_dist.log_prob(x_samples.detach())  # have to recalculate otherwise get grad issues
+            log_probs = log_probs[valid_indices]
             return -self.log_prob_annealed_scaling_factor * torch.mean(log_probs), x_samples
 
     def alpha_div_annealed_samples_re_sample(self, x_samples, log_w):
@@ -259,7 +241,8 @@ class AIS_trainer(LearntDistributionManager):
                                                      - np.log(log_q_x.shape[0])), x_samples
         else:  # placing no log_prob by some of the samples
             x_samples = x_samples[valid_indices, :]
-            log_q_x = self.learnt_sampling_dist.log_prob(x_samples.detach())  # have to recalculate otherwise get grad issues
+            log_q_x = log_q_x[valid_indices]
+            log_p_x = log_p_x[valid_indices]
             return - self.log_prob_annealed_scaling_factor * \
                    self.alpha_one_minus_alpha_sign*(torch.logsumexp((self.alpha - 1) * (log_p_x - log_q_x), dim=0)
                                                      - np.log(log_q_x.shape[0])), x_samples
@@ -290,11 +273,10 @@ class AIS_trainer(LearntDistributionManager):
                    self.alpha_one_minus_alpha_sign * \
                    torch.logsumexp((self.alpha - 1) * (log_p_x - log_q_x + log_w.detach()), dim=0), \
                    x_re_sampled
-        else:  # placing no log_prob by some of the samples
-            x_samples = x_samples[valid_indices, :]
+        else:
             log_w = log_w[valid_indices]
-            log_q_x = self.learnt_sampling_dist.log_prob(
-                x_samples.detach())  # have to recalculate otherwise get grad issues
+            log_q_x = log_q_x[valid_indices]
+            log_p_x = log_p_x[valid_indices]
             return - self.log_prob_annealed_scaling_factor * \
                    self.alpha_one_minus_alpha_sign * \
                    torch.logsumexp((self.alpha - 1) * (log_p_x - log_q_x + log_w.detach()), dim=0), \

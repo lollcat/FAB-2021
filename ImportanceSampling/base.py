@@ -9,8 +9,7 @@ class BaseImportanceSampler(abc.ABC):
             -> (torch.tensor, dict):
         """This is the job of the importance sampler"""
 
-    @staticmethod
-    def effective_sample_size(normalised_sampling_weights):
+    def effective_sample_size(self, normalised_sampling_weights):
         # effective sample size, see https://arxiv.org/abs/1602.03572
         return 1 / torch.sum(normalised_sampling_weights ** 2)
 

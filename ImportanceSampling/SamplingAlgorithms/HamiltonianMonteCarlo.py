@@ -1,14 +1,27 @@
 import torch
+import torch.nn as nn
 from ImportanceSampling.SamplingAlgorithms.base import BaseTransitionModel
 
 class HMC(BaseTransitionModel):
     """
     Following: https: // arxiv.org / pdf / 1206.1901.pdf
     """
-    def __init__(self, n_distributions, epsilon, n_outer=2, L=5, auto_adjust_step_size=True,
-                 target_p_accept = 0.65):
+    def __init__(self, n_distributions, epsilon, dim, n_outer=2, L=5, train_params=True,
+                 auto_adjust_step_size=False,
+                 target_p_accept=0.2, lr=1e-3):
         super(HMC, self).__init__()
-        self.register_buffer("epsilons", torch.ones([n_distributions, n_outer])*epsilon)
+        self.train_params = train_params
+        if train_params:
+            assert auto_adjust_step_size == False
+
+            self.epsilons = nn.ParameterDict()
+            # have to store epsilons like this otherwise we get weird erros
+            for i in range(n_distributions):
+                for n in range(n_outer):
+                    self.epsilons[f"{i}_{n}"] = nn.Parameter(torch.ones(dim))
+            self.optimizer = torch.optim.Adam(self.parameters(), lr=lr, weight_decay=1e-6)
+        else:
+            self.register_buffer("epsilons", torch.ones([n_distributions, n_outer])*epsilon)
         self.n_outer = n_outer
         self.L = L
         self.auto_adjust_step_size = auto_adjust_step_size
@@ -16,14 +29,28 @@ class HMC(BaseTransitionModel):
 
     def interesting_info(self):
         interesting_dict = {}
-        interesting_dict[f"epsilons_0_0"] = self.epsilons[0, 0].cpu().item()
-        interesting_dict[f"epsilons_0_-1"] = self.epsilons[0, -1].cpu().item()
+        if self.train_params:
+            interesting_dict[f"epsilons_0_0_0"] = self.get_epsilon(0, 0)[0].cpu().item()
+            interesting_dict[f"epsilons_0_-1_0"] = self.get_epsilon(0, self.n_outer-1)[0].cpu().item()
+        else:
+            interesting_dict[f"epsilons_0_0"] = self.epsilons[0, 0].cpu().item()
+            interesting_dict[f"epsilons_0_-1"] = self.epsilons[0, -1].cpu().item()
         return interesting_dict
+
+    def get_epsilon(self, i, n):
+        if self.train_params:
+            return self.epsilons[f"{i}_{n}"]
+        else:
+            return self.epsilons[i, n]
+
 
     def HMC_func(self, U, current_q, grad_U, i):
         # base function for HMC written in terms of potential energy function U
+        if self.train_params:
+            self.optimizer.zero_grad()
+            loss = 0
         for n in range(self.n_outer):
-            epsilon = self.epsilons[i, n]
+            epsilon = self.get_epsilon(i, n)
             q = current_q
             p = torch.randn_like(q)
             current_p = p
@@ -33,7 +60,7 @@ class HMC(BaseTransitionModel):
             # Now loop through position and momentum leapfrogs
             for l in range(self.L):
                 # Make full step for position
-                q = q + epsilon*p
+                q = q + epsilon * p
                 # Make a full step for the momentum if not at end of trajectory
                 if l != self.L-1:
                     p = p - epsilon * grad_U(q)
@@ -48,6 +75,9 @@ class HMC(BaseTransitionModel):
             current_K = torch.sum(current_p**2, dim=-1) / 2
             proposed_K = torch.sum(p**2, dim=-1) / 2
 
+            if self.train_params:
+                loss = loss + torch.mean(U_proposed)  # - mean log target prob
+
             # Accept or reject the state at the end of the trajectory, returning either the position at the
             # end of the trajectory or the initial position
             acceptance_probability = torch.exp(U_current - U_proposed + current_K - proposed_K)
@@ -61,6 +91,11 @@ class HMC(BaseTransitionModel):
                     self.epsilons[i, n] = self.epsilons[i, n] * 1.1
                 else:
                     self.epsilons[i, n] = self.epsilons[i, n] * 0.9
+
+        if self.train_params:
+            loss.backward(retain_graph=True)
+            # torch.autograd.grad(loss, self.epsilons["0_1"], retain_graph=True)
+            self.optimizer.step()
         return current_q
 
     def run(self, current_q, log_q_x, i):
@@ -80,6 +115,7 @@ class HMC(BaseTransitionModel):
         return current_q
 
 if __name__ == '__main__':
+    torch.autograd.set_detect_anomaly(True)
     from TargetDistributions.MoG import MoG
     from FittedModels.Models.DiagonalGaussian import DiagonalGaussian
     import matplotlib.pyplot as plt
@@ -89,8 +125,9 @@ if __name__ == '__main__':
     target = MoG(dim=dim, n_mixes=5, loc_scaling=5)
     learnt_sampler = DiagonalGaussian(dim=dim, log_std_initial_scaling=2.0)
     sampler_samples = learnt_sampler(n_samples)[0]
-    hmc = HMC(n_distributions=2, n_outer=40, epsilon=1.0, L=6)
-    x_HMC = hmc.run(sampler_samples, target.log_prob, 0)
+    hmc = HMC(n_distributions=2, n_outer=40, epsilon=1.0, L=6, dim=dim)
+    for i in range(10):
+        x_HMC = hmc.run(sampler_samples, target.log_prob, 0)
 
     sampler_samples = sampler_samples.cpu().detach()
     x_HMC = x_HMC.cpu().detach()

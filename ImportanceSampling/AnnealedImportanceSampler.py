@@ -7,6 +7,9 @@ import numpy as np
 
 class AnnealedImportanceSampler(BaseImportanceSampler):
     """
+    Annealed importance sampler when we aren't using it in training
+    # Used as base class when we are doing IS during train
+    # TODO update to be as updated as AIS_train.AnnealedImportanceSampler.py as it is till
     Sample from p_0 (sampling distribution) through a chain of intermediate distributions,
     to the target distribution p_N
     f_n(x) = p_0 ^ (1 - bt) + p_N ^ bt
@@ -87,7 +90,8 @@ class AnnealedImportanceSampler(BaseImportanceSampler):
         return (1-beta)*self.sampling_distribution.log_prob(x) + beta*self.target_distribution.log_prob(x)
 
 
-    def calculate_expectation(self, n_samples: int, expectation_function, batch_size=None)\
+    def calculate_expectation(self, n_samples: int, expectation_function, batch_size=None,
+                              drop_nan_and_infs=True)\
             -> (torch.tensor, dict):
         if batch_size is None:
             samples, log_w = self.run(n_runs=n_samples)
@@ -102,6 +106,50 @@ class AnnealedImportanceSampler(BaseImportanceSampler):
                 log_w.append(log_w_batch.detach())
             samples = torch.cat(samples, dim=0)
             log_w = torch.cat(log_w, dim=0)
+        if drop_nan_and_infs:
+            contains_neg_infs = (torch.isinf(log_w) & (log_w < torch.tensor(0.0))) | torch.isnan(log_w)
+            log_w = log_w[~contains_neg_infs]
+            samples = samples[~contains_neg_infs, :]
+        with torch.no_grad():
+            normalised_importance_weights = F.softmax(log_w, dim=-1)
+            function_values = expectation_function(samples)
+            expectation = normalised_importance_weights.T @ function_values
+            effective_sample_size = self.effective_sample_size(normalised_importance_weights)
+        info_dict = {"effective_sample_size": effective_sample_size.cpu().detach(),
+                     "normalised_sampling_weights": normalised_importance_weights.cpu().detach(),
+                     "samples": samples.cpu().detach()}
+        return expectation, info_dict
+
+    def calculate_expectation_over_flow(self, n_samples: int, expectation_function, batch_size=None,
+                              drop_nan_and_infs=True)\
+            -> (torch.tensor, dict):
+        if batch_size is None:
+            samples, log_q = self.sampling_distribution(n_samples)
+            nice_indices = ~(torch.isinf(log_q) | torch.isnan(log_q))
+            samples = samples[nice_indices]
+            log_q = log_q[nice_indices]
+            log_p = self.target_distribution.log_prob(samples)
+            log_w = log_p - log_q
+        else:
+            assert n_samples % batch_size == 0.0
+            n_batches = int(n_samples / batch_size)
+            samples = []
+            log_w = []
+            for i in range(n_batches):
+                samples_batch, log_q = self.sampling_distribution(n_samples)
+                nice_indices = ~(torch.isinf(log_q) | torch.isnan(log_q))
+                samples_batch = samples_batch[nice_indices]
+                log_q = log_q[nice_indices]
+                log_p = self.target_distribution.log_prob(samples_batch)
+                log_w_batch = log_p - log_q
+                log_w.append(log_w_batch)
+                samples.append(samples_batch)
+            samples = torch.cat(samples, dim=0)
+            log_w = torch.cat(log_w, dim=0)
+        if drop_nan_and_infs:
+            contains_neg_infs = (torch.isinf(log_w) & (log_w < torch.tensor(0.0))) | torch.isnan(log_w)
+            log_w = log_w[~contains_neg_infs]
+            samples = samples[~contains_neg_infs, :]
         with torch.no_grad():
             normalised_importance_weights = F.softmax(log_w, dim=-1)
             function_values = expectation_function(samples)

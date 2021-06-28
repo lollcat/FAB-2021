@@ -8,7 +8,8 @@ from Utils.plotting_utils import plot_3D
 
 
 def plot_samples_vs_contours_many_well(learnt_dist_manager, n_samples=1000, bounds=([-3, 3], [-3, 3]),
-                                       n_points_contour=100, title=None, samples_q=None):
+                                       n_points_contour=100, title=None, samples_q=None,
+                                       log_prob_contour=True):
     # when we can't sample from target distribution
     if samples_q is None:
         samples_q = learnt_dist_manager.learnt_sampling_dist.sample((n_samples,))
@@ -17,17 +18,21 @@ def plot_samples_vs_contours_many_well(learnt_dist_manager, n_samples=1000, boun
     x_points_dim2 = torch.linspace(bounds[1][0], bounds[1][1], n_points_contour)
     x_points = torch.tensor(list(itertools.product(x_points_dim1, x_points_dim2)))
     with torch.no_grad():
-        p_x = torch.exp(learnt_dist_manager.target_dist.log_prob_2D(x_points.to(learnt_dist_manager.device)))
+        p_x = learnt_dist_manager.target_dist.log_prob_2D(x_points.to(learnt_dist_manager.device))
+        p_x = torch.clamp_min(p_x, -1000)
+        if not log_prob_contour:
+            p_x = torch.exp(p_x)  # bad naming convention but makes life easy
         p_x = p_x.cpu().detach().numpy()
         p_x = p_x.reshape((n_points_contour, n_points_contour))
         x_points_dim1 = x_points[:, 0].reshape((n_points_contour, n_points_contour)).numpy()
         x_points_dim2 = x_points[:, 1].reshape((n_points_contour, n_points_contour)).numpy()
-    fig, axs = plt.subplots(learnt_dist_manager.target_dist.n_wells, 2, figsize=(7, 3 * learnt_dist_manager.target_dist.n_wells), sharex="row", sharey="row")
+    n_plots = int(learnt_dist_manager.learnt_sampling_dist.dim / 2)
+    fig, axs = plt.subplots(n_plots, 2, figsize=(7, 3 * n_plots), sharex="row", sharey="row")
     if len(axs.shape) == 1:  # need another axis for slicing
         axs = axs[np.newaxis, :]
-    for i in range(learnt_dist_manager.target_dist.n_wells):
+    for i in range(n_plots):
         axs[i, 0].plot(samples_q[:, i*2], samples_q[:, i*2+1], "o", alpha=0.2)
-        axs[i, 1].contourf(x_points_dim1, x_points_dim2, p_x)
+        axs[i, 1].contour(x_points_dim1, x_points_dim2, p_x , levels=25)
     if title is not None:
         fig.suptitle(title)
     plt.tight_layout()
@@ -36,7 +41,7 @@ def plot_samples_vs_contours_many_well(learnt_dist_manager, n_samples=1000, boun
 
 
 def plot_distributions(learnt_dist_manager, bounds=([-10, 10], [-10, 10]), n_points=100,
-                       grid=True, log_prob=False):
+                       grid=True, log_prob=True):
     # grid samples on a grid, grid off samples from the distributions themselves
     if grid is True:
         x_points_dim1 = torch.linspace(bounds[0][0], bounds[0][1], n_points)

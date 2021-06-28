@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 from FittedModels.Models.base import BaseLearntDistribution
 from NormalisingFlow.ActNorm import ActNorm
+from NormalisingFlow.utils import Monitor_NaN
 
 
 class FlowModel(nn.Module, BaseLearntDistribution):
@@ -10,7 +11,7 @@ class FlowModel(nn.Module, BaseLearntDistribution):
     we are also assuming that we are only interested in p(x), so return this for both forwards and backwards,
     we could add methods for p(z) if this comes into play
     """
-    def __init__(self, x_dim, flow_type="RealNVP", n_flow_steps=10, scaling_factor=1.0,
+    def __init__(self, x_dim, flow_type="RealNVP", n_flow_steps=10, scaling_factor=1.0, prevent_NaNs=True,
                  *flow_args, **flow_kwargs):
         super(FlowModel, self).__init__()
         self.class_args = (x_dim, flow_type, n_flow_steps, scaling_factor, *flow_args)
@@ -19,6 +20,8 @@ class FlowModel(nn.Module, BaseLearntDistribution):
         self.scaling_factor = nn.Parameter(torch.tensor([scaling_factor]))
         self.register_buffer("prior_mean", torch.zeros(x_dim))
         self.register_buffer("covariance_matrix", torch.eye(x_dim))
+        self.prevent_NaNs = prevent_NaNs  # to allow for slicing to remove infs/Nans for flow output
+
 
         if flow_type == "IAF":
             from NormalisingFlow.IAF import IAF
@@ -36,13 +39,20 @@ class FlowModel(nn.Module, BaseLearntDistribution):
             self.flow_blocks.append(ActNorm(x_dim))
         self.prior = self.get_prior()
 
+        if prevent_NaNs:
+            self.Monitor_NaN = Monitor_NaN()
+            self.register_nan_hooks()
+
     def to(self, device):
         super(FlowModel, self).to(device)
         self.prior = self.get_prior()
 
+    def register_nan_hooks(self):
+        for parameter in self.parameters():
+            parameter.register_hook(self.Monitor_NaN.overwrite_NaN_grad)
 
     def set_flow_requires_grad(self, requires_grad):
-        for parameter in self.flow_blocks.parameters():
+        for parameter in self.parameters():
             parameter.requires_grad = requires_grad
 
     def get_prior(self):

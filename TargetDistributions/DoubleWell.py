@@ -2,7 +2,9 @@ import torch
 import torch.nn as nn
 
 class Energy(torch.nn.Module):
-
+    """
+    https://zenodo.org/record/3242635#.YNna8uhKjIW
+    """
     def __init__(self, dim):
         super().__init__()
         self._dim = dim

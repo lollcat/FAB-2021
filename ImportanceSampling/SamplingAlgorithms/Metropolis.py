@@ -19,8 +19,8 @@ class Metropolis(BaseTransitionModel):
         self.trainable = trainable
         self.register_buffer("step_size", step_size)
         if trainable:
-            self.noise_scaling_ratios = nn.Parameter(torch.linspace(3.0, 0.5, n_updates).repeat(
-                (n_transitions, 1)))
+            raise NotImplementedError("removed this as auto adjust is fine for low dim,"
+                                      "and in high dim we do HMC anyway")
         else:
             self.register_buffer("noise_scaling_ratios", torch.linspace(3.0, 0.5, n_updates).repeat(
                 (n_transitions, 1)))

@@ -32,7 +32,6 @@ class LearntDistributionManager:
 
     def setup_loss(self, loss_type, alpha=2, k=None, new_lr=None, annealing=False):
         self.annealing = annealing
-        self.k = k # if DReG then k is number of samples that going inside the log sum, if none then put all of them inside
         if loss_type == "kl":
             self.loss = self.KL_loss
             self.alpha = 1
@@ -69,9 +68,6 @@ class LearntDistributionManager:
         :param intermediate_plots: plot samples throughout training
         :return: dictionary of training history
         """
-
-        if "DReG" in self.loss_type and self.k is None:
-            self.k = batch_size
         self.total_epochs = epochs  # we need this for annealing if we use it
 
         epoch_per_print = min(max(int(epochs / 100), 1), 100)  # max 100 epoch, min 1 epoch
@@ -154,51 +150,51 @@ class LearntDistributionManager:
             return min(1.0, 0.01 + self.current_epoch/annealing_period)
 
 
-    def dreg_alpha_divergence_loss(self, x_samples, log_q_x_not_used, log_p_x):
+    def dreg_alpha_divergence_loss(self, x_samples, log_q_x_not_used, log_p_x,
+                                   drop_nans_and_infs=True):
         self.learnt_sampling_dist.set_requires_grad(False)
         log_q_x = self.learnt_sampling_dist.log_prob(x_samples)
         self.learnt_sampling_dist.set_requires_grad(True)
         log_w = log_p_x - log_q_x
-        outside_dim = log_q_x.shape[0]/self.k  # this is like a batch dimension that we average DReG estimation over
-        assert outside_dim % 1 == 0  # always make k & n_samples work together nicely for averaging
-        outside_dim = int(outside_dim)
-        log_w = log_w.reshape((outside_dim, self.k))
+        if drop_nans_and_infs:
+            log_w = log_w[~(torch.isinf(log_w) | torch.isnan(log_w))]
         with torch.no_grad():
             w_alpha_normalised_alpha = F.softmax(self.alpha*log_w, dim=-1)
-        DreG_for_each_batch_dim = - self.alpha_one_minus_alpha_sign * \
+        DreG_loss = - self.alpha_one_minus_alpha_sign * \
                     torch.sum(((1 - self.alpha) * w_alpha_normalised_alpha + self.alpha * w_alpha_normalised_alpha**2)
                               * log_w, dim=-1)
-        dreg_loss = torch.mean(DreG_for_each_batch_dim)
-        return dreg_loss
+        return DreG_loss
 
-    def alpha_divergence_loss(self, x_samples_not_used, log_q_x, log_p_x):
+    def alpha_divergence_loss(self, x_samples_not_used, log_q_x, log_p_x,
+                                   drop_nans_and_infs=True):
         # no DReG
         log_w = log_p_x - log_q_x
+        if drop_nans_and_infs:
+            log_w = log_w[~(torch.isinf(log_w) | torch.isnan(log_w))]
         return - self.alpha_one_minus_alpha_sign * (torch.logsumexp(self.alpha * log_w, dim=0) -
                                                     np.log(log_q_x.shape[0]))
 
-    def dreg_kl_loss(self, x_samples, log_q_x_not_used, log_p_x):
+    def dreg_kl_loss(self, x_samples, log_q_x_not_used, log_p_x,
+                                   drop_nans_and_infs=True):
         self.learnt_sampling_dist.set_requires_grad(False)
         log_q_x = self.learnt_sampling_dist.log_prob(x_samples)
         self.learnt_sampling_dist.set_requires_grad(True)
         log_w = log_p_x - log_q_x
-        outside_dim = log_q_x.shape[0]/self.k  # this is like a batch dimension that we average DReG estimation over
-        assert outside_dim % 1 == 0  # always make k & n_samples work together nicely for averaging
-        outside_dim = int(outside_dim)
-        log_w = log_w.reshape((outside_dim, self.k))
+        if drop_nans_and_infs:
+            log_w = log_w[~(torch.isinf(log_w) | torch.isnan(log_w))]
         with torch.no_grad():
             w_normalised_squared = F.softmax(log_w, dim=-1)**2
-        DreG_for_each_batch_dim = - torch.sum(w_normalised_squared * log_w, dim=-1)
-        dreg_loss = torch.mean(DreG_for_each_batch_dim)
-        return dreg_loss
+        DreG_loss = - torch.sum(w_normalised_squared * log_w, dim=-1)
+        return DreG_loss
 
     def importance_weights_key_info(self, batch_size=1000):
         x_samples, log_q_x = self.learnt_sampling_dist(batch_size)
         log_p_x = self.target_dist.log_prob(x_samples)
         # variance in unnormalised weights
-        weights = torch.exp(log_p_x - log_q_x)
-        normalised_weights = torch.softmax(log_p_x - log_q_x, dim=-1)
-        ESS = self.importance_sampler.effective_sample_size(normalised_weights)/batch_size
+        log_w = log_p_x - log_q_x
+        ESS = self.importance_sampler(self.learnt_sampling_dist, self.target_dist).effective_sample_size_unnormalised_log_weights(log_w)
+        weights = torch.exp(log_w)
+        normalised_weights = torch.softmax(weights, dim=-1)
         return torch.var(weights).item(), torch.var(normalised_weights).item(), ESS.item()
 
     def get_gradients(self, n_batches=100, batch_size=100):
@@ -271,16 +267,15 @@ if __name__ == '__main__':
     torch.manual_seed(0)
     from ImportanceSampling.VanillaImportanceSampler import VanillaImportanceSampling
     from TargetDistributions.Guassian_FullCov import Guassian_FullCov
-    from FittedModels.Models.DiagonalGaussian import DiagonalGaussian
+    from FittedModels.Models.FlowModel import FlowModel
     from Utils.numerical_utils import quadratic_function as expectation_function
 
     epochs = 500
     dim = 2
     target = Guassian_FullCov(dim=dim)
-    learnt_sampler = DiagonalGaussian(dim=dim)
+    learnt_sampler = FlowModel(x_dim=dim)
     tester = LearntDistributionManager(target, learnt_sampler, VanillaImportanceSampling, loss_type="DReG",
                                        weight_decay=1e-5)
-    tester.train_prior(epochs=100, batch_size=100)
     history = tester.train(epochs, intermediate_plots=True)
 
 

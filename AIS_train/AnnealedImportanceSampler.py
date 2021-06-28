@@ -30,9 +30,10 @@ class AnnealedImportanceSampler(BaseAIS):
                                                         auto_adjust=not train_parameters)
         elif transition_operator == "HMC":
             from ImportanceSampling.SamplingAlgorithms.HamiltonianMonteCarlo import HMC
-            self.transition_operator_class = HMC(n_distributions=n_distributions,
+            self.transition_operator_class = HMC(dim=dim, n_distributions=n_distributions,
                                                  epsilon=step_size, n_outer=n_steps_transition_operator,
-                                                 L=inner_loop_steps)
+                                                 L=inner_loop_steps, train_params=train_parameters,
+                                                 auto_adjust_step_size=not train_parameters)
         elif transition_operator == "NUTS":
             from ImportanceSampling.SamplingAlgorithms.NUTS import NUTS
             self.transition_operator_class = NUTS(dim=self.sampling_distribution.dim, log_q_x=None,

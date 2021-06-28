@@ -50,7 +50,7 @@ def plot_3D(x, z, n, ax, title=None):
     x1 = x[:, 0].reshape(n, n)
     x2 = x[:, 1].reshape(n, n)
     z = z.reshape(n, n)
-    offset = -z.max() * 2
+    offset = -np.abs(z).max() * 4
     trisurf = ax.plot_trisurf(x1.flatten(), x2.flatten(), z.flatten(), cmap=mpl.cm.jet)
     cs = ax.contour(x1, x2, z, offset=offset, cmap=mpl.cm.jet, stride=0.5, linewidths=0.5)
     ax.set_zlim(offset, z.max())
@@ -58,7 +58,8 @@ def plot_3D(x, z, n, ax, title=None):
         ax.set_title(title)
 
 
-def plot_distribution(distribution, bounds=([-10, 10], [-10, 10]), n_points=100, grid=True):
+def plot_distribution(distribution, bounds=([-10, 10], [-10, 10]), n_points=100, grid=True,
+                      log_prob=True):
     # plot pdf using grid if grid=True,
     # otherwise based of samples, which we need if the probability density struggles in some regions
     if grid is True:
@@ -69,10 +70,15 @@ def plot_distribution(distribution, bounds=([-10, 10], [-10, 10]), n_points=100,
         with torch.no_grad():
             x_points = distribution.sample((n_points**2,))
     with torch.no_grad():
-        p_x = torch.exp(distribution.log_prob(x_points))
+        log_p_x = distribution.log_prob(x_points)
+        log_p_x = torch.clip(log_p_x, min=-100)
+        if not log_prob:
+            p_x = torch.exp(log_p_x)
+        else:
+            p_x = log_p_x  # bad naming
     if True in torch.isinf(p_x) or True in torch.isnan(p_x):
         print("Nan or inf encountered")
-        p_x[torch.isinf(p_x) & torch.isnan(p_x)] = 0    # prevent NaN from breaking plot
+        p_x[torch.isinf(p_x) | torch.isnan(p_x)] = 0    # prevent NaN from breaking plot
     fig = plt.figure(figsize=plt.figaspect(0.5))
     ax = fig.add_subplot(1, 1, 1, projection='3d')
     plot_3D(x_points, p_x, n_points, ax, title="p(x)")
@@ -93,7 +99,25 @@ def plot_func2D(function, range=10, n_points=100):
     plot_3D(x_points, f_x, n_points, ax, title="f(x)")
 
 
-
+def plot_contours(dist, bounds=([-3, 3], [-3, 3]), n_points_contour=100, title=None, log_prob = True):
+    # currently just for 2D
+    x_points_dim1 = torch.linspace(bounds[0][0], bounds[0][1], n_points_contour)
+    x_points_dim2 = torch.linspace(bounds[1][0], bounds[1][1], n_points_contour)
+    x_points = torch.tensor(list(itertools.product(x_points_dim1, x_points_dim2)))
+    with torch.no_grad():
+        p_x = dist.log_prob(x_points) # bad namig to make things easier
+        p_x = torch.clip(p_x, min=-100)
+        if not log_prob:
+            p_x = torch.exp(p_x)
+        p_x = p_x.cpu().detach().numpy()
+        p_x = p_x.reshape((n_points_contour, n_points_contour))
+        x_points_dim1 = x_points[:, 0].reshape((n_points_contour, n_points_contour)).numpy()
+        x_points_dim2 = x_points[:, 1].reshape((n_points_contour, n_points_contour)).numpy()
+    fig, axs = plt.subplots(1, figsize=(7, 3 * 1), sharex="row", sharey="row")
+    axs.contourf(x_points_dim1, x_points_dim2, p_x, levels=15)
+    if title is not None:
+        fig.suptitle(title)
+    plt.tight_layout()
 
 
 if __name__ == '__main__':
