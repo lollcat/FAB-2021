@@ -107,8 +107,6 @@ class AIS_trainer(LearntDistributionManager):
 
         pbar = tqdm(range(epochs))
         for self.current_epoch in pbar:
-            if self.anneal_step_size:
-                self.AIS_train.transition_operator_class.anneal_step_size(self.current_epoch, epochs)
             x_samples, log_w = self.AIS_train.run(batch_size)
             loss_1 = self.loss(log_w)
             if self.use_2nd_loss:
@@ -294,7 +292,7 @@ if __name__ == '__main__':
     from FittedModels.utils.plotting_utils import plot_samples
 
     torch.manual_seed(2)
-    epochs = 1000
+    epochs = 100
     step_size = 5.0
     batch_size = int(1e3)
     dim = 2
@@ -305,7 +303,7 @@ if __name__ == '__main__':
     plt.show()
     learnt_sampler = FlowModel(x_dim=dim, scaling_factor=3.0)  # , flow_type="RealNVP")
     tester = AIS_trainer(target, learnt_sampler, n_distributions=3, n_steps_transition_operator=2,
-                         step_size=step_size, train_AIS_params=False, loss_type=False, #"DReG",
+                         step_size=step_size, train_AIS_params=True, loss_type=False, #"DReG",
                          transition_operator="HMC", learnt_dist_kwargs={"lr": 5e-4},
                          loss_type_2="alpha_2")
     plot_samples(tester)

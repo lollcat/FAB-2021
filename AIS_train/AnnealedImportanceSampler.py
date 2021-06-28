@@ -17,6 +17,7 @@ class AnnealedImportanceSampler(BaseAIS):
                  n_distributions=20, n_steps_transition_operator=10, distribution_spacing="geometric",
                  transition_operator="Metropolis", step_size=1.0, inner_loop_steps=5):
         # this changes meaning depending on algorithm, for Metropolis it scales noise, for HMC it is step size
+        self.dim = sampling_distribution.dim
         self.loss_type = loss_type
         self.sampling_distribution = sampling_distribution
         self.target_distribution = target_distribution
@@ -30,13 +31,13 @@ class AnnealedImportanceSampler(BaseAIS):
                                                         auto_adjust=not train_parameters)
         elif transition_operator == "HMC":
             from ImportanceSampling.SamplingAlgorithms.HamiltonianMonteCarlo import HMC
-            self.transition_operator_class = HMC(dim=dim, n_distributions=n_distributions,
+            self.transition_operator_class = HMC(dim=self.dim, n_distributions=n_distributions,
                                                  epsilon=step_size, n_outer=n_steps_transition_operator,
                                                  L=inner_loop_steps, train_params=train_parameters,
                                                  auto_adjust_step_size=not train_parameters)
         elif transition_operator == "NUTS":
             from ImportanceSampling.SamplingAlgorithms.NUTS import NUTS
-            self.transition_operator_class = NUTS(dim=self.sampling_distribution.dim, log_q_x=None,
+            self.transition_operator_class = NUTS(dim=self.dim, log_q_x=None,
                                                   M_run=n_steps_transition_operator,
                                                   M_initial=n_steps_transition_operator*5)
             if train_parameters:

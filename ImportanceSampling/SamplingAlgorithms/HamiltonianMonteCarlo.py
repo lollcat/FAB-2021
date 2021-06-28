@@ -26,9 +26,13 @@ class HMC(BaseTransitionModel):
         self.L = L
         self.auto_adjust_step_size = auto_adjust_step_size
         self.target_p_accept = target_p_accept
+        self.first_p_accept = 0.0
+        self.last_p_accept = 0.0
 
     def interesting_info(self):
         interesting_dict = {}
+        interesting_dict["first_p_accept"] = self.first_p_accept
+        interesting_dict["last_p_accept"] = self.last_p_accept
         if self.train_params:
             interesting_dict[f"epsilons_0_0_0"] = self.get_epsilon(0, 0)[0].cpu().item()
             interesting_dict[f"epsilons_0_-1_0"] = self.get_epsilon(0, self.n_outer-1)[0].cpu().item()
@@ -92,6 +96,11 @@ class HMC(BaseTransitionModel):
                 else:
                     self.epsilons[i, n] = self.epsilons[i, n] * 0.9
 
+            if n == 0:
+                # save as interesting info for plotting
+                self.last_p_accept = torch.mean(torch.clamp_max(acceptance_probability, 1))
+        # save as interesting info for plotting
+        self.last_p_accept = torch.mean(torch.clamp_max(acceptance_probability, 1))
         if self.train_params:
             loss.backward(retain_graph=True)
             # torch.autograd.grad(loss, self.epsilons["0_1"], retain_graph=True)
