@@ -20,7 +20,7 @@ class AIS_trainer(LearntDistributionManager):
     """
     def __init__(self, target_distribution, fitted_model,
                  n_distributions=10, n_steps_transition_operator=5,
-                 loss_type="kl", step_size=1.0, train_AIS_params=False, alpha=2, transition_param_lr=1e-1,
+                 loss_type="kl", step_size= 1.0, train_AIS_params=False, alpha=2, transition_param_lr=1e-1,
                  transition_operator="Metropolis", inner_loop_steps=3, loss_type_2=False,
                  anneal_step_size=False,
                  learnt_dist_kwargs={}, AIS_kwargs={}):
@@ -122,7 +122,7 @@ class AIS_trainer(LearntDistributionManager):
             loss_1.backward()
             if clip_grad_norm is True:
                 grad_norm = torch.nn.utils.clip_grad_norm_(self.learnt_sampling_dist.parameters(), max_grad_norm)
-                # torch.nn.utils.clip_grad_value_(self.learnt_sampling_dist.parameters(), 1)
+                torch.nn.utils.clip_grad_value_(self.learnt_sampling_dist.parameters(), 1)
             self.optimizer.step()
             # save info
             try:
@@ -156,9 +156,10 @@ class AIS_trainer(LearntDistributionManager):
                                   title=f"training epoch, samples from AIS {self.current_epoch}",
                                   samples_q=x_samples)
                     if "re_sampled_x" in locals():
-                        plotting_func(self, n_samples=batch_size,
-                                      title=f"training epoch, samples from AIS re-sampled {self.current_epoch}",
-                                      samples_q=re_sampled_x)
+                        if re_sampled_x is not None:
+                            plotting_func(self, n_samples=batch_size,
+                                          title=f"training epoch, samples from AIS re-sampled {self.current_epoch}",
+                                          samples_q=re_sampled_x)
         return history
 
     def dreg_alpha_divergence_loss(self, log_w, drop_nans_and_infs=True):
@@ -248,16 +249,17 @@ class AIS_trainer(LearntDistributionManager):
 
     def alpha_div_annealed_samples_re_weight(self, x_samples, log_w):
         # in this version we weight each term using log_w
-
+        batch_size = x_samples.shape[0]
         # first remove samples that have inf/nan log w
         valid_indices = ~torch.isinf(log_w) & ~torch.isnan(log_w)
+        if torch.sum(valid_indices) == 0: # no valid indices
+            print("no valid indices")
+            return torch.tensor(float("nan")), None
         if valid_indices.all():
             pass
         else:
             log_w = log_w[valid_indices]
             x_samples = x_samples[valid_indices, :]
-
-        batch_size = x_samples.shape[0]
         indx = torch.multinomial(torch.softmax(log_w, dim=0), num_samples=batch_size, replacement=True)
         x_re_sampled = x_samples[indx, :] # use so we can plot
 
@@ -292,8 +294,9 @@ if __name__ == '__main__':
     from FittedModels.utils.plotting_utils import plot_samples
 
     torch.manual_seed(2)
-    epochs = 100
-    step_size = 5.0
+    n_plots = 5
+    epochs = 150
+    step_size = 1.0
     batch_size = int(1e3)
     dim = 2
     n_samples_estimation = int(1e4)
@@ -335,7 +338,8 @@ if __name__ == '__main__':
     plt.title("true samples")
     plt.show()
 
-    history = tester.train(epochs, batch_size=batch_size, intermediate_plots=True, plotting_func=plotter, n_plots=5)
+    history = tester.train(epochs, batch_size=batch_size, intermediate_plots=True,
+                           plotting_func=plotter, n_plots=n_plots)
     plot_history(history)
     plt.show()
     plot_samples(tester)

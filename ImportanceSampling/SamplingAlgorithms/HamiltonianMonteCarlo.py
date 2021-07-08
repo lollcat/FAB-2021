@@ -18,21 +18,21 @@ class HMC(BaseTransitionModel):
             # have to store epsilons like this otherwise we get weird erros
             for i in range(n_distributions):
                 for n in range(n_outer):
-                    self.epsilons[f"{i}_{n}"] = nn.Parameter(torch.ones(dim))
-            self.optimizer = torch.optim.Adam(self.parameters(), lr=lr, weight_decay=1e-6)
+                    self.epsilons[f"{i}_{n}"] = nn.Parameter(torch.ones(dim)*epsilon)
+            self.optimizer = torch.optim.Adam(self.parameters(), lr=lr, weight_decay=1e-4)
         else:
             self.register_buffer("epsilons", torch.ones([n_distributions, n_outer])*epsilon)
         self.n_outer = n_outer
         self.L = L
         self.auto_adjust_step_size = auto_adjust_step_size
         self.target_p_accept = target_p_accept
-        self.first_p_accept = 0.0
-        self.last_p_accept = 0.0
+        self.first_p_accept = torch.tensor([0.0])
+        self.last_p_accept = torch.tensor([0.0])
 
     def interesting_info(self):
         interesting_dict = {}
-        interesting_dict["first_p_accept"] = self.first_p_accept
-        interesting_dict["last_p_accept"] = self.last_p_accept
+        interesting_dict["first_p_accept"] = self.first_p_accept.item()
+        interesting_dict["last_p_accept"] = self.last_p_accept.item()
         if self.train_params:
             interesting_dict[f"epsilons_0_0_0"] = self.get_epsilon(0, 0)[0].cpu().item()
             interesting_dict[f"epsilons_0_-1_0"] = self.get_epsilon(0, self.n_outer-1)[0].cpu().item()
@@ -79,8 +79,9 @@ class HMC(BaseTransitionModel):
             current_K = torch.sum(current_p**2, dim=-1) / 2
             proposed_K = torch.sum(p**2, dim=-1) / 2
 
-            if self.train_params:
-                loss = loss + torch.mean(U_proposed)  # - mean log target prob
+            # comment out this, as let's rather just maximise the final log prob
+            #if self.train_params:
+            #    loss = loss + torch.mean(U_proposed)  # - mean log target prob
 
             # Accept or reject the state at the end of the trajectory, returning either the position at the
             # end of the trajectory or the initial position
@@ -98,13 +99,18 @@ class HMC(BaseTransitionModel):
 
             if n == 0:
                 # save as interesting info for plotting
-                self.last_p_accept = torch.mean(torch.clamp_max(acceptance_probability, 1))
+                self.first_p_accept = torch.mean(torch.clamp_max(acceptance_probability, 1))
         # save as interesting info for plotting
         self.last_p_accept = torch.mean(torch.clamp_max(acceptance_probability, 1))
+
+        loss = torch.mean(U_proposed)
         if self.train_params:
             loss.backward(retain_graph=True)
+            grad_norm = torch.nn.utils.clip_grad_norm_(self.parameters(), 1)
+            torch.nn.utils.clip_grad_value_(self.parameters(), 1)
             # torch.autograd.grad(loss, self.epsilons["0_1"], retain_graph=True)
-            self.optimizer.step()
+            if not (torch.isnan(loss) or torch.isinf(loss)):
+                self.optimizer.step()
         return current_q
 
     def run(self, current_q, log_q_x, i):

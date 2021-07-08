@@ -1,12 +1,45 @@
 __author__ = 'noe'
 
 import numpy as np
-import tensorflow as tf
+import torch
+import torch.nn as nn
 
-from deep_boltzmann.util import distance_matrix_squared
 
-class ParticleDimer(object):
+def ensure_traj(X):
+    if np.ndim(X) == 2:
+        return X
+    if np.ndim(X) == 1:
+        return np.array([X])
+    raise ValueError('Incompatible array with shape: ', np.shape(X))
 
+def distance_matrix_squared(crd1, crd2, dim=2):
+    """ Returns the distance matrix or matrices between particles
+
+    Parameters
+    ----------
+    crd1 : array or matrix
+        first coordinate set
+    crd2 : array or matrix
+        second coordinate set
+    dim : int
+        dimension of particle system. If d=2, coordinate vectors are [x1, y1, x2, y2, ...]
+
+    """
+    crd1 = ensure_traj(crd1)
+    crd2 = ensure_traj(crd2)
+    n = int(np.shape(crd1)[1]/dim)
+
+    crd1_components = [np.tile(np.expand_dims(crd1[:, i::dim], 2), (1, 1, n)) for i in range(dim)]
+    crd2_components = [np.tile(np.expand_dims(crd2[:, i::dim], 2), (1, 1, n)) for i in range(dim)]
+    D2_components = [(crd1_components[i] - np.transpose(crd2_components[i], axes=(0, 2, 1)))**2 for i in range(dim)]
+    D2 = np.sum(D2_components, axis=0)
+    return D2
+
+
+class ParticleDimer(nn.Module):
+    """
+    https://zenodo.org/record/3242635#.YNna8uhKjIW
+    """
     params_default = {'nsolvent' : 36,
                       'eps' : 1.0,  # LJ prefactor
                       'rm' : 1.1,  # LJ particle size
@@ -21,6 +54,7 @@ class ParticleDimer(object):
                      }
 
     def __init__(self, params=None):
+        super(ParticleDimer, self).__init__()
         # set parameters
         if params is None:
             params = self.__class__.params_default
@@ -116,8 +150,8 @@ class ParticleDimer(object):
     def dimer_distance(self, x):
         return np.sqrt((x[:, 2] - x[:, 0])**2 + (x[:, 3] - x[:, 1])**2)
 
-    def dimer_distance_tf(self, x):
-        return tf.sqrt((x[:, 2] - x[:, 0])**2 + (x[:, 3] - x[:, 1])**2)
+    def dimer_distance_torch(self, x):
+        return torch.sqrt((x[:, 2] - x[:, 0])**2 + (x[:, 3] - x[:, 1])**2)
 
     def _distance_squared_matrix(self, crd1, crd2):
         return distance_matrix_squared(crd1, crd2, dim=2)
@@ -135,18 +169,18 @@ class ParticleDimer(object):
         E = 0.5*self.params['eps']*np.sum(D2rel**6, axis=(1, 2))  # do 1/2 because we have double-counted each interaction
         return E
 
-    def LJ_energy_tf(self, x):
+    def LJ_energy_torch(self, x):
         # all component-wise distances bet
         xcomp = x[:, 0::2]
         ycomp = x[:, 1::2]
-        batchsize = tf.shape(x)[0]
-        n = tf.shape(xcomp)[1]
-        Xcomp = tf.tile(tf.expand_dims(xcomp, 2), [1, 1, n])
-        Ycomp = tf.tile(tf.expand_dims(ycomp, 2), [1, 1, n])
-        Dx = Xcomp - tf.transpose(Xcomp, perm=[0, 2, 1])
-        Dy = Ycomp - tf.transpose(Ycomp, perm=[0, 2, 1])
+        batchsize = x.shape[0]
+        n = xcomp.shape[1]
+        Xcomp = torch.tile(xcomp[:, :, None], [1, 1, n])
+        Ycomp = torch.tile(ycomp[:, :, None], [1, 1, n])
+        Dx = Xcomp - torch.transpose(Xcomp, perm=[0, 2, 1]) # TODO from here
+        Dy = Ycomp - torch.transpose(Ycomp, perm=[0, 2, 1])
         D2 = Dx**2 + Dy**2
-        mmatrix = tf.tile(tf.expand_dims(self.mask_matrix, 0), [batchsize, 1, 1])
+        mmatrix = torch.tile(self.mask_matrix[None, :], [batchsize, 1, 1])
         D2 = D2 + (1.0 - mmatrix)  # this is just to avoid NaNs, the inverses will be set to 0 later
         D2rel = (self.params['rm']**2) / D2
         # remove self-interactions and interactions between dimer particles
@@ -238,7 +272,7 @@ class ParticleDimer(object):
             return energy_x
 
     def energy_tf(self, x):
-        return self.LJ_energy_tf(x) + self.dimer_energy_tf(x) + self.box_energy_tf(x) + self.box_energy_tf(x)
+        return self.LJ_energy_torch(x) + self.dimer_energy_tf(x) + self.box_energy_tf(x) + self.box_energy_tf(x)
 
     def plot_dimer_energy(self, axis=None):
         """ Plots the dimer energy to the standard figure """
