@@ -20,15 +20,17 @@ class AIS_trainer(LearntDistributionManager):
     """
     def __init__(self, target_distribution, fitted_model,
                  n_distributions=10, n_steps_transition_operator=5,
-                 loss_type="kl", step_size= 1.0, train_AIS_params=False, alpha=2, transition_param_lr=1e-1,
-                 transition_operator="Metropolis", inner_loop_steps=3, loss_type_2=False,
-                 anneal_step_size=False,
+                 loss_type=False, loss_type_2="alpha_2", step_size= 1.0, train_AIS_params=False, alpha=2,
+                 transition_operator="Metropolis", inner_loop_steps=5,
                  learnt_dist_kwargs={}, AIS_kwargs={}):
         assert loss_type in [False, "kl", "DReG", "var", "ESS", "alpha_2_non_DReG"]
         assert loss_type_2 in [False, "kl", "alpha_2", "alpha_2_resample"]
+        if train_AIS_params and transition_operator == "AIS":
+            assert loss_type != "DReG"  # not able to back-prop through trainining HMC
         self.AIS_train = AnnealedImportanceSampler(loss_type, train_AIS_params, fitted_model, target_distribution,
                                                    transition_operator=transition_operator,
-                                                   n_distributions=n_distributions, n_steps_transition_operator=n_steps_transition_operator,
+                                                   n_distributions=n_distributions,
+                                                   n_steps_transition_operator=n_steps_transition_operator,
                                                    step_size=step_size, inner_loop_steps=inner_loop_steps, **AIS_kwargs)
         self.log_prob_annealed_scaling_factor = torch.tensor(1.0)
         super(AIS_trainer, self).__init__(target_distribution, fitted_model, self.AIS_train,
@@ -293,6 +295,7 @@ if __name__ == '__main__':
     from Utils.numerical_utils import quadratic_function as expectation_function
     from FittedModels.utils.plotting_utils import plot_samples
 
+
     torch.manual_seed(2)
     n_plots = 5
     epochs = 150
@@ -305,8 +308,8 @@ if __name__ == '__main__':
     fig = plot_distribution(target, bounds=[[-30, 20], [-20, 20]])
     plt.show()
     learnt_sampler = FlowModel(x_dim=dim, scaling_factor=3.0)  # , flow_type="RealNVP")
-    tester = AIS_trainer(target, learnt_sampler, n_distributions=3, n_steps_transition_operator=2,
-                         step_size=step_size, train_AIS_params=True, loss_type=False, #"DReG",
+    tester = AIS_trainer(target, learnt_sampler, n_distributions=4, n_steps_transition_operator=2,
+                         step_size=step_size, train_AIS_params=False, loss_type=False, #"DReG",
                          transition_operator="HMC", learnt_dist_kwargs={"lr": 5e-4},
                          loss_type_2="alpha_2")
     plot_samples(tester)

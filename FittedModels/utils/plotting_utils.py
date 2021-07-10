@@ -109,7 +109,7 @@ def plot_sampling_info(history):
 
 
 def plot_history(history, bounds=None, running_chunk_n=15):
-    figure, axs = plt.subplots(len(history), 1, figsize=(6, 10))
+    figure, axs = plt.subplots(len(history), 1, figsize=(7, 3*len(history.keys())))
     for i, key in enumerate(history):
         data = pd.Series(history[key])
         data.replace([np.inf, -np.inf], np.nan, inplace=True)

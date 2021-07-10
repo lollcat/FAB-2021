@@ -90,6 +90,7 @@ class AnnealedImportanceSampler(BaseAIS):
 
 
 if __name__ == '__main__':
+    torch.autograd.set_detect_anomaly(True)
     from FittedModels.Models.FlowModel import FlowModel
     from TargetDistributions.MoG import MoG
     import matplotlib.pyplot as plt
@@ -99,16 +100,17 @@ if __name__ == '__main__':
     n_samples_estimation = int(1e4)
     target = MoG(dim=dim, n_mixes=2, min_cov=1, loc_scaling=3)
     learnt_sampler = FlowModel(x_dim=dim, scaling_factor=3.0)  # , flow_type="RealNVP")
-    test = AnnealedImportanceSampler(loss_type="kl", train_parameters=False,
+    test = AnnealedImportanceSampler(loss_type="kl", train_parameters=True,
                                      sampling_distribution=learnt_sampler,
-                                     target_distribution=target, n_distributions=3,
+                                     target_distribution=target, n_distributions=5,
                                      n_steps_transition_operator=2,
                                      transition_operator="HMC")
-    x_new, log_w = test.run(100)
+    x_new, log_w = test.run(1000)
     x_new = x_new.cpu().detach()
     plt.plot(x_new[:, 0], (x_new[:, 1]), "o")
     plt.show()
 
-    true_samples = target.sample((100,)).detach().cpu()
+    true_samples = target.sample((1000,)).detach().cpu()
     plt.plot(true_samples[:, 0], (true_samples[:, 1]), "o")
     plt.show()
+    print(test.transition_operator_class.interesting_info())
