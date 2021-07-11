@@ -303,11 +303,13 @@ if __name__ == '__main__':
     batch_size = int(1e3)
     dim = 2
     n_samples_estimation = int(1e4)
+    flow_type = "IAF"  # "RealNVP"
+    n_flow_steps = 10
     target = MoG(dim=dim, n_mixes=5, min_cov=1, loc_scaling=10)
     true_expectation = MC_estimate_true_expectation(target, expectation_function, int(1e5))
     fig = plot_distribution(target, bounds=[[-30, 20], [-20, 20]])
     plt.show()
-    learnt_sampler = FlowModel(x_dim=dim, scaling_factor=3.0)  # , flow_type="RealNVP")
+    learnt_sampler = FlowModel(x_dim=dim, scaling_factor=3.0, flow_type=flow_type, n_flow_steps=n_flow_steps)
     tester = AIS_trainer(target, learnt_sampler, n_distributions=5, n_steps_transition_operator=2,
                          step_size=step_size, train_AIS_params=True, loss_type=False, #"DReG",
                          transition_operator="HMC", learnt_dist_kwargs={"lr": 5e-4},

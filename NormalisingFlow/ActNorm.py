@@ -19,7 +19,7 @@ class ActNorm(BaseFlow):
         if self.initialised == False:
             self.loc.data = torch.mean(z, dim=0)
             self.scale.data = torch.log(torch.std(z, dim=0))
-            self.initialised.data = torch.tensor(True)
+            self.initialised.data = torch.tensor(True).to(self.loc.device)
         return (z - self.loc) / torch.exp(self.scale), -torch.sum(self.scale)
 
 
