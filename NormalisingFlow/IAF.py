@@ -48,6 +48,16 @@ class IAF(BaseFlow):
                 log_determinant -= torch.log(sigma[:, i])
         return z, log_determinant
 
+class Reverse_IAF(IAF):
+    def __init__(self, *args, **kwargs):
+        super(Reverse_IAF, self).__init__(*args, **kwargs)
+
+    def forward(self, x):
+        return super(Reverse_IAF, self).inverse(x)
+
+    def inverse(self, x):
+        return super(Reverse_IAF, self).forward(x)
+
 
 if __name__ == '__main__':
     dim = 3

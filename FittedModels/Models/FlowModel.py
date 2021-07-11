@@ -26,6 +26,9 @@ class FlowModel(nn.Module, BaseLearntDistribution):
         if flow_type == "IAF":
             from NormalisingFlow.IAF import IAF
             flow = IAF
+        elif flow_type == "ReverseIAF":
+            from NormalisingFlow.IAF import Reverse_IAF
+            flow = Reverse_IAF
         elif flow_type == "RealNVP":
             from NormalisingFlow.RealNVP import RealNVP
             flow = RealNVP
@@ -201,7 +204,8 @@ if __name__ == '__main__':
     from Utils.plotting_utils import plot_distribution
     import matplotlib.pyplot as plt
     torch.manual_seed(1)
-    model = FlowModel(x_dim=2, n_flow_steps=4, scaling_factor=1.5, use_exp=False) #, flow_type="RealNVP")  #
+    model = FlowModel(x_dim=2, flow_type="ReverseIAF",
+                      n_flow_steps=4, scaling_factor=1.5, use_exp=False) #, flow_type="RealNVP")  #
     model(100)
     x, log_prob = model.forward(100)
     #  x, log_prob = model.batch_forward(100, 10)

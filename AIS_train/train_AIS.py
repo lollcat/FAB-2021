@@ -303,7 +303,7 @@ if __name__ == '__main__':
     batch_size = int(1e3)
     dim = 2
     n_samples_estimation = int(1e4)
-    flow_type = "IAF"  # "RealNVP"
+    flow_type = "ReverseIAF" #IAF"  # "RealNVP"
     n_flow_steps = 10
     target = MoG(dim=dim, n_mixes=5, min_cov=1, loc_scaling=10)
     true_expectation = MC_estimate_true_expectation(target, expectation_function, int(1e5))
