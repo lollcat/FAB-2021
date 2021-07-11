@@ -7,7 +7,7 @@ class HMC(BaseTransitionModel):
     Following: https: // arxiv.org / pdf / 1206.1901.pdf
     """
     def __init__(self, n_distributions, epsilon, dim, n_outer=2, L=5, train_params=True,
-                 target_p_accept=0.5, lr=1e-3, auto_adjust_step_size=False):
+                 target_p_accept=0.65, lr=1e-3, auto_adjust_step_size=False):
         super(HMC, self).__init__()
         self.train_params = train_params
         if train_params:
@@ -53,6 +53,7 @@ class HMC(BaseTransitionModel):
 
 
     def HMC_func(self, U, current_q, grad_U, i):
+        current_q = torch.clone(current_q)  # so we can do in place operations
         # base function for HMC written in terms of potential energy function U
         if self.train_params:
             self.optimizer.zero_grad()
@@ -90,7 +91,8 @@ class HMC(BaseTransitionModel):
             # Accept or reject the state at the end of the trajectory, returning either the position at the
             # end of the trajectory or the initial position
             acceptance_probability = torch.exp(U_current - U_proposed + current_K - proposed_K)
-            acceptance_probability = torch.nan_to_num(acceptance_probability, nan=0.0, posinf=1.0, neginf=0.0)
+            # reject samples with nan acceptance probability
+            acceptance_probability = torch.nan_to_num(acceptance_probability, nan=0.0, posinf=0.0, neginf=0.0)
             accept = acceptance_probability > torch.rand(acceptance_probability.shape).to(q.device)
             current_q[accept] = q[accept]
 

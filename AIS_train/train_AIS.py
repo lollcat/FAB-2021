@@ -308,8 +308,8 @@ if __name__ == '__main__':
     fig = plot_distribution(target, bounds=[[-30, 20], [-20, 20]])
     plt.show()
     learnt_sampler = FlowModel(x_dim=dim, scaling_factor=3.0)  # , flow_type="RealNVP")
-    tester = AIS_trainer(target, learnt_sampler, n_distributions=4, n_steps_transition_operator=2,
-                         step_size=step_size, train_AIS_params=False, loss_type=False, #"DReG",
+    tester = AIS_trainer(target, learnt_sampler, n_distributions=5, n_steps_transition_operator=2,
+                         step_size=step_size, train_AIS_params=True, loss_type=False, #"DReG",
                          transition_operator="HMC", learnt_dist_kwargs={"lr": 5e-4},
                          loss_type_2="alpha_2")
     plot_samples(tester)
@@ -355,7 +355,6 @@ if __name__ == '__main__':
     print(
         f"ESS is {info_dict['effective_sample_size'] / n_samples_estimation}, "
         f"var is {torch.var(info_dict['normalised_sampling_weights'])}")
-
 
 
 
