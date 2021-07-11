@@ -50,14 +50,22 @@ class AnnealedImportanceSampler(BaseAIS):
 
     def run(self, n_runs):
         log_w = torch.zeros(n_runs).to(self.device)  # log importance weight
-        x_new, log_prob_p0 = self.sampling_distribution(n_runs)
-        if "DReG" == self.loss_type:
+        if self.loss_type == False: # in this case we don't need gradients here
             self.sampling_distribution.set_requires_grad(False)
-            log_prob_p0 = self.sampling_distribution.log_prob(x_new)
-        log_w += self.intermediate_unnormalised_log_prob(x_new, 1) - log_prob_p0
+            with torch.no_grad():
+                x_new, log_prob_p0 = self.sampling_distribution(n_runs)
+                log_prob_p0 = self.sampling_distribution.log_prob(x_new)
+                log_w += self.intermediate_unnormalised_log_prob(x_new, 1) - log_prob_p0
+        else:
+            x_new, log_prob_p0 = self.sampling_distribution(n_runs)
+            if "DReG" == self.loss_type:
+                self.sampling_distribution.set_requires_grad(False)
+                log_prob_p0 = self.sampling_distribution.log_prob(x_new)
+                log_w += self.intermediate_unnormalised_log_prob(x_new, 1) - log_prob_p0
+
         for j in range(1, self.n_distributions-1):
             x_new, log_w = self.perform_transition(x_new, log_w, j)
-        if "DReG" == self.loss_type:
+        if "DReG" == self.loss_type or False == self.loss_type:
             self.sampling_distribution.set_requires_grad(True)
         return x_new, log_w
 

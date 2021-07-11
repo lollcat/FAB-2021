@@ -53,6 +53,7 @@ class HMC(BaseTransitionModel):
 
 
     def HMC_func(self, U, current_q, grad_U, i):
+        current_q.requires_grad = True  # need this for grad function
         current_q = torch.clone(current_q)  # so we can do in place operations
         # base function for HMC written in terms of potential energy function U
         if self.train_params:
@@ -121,7 +122,6 @@ class HMC(BaseTransitionModel):
             if not (torch.isnan(loss) or torch.isinf(loss)):
                 self.optimizer.step()
             current_q = current_q.detach()  # otherwise traces gradient back to epsilon
-            current_q.requires_grad = True # need this for grad function
         return current_q
 
     def run(self, current_q, log_q_x, i):

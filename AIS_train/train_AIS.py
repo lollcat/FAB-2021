@@ -23,6 +23,8 @@ class AIS_trainer(LearntDistributionManager):
                  loss_type=False, loss_type_2="alpha_2", step_size= 1.0, train_AIS_params=False, alpha=2,
                  transition_operator="Metropolis", inner_loop_steps=5,
                  learnt_dist_kwargs={}, AIS_kwargs={}):
+        self.loss_type = loss_type
+        self.loss_type_2 = loss_type_2
         assert loss_type in [False, "kl", "DReG", "var", "ESS", "alpha_2_non_DReG"]
         assert loss_type_2 in [False, "kl", "alpha_2", "alpha_2_resample"]
         if train_AIS_params and transition_operator == "AIS":
@@ -126,42 +128,43 @@ class AIS_trainer(LearntDistributionManager):
                 grad_norm = torch.nn.utils.clip_grad_norm_(self.learnt_sampling_dist.parameters(), max_grad_norm)
                 torch.nn.utils.clip_grad_value_(self.learnt_sampling_dist.parameters(), 1)
             self.optimizer.step()
-            # save info
-            try:
-                log_p_x = self.target_dist.log_prob(x_samples)
-                log_p_x = log_p_x[~(torch.isnan(log_p_x) | torch.isinf(log_p_x))]
-                history["log_p_x_after_AIS"].append(torch.mean(log_p_x).item())
-            except:
-                print("Couldn't calculate log prob over target distribution")
-            history["loss"].append(loss_1.item())
-            history["log_w"].append(torch.mean(log_w).item())
-            history["ESS"].append(
-                self.AIS_train.effective_sample_size_unnormalised_log_weights(log_w, drop_nan=True).item() /
-                log_w.shape[0])
-            transition_operator_info = self.AIS_train.transition_operator_class.interesting_info()
-            for key in transition_operator_info:
-                history[key].append(transition_operator_info[key])
-            if (self.current_epoch % epoch_per_print == 0 or self.current_epoch == epochs) and self.current_epoch > 0:
-                pbar.set_description(f"loss: {np.mean(history['loss'][-epoch_per_print:])},   "
-                                     f"log_p_x_post_AIS {np.mean(history['log_p_x_after_AIS'][-epoch_per_print:])}, "
-                                     f"ESS {np.mean(history['ESS'][-epoch_per_print:])}")
-            if self.current_epoch % epoch_per_save == 0 or self.current_epoch == epochs:
-                history["kl"].append(self.kl_MC_estimate(KPI_batch_size))
-                history["alpha_2_divergence"].append(self.alpha_divergence_MC_estimate(KPI_batch_size))
-                history["log_q_AIS_x"].append(self.log_prob_annealed_samples_loss_resample(x_samples, log_w)[0].item())
-            if intermediate_plots:
-                if self.current_epoch % epoch_per_plot == 0:
-                    plotting_func(self, n_samples=batch_size,
-                                  title=f"training epoch, samples from flow {self.current_epoch}")
-                    # make sure plotting func has option to enter x_samples directly
-                    plotting_func(self, n_samples=batch_size,
-                                  title=f"training epoch, samples from AIS {self.current_epoch}",
-                                  samples_q=x_samples)
-                    if "re_sampled_x" in locals():
-                        if re_sampled_x is not None:
-                            plotting_func(self, n_samples=batch_size,
-                                          title=f"training epoch, samples from AIS re-sampled {self.current_epoch}",
-                                          samples_q=re_sampled_x)
+            with torch.no_grad(): # none of the below steps should require gradients
+                # save info
+                try:
+                    log_p_x = self.target_dist.log_prob(x_samples)
+                    log_p_x = log_p_x[~(torch.isnan(log_p_x) | torch.isinf(log_p_x))]
+                    history["log_p_x_after_AIS"].append(torch.mean(log_p_x).item())
+                except:
+                    print("Couldn't calculate log prob over target distribution")
+                history["loss"].append(loss_1.item())
+                history["log_w"].append(torch.mean(log_w).item())
+                history["ESS"].append(
+                    self.AIS_train.effective_sample_size_unnormalised_log_weights(log_w, drop_nan=True).item() /
+                    log_w.shape[0])
+                transition_operator_info = self.AIS_train.transition_operator_class.interesting_info()
+                for key in transition_operator_info:
+                    history[key].append(transition_operator_info[key])
+                if (self.current_epoch % epoch_per_print == 0 or self.current_epoch == epochs) and self.current_epoch > 0:
+                    pbar.set_description(f"loss: {np.mean(history['loss'][-epoch_per_print:])},   "
+                                         f"log_p_x_post_AIS {np.mean(history['log_p_x_after_AIS'][-epoch_per_print:])}, "
+                                         f"ESS {np.mean(history['ESS'][-epoch_per_print:])}")
+                if self.current_epoch % epoch_per_save == 0 or self.current_epoch == epochs:
+                    history["kl"].append(self.kl_MC_estimate(KPI_batch_size))
+                    history["alpha_2_divergence"].append(self.alpha_divergence_MC_estimate(KPI_batch_size))
+                    history["log_q_AIS_x"].append(self.log_prob_annealed_samples_loss_resample(x_samples, log_w)[0].item())
+                if intermediate_plots:
+                    if self.current_epoch % epoch_per_plot == 0:
+                        plotting_func(self, n_samples=batch_size,
+                                      title=f"training epoch, samples from flow {self.current_epoch}")
+                        # make sure plotting func has option to enter x_samples directly
+                        plotting_func(self, n_samples=batch_size,
+                                      title=f"training epoch, samples from AIS {self.current_epoch}",
+                                      samples_q=x_samples)
+                        if "re_sampled_x" in locals():
+                            if re_sampled_x is not None:
+                                plotting_func(self, n_samples=batch_size,
+                                              title=f"training epoch, samples from AIS re-sampled {self.current_epoch}",
+                                              samples_q=re_sampled_x)
         return history
 
     def dreg_alpha_divergence_loss(self, log_w, drop_nans_and_infs=True):
