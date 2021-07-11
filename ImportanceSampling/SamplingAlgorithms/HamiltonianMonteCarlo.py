@@ -93,11 +93,12 @@ class HMC(BaseTransitionModel):
             acceptance_probability = torch.exp(U_current - U_proposed + current_K - proposed_K)
             # reject samples with nan acceptance probability
             acceptance_probability = torch.nan_to_num(acceptance_probability, nan=0.0, posinf=0.0, neginf=0.0)
+            acceptance_probability = torch.clamp(acceptance_probability, min=0.0, max=1.0)
             accept = acceptance_probability > torch.rand(acceptance_probability.shape).to(q.device)
             current_q[accept] = q[accept]
 
             if self.auto_adjust_step_size:
-                p_accept = torch.mean(torch.clamp_max(acceptance_probability, 1))
+                p_accept = torch.mean(acceptance_probability)
                 if p_accept > self.target_p_accept: # too much accept
                     self.epsilons[i, n] = self.epsilons[i, n] * 1.1
                     self.common_epsilon = self.common_epsilon * 1.05
@@ -107,9 +108,9 @@ class HMC(BaseTransitionModel):
 
             if i == 0: # save fist and last distribution info
                 # save as interesting info for plotting
-                self.first_dist_p_accepts[n] = torch.mean(torch.clamp_max(acceptance_probability, 1))
+                self.first_dist_p_accepts[n] = torch.mean(acceptance_probability)
             elif i == self.n_distributions - 3:
-                self.last_dist_p_accepts[n] = torch.mean(torch.clamp_max(acceptance_probability, 1))
+                self.last_dist_p_accepts[n] = torch.mean(acceptance_probability)
 
         loss = torch.mean(U_proposed)
         if self.train_params:
