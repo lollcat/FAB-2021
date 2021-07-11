@@ -90,9 +90,9 @@ class HMC(BaseTransitionModel):
             # Accept or reject the state at the end of the trajectory, returning either the position at the
             # end of the trajectory or the initial position
             acceptance_probability = torch.exp(U_current - U_proposed + current_K - proposed_K)
-            accept = (acceptance_probability > torch.rand(acceptance_probability.shape).to(q.device)).int()
-            accept = accept[:, None].repeat(1, q.shape[-1])
-            current_q = accept * q + (1 - accept) * current_q
+            acceptance_probability = torch.nan_to_num(acceptance_probability, nan=0.0, posinf=1.0, neginf=0.0)
+            accept = acceptance_probability > torch.rand(acceptance_probability.shape).to(q.device)
+            current_q[accept] = q[accept]
 
             if self.auto_adjust_step_size:
                 p_accept = torch.mean(torch.clamp_max(acceptance_probability, 1))
@@ -148,7 +148,8 @@ if __name__ == '__main__':
     torch.manual_seed(2)
     target = MoG(dim=dim, n_mixes=5, loc_scaling=5)
     learnt_sampler = DiagonalGaussian(dim=dim, log_std_initial_scaling=2.0)
-    hmc = HMC(n_distributions=n_distributions_pretend, n_outer=40, epsilon=1.0, L=6, dim=dim)
+    hmc = HMC(n_distributions=n_distributions_pretend, n_outer=40, epsilon=1.0, L=6, dim=dim, train_params=False,
+              auto_adjust_step_size=True)
     n = 5
     for i in range(n):
         for j in range(n_distributions_pretend-2):
