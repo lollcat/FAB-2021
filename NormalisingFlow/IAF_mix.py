@@ -9,7 +9,7 @@ class IAF_mix(BaseFlow):
     def __init__(self, x_dim, nodes_per_x=3, n_hidden_layers=1, reversed=True, init_zeros=True):
         super(IAF_mix, self).__init__()
         self.x_dim = x_dim
-        hidden_layer_width = nodes_per_x*x_dim  # this lets us enter the layer width default argument dependent on x_dim
+        hidden_layer_width = int(nodes_per_x*x_dim)  # this lets us enter the layer width default argument dependent on x_dim
         # if this works we can rewrite AutoregressiveNN to allow any number of outputs
         self.AutoregressiveNN_1 = MADE_IAF(x_dim=x_dim, hidden_layer_width=hidden_layer_width,
                                          n_hidden_layers=n_hidden_layers, init_zeros=init_zeros)

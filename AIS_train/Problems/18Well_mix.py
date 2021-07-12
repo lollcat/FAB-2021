@@ -35,7 +35,8 @@ if __name__ == '__main__':
     n_samples_expectation = int(1e5)
     n_samples = int(1e4)
 
-    learnt_sampler = FlowModel(x_dim=dim, scaling_factor=2.0, flow_type="ReverseIAF_MIX", n_flow_steps=20)
+    learnt_sampler = FlowModel(x_dim=dim, scaling_factor=2.0, flow_type="ReverseIAF_MIX", n_flow_steps=20,
+                               nodes_per_x=1.5)
     tester = AIS_trainer(target, learnt_sampler, loss_type=False, n_distributions=30, n_steps_transition_operator=1,
                          step_size=1.0, transition_operator="HMC", learnt_dist_kwargs={"lr": 1e-4},
                          loss_type_2="alpha_2", train_AIS_params=False, inner_loop_steps=5)
