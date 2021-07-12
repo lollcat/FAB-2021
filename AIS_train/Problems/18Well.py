@@ -1,10 +1,9 @@
 if __name__ == '__main__':
     import pathlib
-    from pathlib import Path
     import os
-    cwd_path = Path.cwd()
-    set_path = str(cwd_path.parent.parent)
-    os.chdir(set_path)
+    import sys
+    if not os.getcwd() in sys.path:
+        sys.path.append(os.getcwd())
     import torch
 
     from TargetDistributions.DoubleWell import ManyWellEnergy
