@@ -29,6 +29,9 @@ class FlowModel(nn.Module, BaseLearntDistribution):
         elif flow_type == "ReverseIAF":
             from NormalisingFlow.IAF import Reverse_IAF
             flow = Reverse_IAF
+        elif flow_type == "ReverseIAF_MIX":
+            from NormalisingFlow.IAF_mix import Reverse_IAF_MIX
+            flow = Reverse_IAF_MIX
         elif flow_type == "RealNVP":
             from NormalisingFlow.RealNVP import RealNVP
             flow = RealNVP

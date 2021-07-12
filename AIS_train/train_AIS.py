@@ -198,7 +198,6 @@ class AIS_trainer(LearntDistributionManager):
     def var_loss(self, log_w):
         return torch.var(torch.exp(log_w))
 
-
     def log_prob_annealed_samples_loss_resample(self, x_samples, log_w):
         batch_size = x_samples.shape[0]
         # not we return - log_prob_annealed to get the loss
@@ -306,7 +305,7 @@ if __name__ == '__main__':
     batch_size = int(1e3)
     dim = 2
     n_samples_estimation = int(1e4)
-    flow_type = "ReverseIAF" #IAF"  # "RealNVP"
+    flow_type = "ReverseIAF"  #"ReverseIAF_MIX" #"ReverseIAF" #IAF"  # "RealNVP"
     n_flow_steps = 10
     target = MoG(dim=dim, n_mixes=5, min_cov=1, loc_scaling=10)
     true_expectation = MC_estimate_true_expectation(target, expectation_function, int(1e5))
