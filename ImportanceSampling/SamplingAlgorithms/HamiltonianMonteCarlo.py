@@ -53,8 +53,8 @@ class HMC(BaseTransitionModel):
 
 
     def HMC_func(self, U, current_q, grad_U, i):
-        current_q = torch.clone(current_q)
-        current_q.requires_grad = True  # need this for grad function
+        # need this for grad function
+        current_q = current_q.clone().detach().requires_grad_(True)
         current_q = torch.clone(current_q)  # so we can do in place operations, kinda weird hack
         # base function for HMC written in terms of potential energy function U
         if self.train_params:
