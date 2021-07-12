@@ -1,11 +1,12 @@
 if __name__ == '__main__':
+    epochs = 12000
     import pathlib
     import os
     import sys
     if not os.getcwd() in sys.path:
         sys.path.append(os.getcwd())
     import torch
-
+    from Utils.plotting_utils import multipage
     from TargetDistributions.DoubleWell import ManyWellEnergy
     from FittedModels.utils.plotting_utils import plot_samples_vs_contours_many_well
 
@@ -27,8 +28,8 @@ if __name__ == '__main__':
         plot_samples_vs_contours_many_well(*args, **kwargs)
 
 
-    save_path = pathlib.Path("16_dim_ReverseIAF.pdf")
-    save_path.parent.mkdir(parents=True, exist_ok=False)
+    save_path = pathlib.Path("16_dim_ReverseIAF")
+    save_path.mkdir(parents=True, exist_ok=False)
     dim = 16
     target = ManyWellEnergy(dim=dim, a=-0.5, b=-6)
     n_samples_expectation = int(1e5)
@@ -39,10 +40,9 @@ if __name__ == '__main__':
                          step_size=1.0, transition_operator="HMC", learnt_dist_kwargs={"lr": 1e-4},
                          loss_type_2="alpha_2", train_AIS_params=False, inner_loop_steps=5)
 
-    history = tester.train(12000, batch_size=int(1e3), intermediate_plots=True, n_plots=20, plotting_func=plotter)
+    history = tester.train(epochs, batch_size=int(1e3), intermediate_plots=True, n_plots=20, plotting_func=plotter)
     plot_history(history)
-    plot_history(dict([(key, history[key]) for key in ('loss', 'log_p_x_after_AIS', 'log_w', 'kl',
-                                                       'alpha_2_divergence', 'log_q_AIS_x', 'ESS')]))
+    multipage(str(save_path / "training.pdf"))
     expectation, info_dict = tester.AIS_train.calculate_expectation(n_samples_expectation,
                                                                     expectation_function=expectation_function,
                                                                     batch_size=int(1e3),
@@ -53,14 +53,14 @@ if __name__ == '__main__':
     plot_samples_vs_contours_many_well(tester, n_samples=None,
                                        title=f"training epoch, samples from AIS",
                                        samples_q=info_dict["samples"])
+    multipage(str(save_path / "after_training.pdf"))
+
     expectation_flo, info_dict_flo = tester.AIS_train.calculate_expectation_over_flow(n_samples_expectation,
                                                                                       expectation_function=expectation_function,
                                                                                       batch_size=int(1e3),
                                                                                       drop_nan_and_infs=True)
     print(info_dict_flo['effective_sample_size'].item() / info_dict_flo["normalised_sampling_weights"].shape[0])
 
-    from Utils.plotting_utils import multipage
-    multipage(str(save_path))
 
 
 
