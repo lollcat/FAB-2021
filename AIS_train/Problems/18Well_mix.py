@@ -39,7 +39,7 @@ if __name__ == '__main__':
                                nodes_per_x=1.5)
     tester = AIS_trainer(target, learnt_sampler, loss_type=False, n_distributions=30, n_steps_transition_operator=1,
                          step_size=1.0, transition_operator="HMC", learnt_dist_kwargs={"lr": 1e-4},
-                         loss_type_2="alpha_2", train_AIS_params=False, inner_loop_steps=5)
+                         loss_type_2="alpha_2", train_AIS_params=True, inner_loop_steps=5)
 
     history = tester.train(epochs, batch_size=int(1e3), intermediate_plots=True, n_plots=20, plotting_func=plotter)
     plot_history(history)

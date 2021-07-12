@@ -56,6 +56,7 @@ class AIS_trainer(LearntDistributionManager):
 
     def to(self, device):
         """device is cuda or cpu"""
+        print(f"setting device as {device}")
         self.device = device
         self.learnt_sampling_dist.to(self.device)
         self.target_dist.to(self.device)

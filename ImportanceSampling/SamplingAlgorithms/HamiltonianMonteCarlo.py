@@ -7,10 +7,13 @@ class HMC(BaseTransitionModel):
     Following: https: // arxiv.org / pdf / 1206.1901.pdf
     """
     def __init__(self, n_distributions, epsilon, dim, n_outer=2, L=5, train_params=True,
-                 target_p_accept=0.65, lr=1e-3, auto_adjust_step_size=False):
+                 target_p_accept=0.65, lr=1e-3, auto_adjust_step_size=False,
+                 tune_period=500):
         super(HMC, self).__init__()
         self.train_params = train_params
         if train_params:
+            self.tune_period = tune_period
+            self.counter = 0
             self.epsilons = nn.ParameterDict()
             # have to store epsilons like this otherwise we get weird erros
             self.epsilons["common"] = nn.Parameter(torch.tensor([epsilon]))
@@ -114,8 +117,9 @@ class HMC(BaseTransitionModel):
             elif i == self.n_distributions - 3:
                 self.last_dist_p_accepts[n] = torch.mean(acceptance_probability)
 
-        loss = torch.mean(U_proposed)
-        if self.train_params:
+        self.counter += 1
+        if self.counter < self.tune_period and self.train_params:
+            loss = torch.mean(U_proposed)
             loss.backward()#retain_graph=True)
             grad_norm = torch.nn.utils.clip_grad_norm_(self.parameters(), 1)
             torch.nn.utils.clip_grad_value_(self.parameters(), 1)
