@@ -1,28 +1,33 @@
-import os
-import torch
-import tqdm
-import matplotlib.pyplot as plt
-
-from TargetDistributions.DoubleWell import ManyWellEnergy
-from FittedModels.utils.plotting_utils import plot_samples_vs_contours_many_well
-
-from FittedModels.Models.FlowModel import FlowModel
-from AIS_train.train_AIS import AIS_trainer
-from ImportanceSampling.VanillaImportanceSampler import VanillaImportanceSampling
-from FittedModels.utils.plotting_utils import plot_history, plot_distributions, plot_samples
-
-import matplotlib.pyplot as plt
-import torch
-import pathlib
-from Utils.plotting_utils import plot_func2D, plot_distribution
-from Utils.numerical_utils import MC_estimate_true_expectation
-from Utils.numerical_utils import quadratic_function as expectation_function
-torch.set_default_dtype(torch.float64)
-
-def plotter(*args, **kwargs):
-    plot_samples_vs_contours_many_well(*args, **kwargs)
-
 if __name__ == '__main__':
+    import pathlib
+    from pathlib import Path
+    import os
+    cwd_path = Path.cwd()
+    set_path = str(cwd_path.parent.parent)
+    os.chdir(set_path)
+    import torch
+
+    from TargetDistributions.DoubleWell import ManyWellEnergy
+    from FittedModels.utils.plotting_utils import plot_samples_vs_contours_many_well
+
+    from FittedModels.Models.FlowModel import FlowModel
+    from AIS_train.train_AIS import AIS_trainer
+    from ImportanceSampling.VanillaImportanceSampler import VanillaImportanceSampling
+    from FittedModels.utils.plotting_utils import plot_history, plot_distributions, plot_samples
+
+    import matplotlib.pyplot as plt
+    import torch
+    from Utils.plotting_utils import plot_func2D, plot_distribution
+    from Utils.numerical_utils import MC_estimate_true_expectation
+    from Utils.numerical_utils import quadratic_function as expectation_function
+
+    torch.set_default_dtype(torch.float64)
+
+
+    def plotter(*args, **kwargs):
+        plot_samples_vs_contours_many_well(*args, **kwargs)
+
+
     save_path = pathlib.Path("16_dim_ReverseIAF.pdf")
     save_path.parent.mkdir(parents=True, exist_ok=False)
     dim = 16
