@@ -95,7 +95,7 @@ class AIS_trainer(LearntDistributionManager):
               plotting_func=plot_samples, n_plots=3,
               KPI_batch_size=int(1e4),
               allow_ignore_nan_loss=True, clip_grad_norm=True,
-              max_grad_norm=1):
+              max_grad_norm=1, plotting_batch_size=int(1e3)):
         epoch_per_print = min(max(int(epochs / 100), 1), 100)  # max 100 epoch, min 1 epoch
         epoch_per_save = max(int(epochs / 100), 1)
         if intermediate_plots is True:
@@ -155,17 +155,17 @@ class AIS_trainer(LearntDistributionManager):
                     history["log_q_AIS_x"].append(self.log_prob_annealed_samples_loss_resample(x_samples, log_w)[0].item())
                 if intermediate_plots:
                     if self.current_epoch % epoch_per_plot == 0:
-                        plotting_func(self, n_samples=batch_size,
+                        plotting_func(self, n_samples=plotting_batch_size,
                                       title=f"training epoch, samples from flow {self.current_epoch}")
                         # make sure plotting func has option to enter x_samples directly
                         plotting_func(self, n_samples=batch_size,
                                       title=f"training epoch, samples from AIS {self.current_epoch}",
-                                      samples_q=x_samples)
+                                      samples_q=x_samples.cpu().detach())
                         if "re_sampled_x" in locals():
                             if re_sampled_x is not None:
                                 plotting_func(self, n_samples=batch_size,
                                               title=f"training epoch, samples from AIS re-sampled {self.current_epoch}",
-                                              samples_q=re_sampled_x)
+                                              samples_q=re_sampled_x.cpu().detach())
         return history
 
     def dreg_alpha_divergence_loss(self, log_w, drop_nans_and_infs=True):

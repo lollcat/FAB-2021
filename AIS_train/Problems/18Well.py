@@ -40,7 +40,7 @@ if __name__ == '__main__':
                          step_size=1.0, transition_operator="HMC", learnt_dist_kwargs={"lr": 1e-4},
                          loss_type_2="alpha_2", train_AIS_params=True, inner_loop_steps=5)
 
-    history = tester.train(epochs, batch_size=int(1e3), intermediate_plots=True, n_plots=20, plotting_func=plotter)
+    history = tester.train(epochs, batch_size=int(5e3), intermediate_plots=True, n_plots=20, plotting_func=plotter)
     plot_history(history)
     multipage(str(save_path / "training.pdf"))
     expectation, info_dict = tester.AIS_train.calculate_expectation(n_samples_expectation,
