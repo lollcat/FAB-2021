@@ -116,8 +116,8 @@ class HMC(BaseTransitionModel):
                 self.first_dist_p_accepts[n] = torch.mean(acceptance_probability)
             elif i == self.n_distributions - 3:
                 self.last_dist_p_accepts[n] = torch.mean(acceptance_probability)
-
-        self.counter += 1
+        if i == 0:
+            self.counter += 1
         if self.counter < self.tune_period and self.train_params:
             loss = torch.mean(U_proposed)
             loss.backward()#retain_graph=True)
