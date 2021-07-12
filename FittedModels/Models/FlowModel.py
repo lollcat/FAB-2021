@@ -206,9 +206,10 @@ class FlowModel(nn.Module, BaseLearntDistribution):
 if __name__ == '__main__':
     from Utils.plotting_utils import plot_distribution
     import matplotlib.pyplot as plt
+    torch.set_default_dtype(torch.float64)
     torch.manual_seed(1)
-    model = FlowModel(x_dim=2, flow_type="ReverseIAF",
-                      n_flow_steps=4, scaling_factor=1.5, use_exp=False) #, flow_type="RealNVP")  #
+    model = FlowModel(x_dim=2, flow_type="ReverseIAF_MIX",
+                      n_flow_steps=4, scaling_factor=1.5, init_zeros=False)
     model(100)
     x, log_prob = model.forward(100)
     #  x, log_prob = model.batch_forward(100, 10)
