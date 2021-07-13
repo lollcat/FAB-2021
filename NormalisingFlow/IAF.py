@@ -4,7 +4,6 @@ import torch.nn as nn
 from NormalisingFlow.base import BaseFlow
 
 
-
 class IAF(BaseFlow):
     def __init__(self, x_dim, nodes_per_x=3, n_hidden_layers=1, reversed=True, use_exp=False, init_zeros=True):
         super(IAF, self).__init__()

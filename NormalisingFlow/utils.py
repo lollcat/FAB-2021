@@ -5,10 +5,10 @@ class Monitor_NaN:
     def __init__(self, name=None):
         self.found_Nan = False
 
-    def overwrite_NaN_grad(self, grad, name=None, print_=True):
+    def overwrite_NaN_grad(self, grad, name=None, print_=True, replace_with=0.0):
         if True in torch.isnan(grad):
             if self.found_Nan is False and print_:
                 print(f"found a NaN and overwrote it during flow gradient calculation: {name}")
                 self.found_Nan = True
-            grad[torch.isnan(grad)] = 0
+            grad[torch.isnan(grad)] = replace_with
         return grad

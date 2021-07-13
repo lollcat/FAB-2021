@@ -102,8 +102,8 @@ class AnnealedImportanceSampler(BaseImportanceSampler):
             log_w = []
             for i in range(n_batches):
                 sample_batch, log_w_batch = self.run(n_runs=batch_size)
-                samples.append(sample_batch.detach())
-                log_w.append(log_w_batch.detach())
+                samples.append(sample_batch.cpu().detach())
+                log_w.append(log_w_batch.cpu().detach())
             samples = torch.cat(samples, dim=0)
             log_w = torch.cat(log_w, dim=0)
         if drop_nan_and_infs:

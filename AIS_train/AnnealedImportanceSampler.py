@@ -84,7 +84,12 @@ class AnnealedImportanceSampler(BaseAIS):
 
     def setup_n_distributions(self, n_distributions, distribution_spacing="geometric"):
         self.n_distributions = n_distributions
-        n_linspace_points = int(n_distributions / 5)  # rough heuristic, copying ratio used in example in AIS paper
+        assert self.n_distributions > 1
+        if self.n_distributions == 2:
+            print("running without any intermediate distributions")
+            self.B_space = np.linspace(0.0, 1.0, 2)
+            return
+        n_linspace_points = max(int(n_distributions / 5), 2)  # rough heuristic, copying ratio used in example in AIS paper
         n_geomspace_points = n_distributions - n_linspace_points
         if distribution_spacing == "geometric":
             self.B_space = torch.tensor(list(np.linspace(0, 0.01, n_linspace_points)) +

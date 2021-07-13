@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 from ImportanceSampling.SamplingAlgorithms.base import BaseTransitionModel
+from NormalisingFlow.utils import Monitor_NaN
 
 class HMC(BaseTransitionModel):
     """
@@ -14,13 +15,15 @@ class HMC(BaseTransitionModel):
         if train_params:
             self.tune_period = tune_period
             self.counter = 0
-            self.epsilons = nn.ParameterDict()
+            self.log_epsilons = nn.ParameterDict()
             # have to store epsilons like this otherwise we get weird erros
-            self.epsilons["common"] = nn.Parameter(torch.tensor([epsilon]))
+            self.log_epsilons["common"] = nn.Parameter(torch.log(torch.tensor([epsilon])))
             for i in range(n_distributions-2):
                 for n in range(n_outer):
-                    self.epsilons[f"{i}_{n}"] = nn.Parameter(torch.zeros(dim))
+                    self.log_epsilons[f"{i}_{n}"] = nn.Parameter(torch.ones(dim))
             self.optimizer = torch.optim.Adam(self.parameters(), lr=lr, weight_decay=1e-4)
+            self.Monitor_NaN = Monitor_NaN()
+            self.register_nan_hooks()
         else:
             self.register_buffer("common_epsilon", torch.tensor([epsilon]))
             self.register_buffer("epsilons", torch.ones([n_distributions, n_outer])*epsilon)
@@ -32,27 +35,35 @@ class HMC(BaseTransitionModel):
         self.first_dist_p_accepts = [torch.tensor([0.0]) for _ in range(n_outer)]
         self.last_dist_p_accepts = [torch.tensor([0.0]) for _ in range(n_outer)]
 
+    def register_nan_hooks(self):
+        for parameter in self.parameters():
+            # replace with positive number so it decreases step size when we get nans
+            parameter.register_hook(
+                lambda grad: self.Monitor_NaN.overwrite_NaN_grad(grad, print_=False, replace_with=1.0))
+
     def interesting_info(self):
         interesting_dict = {}
-        for i, val in enumerate(self.first_dist_p_accepts):
-            interesting_dict[f"dist1_p_accept_{i}"] = val.item()
-        for i, val in enumerate(self.last_dist_p_accepts):
-            interesting_dict[f"dist{self.n_distributions-3}_p_accept_{i}"] = val.item()
-        if self.train_params:
-            interesting_dict["epsilon_shared"] = self.epsilons["common"].item()
-            interesting_dict[f"epsilons_0_0_0"] = self.get_epsilon(0, 0)[0].cpu().item()
-            interesting_dict[f"epsilons_0_-1_0"] = self.get_epsilon(0, self.n_outer-1)[0].cpu().item()
-        else:
-            interesting_dict["epsilon_shared"] = self.common_epsilon.item()
-            interesting_dict[f"epsilons_0_0"] = self.epsilons[0, 0].cpu().item()
-            interesting_dict[f"epsilons_0_-1"] = self.epsilons[0, -1].cpu().item()
+        if self.n_distributions > 2:
+            for i, val in enumerate(self.first_dist_p_accepts):
+                interesting_dict[f"dist1_p_accept_{i}"] = val.item()
+            if self.n_distributions != 3:
+                for i, val in enumerate(self.last_dist_p_accepts):
+                    interesting_dict[f"dist{self.n_distributions-3}_p_accept_{i}"] = val.item()
+            if self.train_params:
+                interesting_dict["epsilon_shared"] = self.log_epsilons["common"].item()
+                interesting_dict[f"epsilons_0_0_0"] = self.get_epsilon(0, 0)[0].cpu().item()
+                interesting_dict[f"epsilons_0_-1_0"] = self.get_epsilon(0, self.n_outer-1)[0].cpu().item()
+            else:
+                interesting_dict["epsilon_shared"] = self.common_epsilon.item()
+                interesting_dict[f"epsilons_0_0"] = self.log_epsilons[0, 0].cpu().item()
+                interesting_dict[f"epsilons_0_-1"] = self.log_epsilons[0, -1].cpu().item()
         return interesting_dict
 
     def get_epsilon(self, i, n):
         if self.train_params:
-            return self.epsilons[f"{i}_{n}"] + self.epsilons["common"]
+            return torch.exp(self.log_epsilons[f"{i}_{n}"]) + torch.exp(self.log_epsilons["common"])
         else:
-            return (self.epsilons[i, n] + self.common_epsilon)/2
+            return (self.epsilons[i, n] + self.common_epsilon) / 2
 
 
     def HMC_func(self, U, current_q, grad_U, i):
@@ -105,27 +116,26 @@ class HMC(BaseTransitionModel):
             if self.auto_adjust_step_size:
                 p_accept = torch.mean(acceptance_probability)
                 if p_accept > self.target_p_accept: # too much accept
-                    self.epsilons[i, n] = self.epsilons[i, n] * 1.1
+                    self.log_epsilons[i, n] = self.log_epsilons[i, n] * 1.1
                     self.common_epsilon = self.common_epsilon * 1.05
                 else:
-                    self.epsilons[i, n] = self.epsilons[i, n] / 1.1
+                    self.log_epsilons[i, n] = self.log_epsilons[i, n] / 1.1
                     self.common_epsilon = self.common_epsilon / 1.05
 
             if i == 0: # save fist and last distribution info
                 # save as interesting info for plotting
-                self.first_dist_p_accepts[n] = torch.mean(acceptance_probability)
+                self.first_dist_p_accepts[n] = torch.mean(acceptance_probability).cpu().detach()
             elif i == self.n_distributions - 3:
-                self.last_dist_p_accepts[n] = torch.mean(acceptance_probability)
+                self.last_dist_p_accepts[n] = torch.mean(acceptance_probability).cpu().detach()
         if i == 0:
             self.counter += 1
         if self.counter < self.tune_period and self.train_params:
             loss = torch.mean(U_proposed)
-            loss.backward()#retain_graph=True)
+            loss.backward() #retain_graph=True)
             grad_norm = torch.nn.utils.clip_grad_norm_(self.parameters(), 1)
             torch.nn.utils.clip_grad_value_(self.parameters(), 1)
             # torch.autograd.grad(loss, self.epsilons["0_1"], retain_graph=True)
-            if not (torch.isnan(loss) or torch.isinf(loss)):
-                self.optimizer.step()
+            self.optimizer.step()
             current_q = current_q.detach()  # otherwise traces gradient back to epsilon
         return current_q
 

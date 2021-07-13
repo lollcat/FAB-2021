@@ -1,7 +1,7 @@
 if __name__ == '__main__':
     epochs = 12000
     n_flow_steps = 30
-    n_distributions = 20
+    n_distributions = 10
     batch_size = int(1e3)
     import pathlib
     import os
