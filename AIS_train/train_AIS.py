@@ -96,8 +96,7 @@ class AIS_trainer(LearntDistributionManager):
               KPI_batch_size=int(1e4),
               allow_ignore_nan_loss=True, clip_grad_norm=True,
               max_grad_norm=1, plotting_batch_size=int(1e3)):
-        epoch_per_print = min(max(int(epochs / 100), 1), 100)  # max 100 epoch, min 1 epoch
-        epoch_per_save = max(int(epochs / 100), 1)
+        epoch_per_save_and_print = max(int(epochs / 100), 1)
         if intermediate_plots is True:
             epoch_per_plot = max(int(epochs / n_plots), 1)
         history = {"loss": [],
@@ -131,12 +130,6 @@ class AIS_trainer(LearntDistributionManager):
             self.optimizer.step()
             with torch.no_grad(): # none of the below steps should require gradients
                 # save info
-                try:
-                    log_p_x = self.target_dist.log_prob(x_samples)
-                    log_p_x = log_p_x[~(torch.isnan(log_p_x) | torch.isinf(log_p_x))]
-                    history["log_p_x_after_AIS"].append(torch.mean(log_p_x).item())
-                except:
-                    print("Couldn't calculate log prob over target distribution")
                 history["loss"].append(loss_1.item())
                 history["log_w"].append(torch.mean(log_w).item())
                 history["ESS"].append(
@@ -145,14 +138,22 @@ class AIS_trainer(LearntDistributionManager):
                 transition_operator_info = self.AIS_train.transition_operator_class.interesting_info()
                 for key in transition_operator_info:
                     history[key].append(transition_operator_info[key])
-                if (self.current_epoch % epoch_per_print == 0 or self.current_epoch == epochs) and self.current_epoch > 0:
-                    pbar.set_description(f"loss: {np.mean(history['loss'][-epoch_per_print:])},   "
-                                         f"log_p_x_post_AIS {np.mean(history['log_p_x_after_AIS'][-epoch_per_print:])}, "
-                                         f"ESS {np.mean(history['ESS'][-epoch_per_print:])}")
-                if self.current_epoch % epoch_per_save == 0 or self.current_epoch == epochs:
+                if self.current_epoch % epoch_per_save_and_print == 0 or self.current_epoch == epochs:
                     history["kl"].append(self.kl_MC_estimate(KPI_batch_size))
                     history["alpha_2_divergence"].append(self.alpha_divergence_MC_estimate(KPI_batch_size))
                     history["log_q_AIS_x"].append(self.log_prob_annealed_samples_loss_resample(x_samples, log_w)[0].item())
+                    if self.current_epoch > 0:
+                        try:
+                            log_p_x = self.target_dist.log_prob(x_samples).detach()
+                            log_p_x = log_p_x[~(torch.isnan(log_p_x) | torch.isinf(log_p_x))]
+                            history["log_p_x_after_AIS"].append(torch.mean(log_p_x).item())
+                        except:
+                            print("Couldn't calculate log prob over target distribution")
+                            log_p_x = 0.0
+                        pbar.set_description(
+                            f"loss: {np.mean(history['loss'][-epoch_per_save_and_print:])},"
+                            f""f"log_p_x_post_AIS {np.mean(history['log_p_x_after_AIS'][-epoch_per_save_and_print:])},"
+                            f"ESS {np.mean(history['ESS'][-epoch_per_save_and_print:])}")
                 if intermediate_plots:
                     if self.current_epoch % epoch_per_plot == 0:
                         plotting_func(self, n_samples=plotting_batch_size,
