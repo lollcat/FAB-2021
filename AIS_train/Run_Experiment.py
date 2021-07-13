@@ -53,26 +53,42 @@ def run_experiment(dim, save_path, epochs, n_flow_steps, n_distributions,
        f"{info_dict_before['effective_sample_size'].item() / info_dict_before['normalised_sampling_weights'].shape[0]}" \
        f" calculated using {info_dict_before['normalised_sampling_weights'].shape[0]} samples \n"
     history = tester.train(epochs, batch_size=batch_size, intermediate_plots=True, n_plots=10, plotting_func=plotter)
-    multipage(str(save_path / "plots_during_training.pdf"))
-    plt.close("all")
+    if save:
+        multipage(str(save_path / "plots_during_training.pdf"))
+        plt.close("all")
+    else:
+        plt.show()
     plot_history(history)
     if save:
         multipage(str(save_path / "histories.pdf"))
         plt.close("all")
+    else:
+        plt.show()
     expectation, info_dict = tester.AIS_train.calculate_expectation(n_samples_expectation,
                                                                     expectation_function=expectation_function,
                                                                     batch_size=int(1e3),
                                                                     drop_nan_and_infs=True)
-    summary_results += f"ESS for samples from AIS of  "\
+    summary_results += f"ESS for samples from AIS  "\
         f"{info_dict['effective_sample_size'].item()/ info_dict['normalised_sampling_weights'].shape[0]}" \
         f" calculated using {info_dict['normalised_sampling_weights'].shape[0]} samples \n"
+    expectation, info_dict = tester.AIS_train.calculate_expectation(n_samples_expectation,
+                                                                    expectation_function=expectation_function,
+                                                                    batch_size=int(1e3),
+                                                                    drop_nan_and_infs=True)
+    summary_results += f"ESS for samples from AIS of repeat calc " \
+                       f"{info_dict['effective_sample_size'].item() / info_dict['normalised_sampling_weights'].shape[0]}" \
+                       f" calculated using {info_dict['normalised_sampling_weights'].shape[0]} samples \n"
+
     plot_samples_vs_contours_many_well(tester, n_samples=1000,
                                        title=f"training epoch, samples from flow")
     plot_samples_vs_contours_many_well(tester, n_samples=None,
                                        title=f"training epoch, samples from AIS",
                                        samples_q=info_dict["samples"])
-    multipage(str(save_path / "plots.pdf"))
-    plt.close("all")
+    if save:
+        multipage(str(save_path / "plots.pdf"))
+        plt.close("all")
+    else:
+        plt.show()
 
     expectation_flo, info_dict_flo = tester.AIS_train.calculate_expectation_over_flow(n_samples_expectation,
                                                                   expectation_function=expectation_function,
@@ -81,9 +97,10 @@ def run_experiment(dim, save_path, epochs, n_flow_steps, n_distributions,
     summary_results += f"ESS of flow model after training is " \
            f"{info_dict_flo['effective_sample_size'].item()/ info_dict_flo['normalised_sampling_weights'].shape[0]}" \
            f" calculated using {info_dict_flo['normalised_sampling_weights'].shape[0]} samples"
-    summary_results_path = str(save_path / "results.txt")
+
     print(summary_results)
     if save:
+        summary_results_path = str(save_path / "results.txt")
         with open(summary_results_path, "w") as g:
             g.write(summary_results)
 
@@ -91,16 +108,16 @@ if __name__ == '__main__':
     from datetime import datetime
     current_time = datetime.now().strftime("%Y_%m_%d-%I_%M_%S_%p")
     dim = 2
-    epochs = 10000
+    epochs = 1000
     n_flow_steps = 1
     n_distributions = 2
-    experiment_name = "testing1"
-    flow_type = "ReverseIAF"
+    experiment_name = None #"testing1"
+    flow_type = "RealNVP" # "ReverseIAF"
     save_path = f"{experiment_name}__" \
                 f"{dim}dim_{flow_type}_epochs{epochs}_flowsteps{n_flow_steps}_dist{n_distributions}__{current_time}"
     print(f"running experiment {save_path} \n\n")
     run_experiment(dim, save_path, epochs, n_flow_steps, n_distributions,
-                   flow_type, n_samples_expectation=int(1e3))
+                   flow_type, n_samples_expectation=int(1e3), save=False)
     print(f"\n\nfinished running experiment {save_path}")
 
 
