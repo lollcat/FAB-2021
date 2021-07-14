@@ -111,7 +111,7 @@ if __name__ == '__main__':
     dim = 2
     epochs = 1000
     n_flow_steps = 5
-    n_distributions = 6
+    n_distributions = 2
     experiment_name = None #"testing1"
     flow_type = "RealNVP"  # "ReverseIAF"
     save_path = f"{experiment_name}__" \

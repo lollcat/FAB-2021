@@ -101,19 +101,19 @@ class HMC(BaseTransitionModel):
             if self.train_params:
                 if i == 0:
                     self.counter += 1
-                if self.counter < self.tune_period:
-                        loss = torch.mean(U_proposed)
-                        if not (torch.isinf(loss) or torch.isnan(loss)):
-                            loss.backward()
-                            grad_norm = torch.nn.utils.clip_grad_norm_(self.parameters(), 1)
-                            torch.nn.utils.clip_grad_value_(self.parameters(), 1)
-                            # torch.autograd.grad(loss, self.epsilons["0_1"], retain_graph=True)
-                            self.optimizer.step()
             if i == 0: # save fist and last distribution info
                 # save as interesting info for plotting
                 self.first_dist_p_accepts[n] = torch.mean(acceptance_probability).cpu().detach()
             elif i == self.n_distributions - 3:
                 self.last_dist_p_accepts[n] = torch.mean(acceptance_probability).cpu().detach()
+        if self.counter < self.tune_period:
+            loss = torch.mean(U_proposed)
+            if not (torch.isinf(loss) or torch.isnan(loss)):
+                loss.backward()
+                grad_norm = torch.nn.utils.clip_grad_norm_(self.parameters(), 1)
+                torch.nn.utils.clip_grad_value_(self.parameters(), 1)
+                # torch.autograd.grad(loss, self.epsilons["0_1"], retain_graph=True)
+                self.optimizer.step()
         return current_q.detach() # stop gradient flow
 
     def run(self, current_q, log_q_x, i):
