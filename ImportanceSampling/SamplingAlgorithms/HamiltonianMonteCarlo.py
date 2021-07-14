@@ -17,10 +17,10 @@ class HMC(BaseTransitionModel):
             self.counter = 0
             self.log_epsilons = nn.ParameterDict()
             # have to store epsilons like this otherwise we get weird erros
-            self.log_epsilons["common"] = nn.Parameter(torch.log(torch.tensor([epsilon])))
+            self.log_epsilons["common"] = nn.Parameter(torch.log(torch.tensor([epsilon*0.5])))
             for i in range(n_distributions-2):
                 for n in range(n_outer):
-                    self.log_epsilons[f"{i}_{n}"] = nn.Parameter(torch.ones(dim))
+                    self.log_epsilons[f"{i}_{n}"] = nn.Parameter(torch.log(torch.ones(dim)*epsilon*0.5))
             self.optimizer = torch.optim.Adam(self.parameters(), lr=lr, weight_decay=1e-4)
             self.Monitor_NaN = Monitor_NaN()
             self.register_nan_hooks()
@@ -39,7 +39,7 @@ class HMC(BaseTransitionModel):
         for parameter in self.parameters():
             # replace with positive number so it decreases step size when we get nans
             parameter.register_hook(
-                lambda grad: self.Monitor_NaN.overwrite_NaN_grad(grad, print_=False, replace_with=1.0))
+                lambda grad: self.Monitor_NaN.overwrite_NaN_grad(grad, print_=False, replace_with=0.5))
 
     def interesting_info(self):
         interesting_dict = {}
