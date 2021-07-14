@@ -89,6 +89,9 @@ class AnnealedImportanceSampler(BaseAIS):
             print("running without any intermediate distributions")
             self.B_space = np.linspace(0.0, 1.0, 2)
             return
+        elif self.n_distributions == 3:
+            self.B_space = np.array([0.0, 0.5, 1.0])
+            return
         n_linspace_points = max(int(n_distributions / 5), 2)  # rough heuristic, copying ratio used in example in AIS paper
         n_geomspace_points = n_distributions - n_linspace_points
         if distribution_spacing == "geometric":
