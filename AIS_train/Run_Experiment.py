@@ -26,7 +26,8 @@ def plotter(*args, **kwargs):
 
 def run_experiment(dim, save_path, epochs, n_flow_steps, n_distributions,
                    flow_type="ReverseIAF", batch_size=int(1e3), seed=0,
-                   n_samples_expectation=int(1e5), save=True, n_plots=5, train_AIS_params=True):
+                   n_samples_expectation=int(1e5), save=True, n_plots=5, train_AIS_params=True,
+                   step_size=1.0):
     local_var_dict = locals().copy()
     summary_results = "*********     Parameters      *******************\n\n"  # for writing to file
     for key in local_var_dict:
@@ -43,7 +44,7 @@ def run_experiment(dim, save_path, epochs, n_flow_steps, n_distributions,
                                n_flow_steps=n_flow_steps)
     tester = AIS_trainer(target, learnt_sampler, loss_type=False, n_distributions=n_distributions
                          , n_steps_transition_operator=1,
-                         step_size=1.0, transition_operator="HMC", learnt_dist_kwargs={"lr": 1e-4},
+                         step_size=step_size, transition_operator="HMC", learnt_dist_kwargs={"lr": 1e-4},
                          loss_type_2="alpha_2", train_AIS_params=train_AIS_params, inner_loop_steps=5)
     summary_results += "\n\n *******************************    Results ********************* \n\n"
     expectation_before, info_dict_before = tester.AIS_train.calculate_expectation(n_samples_expectation,

@@ -120,8 +120,8 @@ class HMC(BaseTransitionModel):
                 if p_accept == 0.0:
                     # if p_accept is zero then manually decrease step size, as this means that no acceptances so no
                     # gradient flow to use
-                    self.epsilons[f"{i}_{n}"].data = self.epsilons[f"{i}_{n}"].data / 1.1
-                    self.epsilons["common"].data = self.epsilons["common"].data / 1.05
+                    self.epsilons[f"{i}_{n}"].data = self.epsilons[f"{i}_{n}"].data / 1.5
+                    self.epsilons["common"].data = self.epsilons["common"].data / 1.2
                 if i == 0:
                     self.counter += 1
             if i == 0: # save fist and last distribution info
