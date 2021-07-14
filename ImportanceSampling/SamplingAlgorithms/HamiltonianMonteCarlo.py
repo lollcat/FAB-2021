@@ -44,18 +44,19 @@ class HMC(BaseTransitionModel):
 
     def interesting_info(self):
         interesting_dict = {}
-        for i, val in enumerate(self.first_dist_p_accepts):
-            interesting_dict[f"dist1_p_accept_{i}"] = val.item()
-        for i, val in enumerate(self.last_dist_p_accepts):
-            interesting_dict[f"dist{self.n_distributions-3}_p_accept_{i}"] = val.item()
-        if self.train_params:
-            interesting_dict["epsilon_shared"] = self.epsilons["common"].item()
-            interesting_dict[f"epsilons_0_0_0"] = self.get_epsilon(0, 0)[0].cpu().item()
-            interesting_dict[f"epsilons_0_-1_0"] = self.get_epsilon(0, self.n_outer-1)[0].cpu().item()
-        else:
-            interesting_dict["epsilon_shared"] = self.common_epsilon.item()
-            interesting_dict[f"epsilons_0_0"] = self.epsilons[0, 0].cpu().item()
-            interesting_dict[f"epsilons_0_-1"] = self.epsilons[0, -1].cpu().item()
+        if self.n_distributions > 2:
+            for i, val in enumerate(self.first_dist_p_accepts):
+                interesting_dict[f"dist1_p_accept_{i}"] = val.item()
+            for i, val in enumerate(self.last_dist_p_accepts):
+                interesting_dict[f"dist{self.n_distributions-3}_p_accept_{i}"] = val.item()
+            if self.train_params:
+                interesting_dict["epsilon_shared"] = self.epsilons["common"].item()
+                interesting_dict[f"epsilons_0_0_0"] = self.get_epsilon(0, 0)[0].cpu().item()
+                interesting_dict[f"epsilons_0_-1_0"] = self.get_epsilon(0, self.n_outer-1)[0].cpu().item()
+            else:
+                interesting_dict["epsilon_shared"] = self.common_epsilon.item()
+                interesting_dict[f"epsilons_0_0"] = self.epsilons[0, 0].cpu().item()
+                interesting_dict[f"epsilons_0_-1"] = self.epsilons[0, -1].cpu().item()
         return interesting_dict
 
     def get_epsilon(self, i, n):
