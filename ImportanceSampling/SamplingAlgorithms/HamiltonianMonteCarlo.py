@@ -50,7 +50,7 @@ class HMC(BaseTransitionModel):
                 for i, val in enumerate(self.last_dist_p_accepts):
                     interesting_dict[f"dist{self.n_distributions-3}_p_accept_{i}"] = val.item()
             if self.train_params:
-                interesting_dict["epsilon_shared"] = self.log_epsilons["common"].item()
+                interesting_dict["epsilon_shared"] = torch.exp(self.log_epsilons["common"]).item()
                 interesting_dict[f"epsilons_0_0_0"] = self.get_epsilon(0, 0)[0].cpu().item()
                 interesting_dict[f"epsilons_0_-1_0"] = self.get_epsilon(0, self.n_outer-1)[0].cpu().item()
             else:
