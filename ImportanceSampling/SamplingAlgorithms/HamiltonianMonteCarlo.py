@@ -22,7 +22,7 @@ class HMC(BaseTransitionModel):
             for i in range(n_distributions-2):
                 for n in range(n_outer):
                     self.epsilons[f"{i}_{n}"] = nn.Parameter(torch.zeros(dim))
-            self.optimizer = torch.optim.Adam(self.parameters(), lr=lr, weight_decay=1e-4)
+            self.optimizer = torch.optim.AdamW(self.parameters(), lr=lr)
             self.Monitor_NaN = Monitor_NaN()
             self.register_nan_hooks()
         else:
