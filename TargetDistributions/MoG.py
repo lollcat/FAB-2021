@@ -109,13 +109,12 @@ class Triangle_MoG(BaseTargetDistribution):
         return self.distribution.sample(shape)
 
 class Difficult_MoG(BaseTargetDistribution):
-    # Mog with hard coded mean and cov to form a triangle
     def __init__(self, loc_scaling=5, cov_scaling=1):
         super(Difficult_MoG, self).__init__()
         dim = 2
-        locs = torch.stack([torch.tensor([1.0, 0.0]),
-                            torch.tensor([0.0, 1.0]),
-                            torch.tensor([-1.0, 0.0]),
+        locs = torch.stack([torch.tensor([2.0, 0.0]),
+                            torch.tensor([0.0, 2.0]),
+                            torch.tensor([0.0, -2.0]),
                             torch.tensor([1, 1.5])]
                            )*loc_scaling
         covs = torch.stack([torch.eye(dim)*cov_scaling*0.05,  # biggest hump is quite steep
@@ -129,7 +128,7 @@ class Difficult_MoG(BaseTargetDistribution):
         self.distribution = self.get_distribution
 
     def to(self, device):
-        super(MoG, self).to(device)
+        super(Difficult_MoG, self).to(device)
         self.distribution = self.get_distribution
 
     @property

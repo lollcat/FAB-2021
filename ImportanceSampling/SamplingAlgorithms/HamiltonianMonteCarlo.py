@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 from ImportanceSampling.SamplingAlgorithms.base import BaseTransitionModel
+from NormalisingFlow.utils import Monitor_NaN
 
 class HMC(BaseTransitionModel):
     """
@@ -12,15 +13,21 @@ class HMC(BaseTransitionModel):
         super(HMC, self).__init__()
         self.dim = dim
         self.train_params = train_params
+        self.tune_period = tune_period
         if train_params:
-            self.tune_period = tune_period
             self.counter = 0
-            self.epsilon_weighting = nn.Parameter(torch.ones(dim))
+            self.epsilons = nn.ParameterDict()
+            # have to store epsilons like this otherwise we get weird erros
+            self.epsilons["common"] = nn.Parameter(torch.tensor([epsilon]))
+            for i in range(n_distributions-2):
+                for n in range(n_outer):
+                    self.epsilons[f"{i}_{n}"] = nn.Parameter(torch.zeros(dim))
             self.optimizer = torch.optim.Adam(self.parameters(), lr=lr, weight_decay=1e-4)
+            self.Monitor_NaN = Monitor_NaN()
+            self.register_nan_hooks()
         else:
-            self.register_buffer("epsilon_weighting", torch.tensor(torch.ones(dim)))
-        self.register_buffer("common_epsilon", torch.tensor([epsilon*0.5]))
-        self.register_buffer("epsilons", torch.ones([n_distributions, n_outer])*epsilon*0.5)
+            self.register_buffer("common_epsilon", torch.tensor([epsilon*0.5]))
+            self.register_buffer("epsilons", torch.ones([n_distributions, n_outer])*epsilon*0.5)
         self.n_outer = n_outer
         self.L = L
         self.n_distributions = n_distributions
@@ -29,26 +36,33 @@ class HMC(BaseTransitionModel):
         self.first_dist_p_accepts = [torch.tensor([0.0]) for _ in range(n_outer)]
         self.last_dist_p_accepts = [torch.tensor([0.0]) for _ in range(n_outer)]
 
+    def register_nan_hooks(self):
+        for parameter in self.parameters():
+            # replace with positive number so it decreases step size when we get nans
+            parameter.register_hook(
+                lambda grad: self.Monitor_NaN.overwrite_NaN_grad(grad, print_=False, replace_with=0.0))
+
     def interesting_info(self):
         interesting_dict = {}
-        if self.n_distributions > 2:
-            for i, val in enumerate(self.first_dist_p_accepts):
-                interesting_dict[f"dist1_p_accept_{i}"] = val.item()
-            if self.n_distributions != 3:
-                for i, val in enumerate(self.last_dist_p_accepts):
-                    interesting_dict[f"dist{self.n_distributions-3}_p_accept_{i}"] = val.item()
-            if self.train_params:
-                interesting_dict["epsilon_weight_0"] = self.epsilon_weighting[0].item()
-                interesting_dict["epsilon_weight_1"] = self.epsilon_weighting[1].item()
-            else:
-                interesting_dict["epsilon_shared"] = self.common_epsilon.item()
-                interesting_dict[f"epsilons_0_0"] = self.epsilons[0, 0].cpu().item()
-                interesting_dict[f"epsilons_0_-1"] = self.epsilons[0, -1].cpu().item()
+        for i, val in enumerate(self.first_dist_p_accepts):
+            interesting_dict[f"dist1_p_accept_{i}"] = val.item()
+        for i, val in enumerate(self.last_dist_p_accepts):
+            interesting_dict[f"dist{self.n_distributions-3}_p_accept_{i}"] = val.item()
+        if self.train_params:
+            interesting_dict["epsilon_shared"] = self.epsilons["common"].item()
+            interesting_dict[f"epsilons_0_0_0"] = self.get_epsilon(0, 0)[0].cpu().item()
+            interesting_dict[f"epsilons_0_-1_0"] = self.get_epsilon(0, self.n_outer-1)[0].cpu().item()
+        else:
+            interesting_dict["epsilon_shared"] = self.common_epsilon.item()
+            interesting_dict[f"epsilons_0_0"] = self.epsilons[0, 0].cpu().item()
+            interesting_dict[f"epsilons_0_-1"] = self.epsilons[0, -1].cpu().item()
         return interesting_dict
 
     def get_epsilon(self, i, n):
-        return (self.epsilons[i, n] + self.common_epsilon)*torch.softmax(self.epsilon_weighting, dim=0)*self.dim
-
+        if self.train_params:
+            return self.epsilons[f"{i}_{n}"] + self.epsilons["common"]
+        else:
+            return self.epsilons[i, n] + self.common_epsilon
 
     def HMC_func(self, U, current_q, grad_U, i):
         # need this for grad function
@@ -91,13 +105,15 @@ class HMC(BaseTransitionModel):
             acceptance_probability = torch.clamp(acceptance_probability, min=0.0, max=1.0)
             accept = acceptance_probability > torch.rand(acceptance_probability.shape).to(q.device)
             current_q[accept] = q[accept]
-            p_accept = torch.mean(acceptance_probability)
-            if p_accept > self.target_p_accept: # too much accept
-                self.epsilons[i, n] = self.epsilons[i, n] * 1.1
-                self.common_epsilon = self.common_epsilon * 1.05
-            else:
-                self.epsilons[i, n] = self.epsilons[i, n] / 1.1
-                self.common_epsilon = self.common_epsilon / 1.05
+
+            if self.auto_adjust_step_size:
+                p_accept = torch.mean(acceptance_probability)
+                if p_accept > self.target_p_accept: # too much accept
+                    self.epsilons[i, n] = self.epsilons[i, n] * 1.1
+                    self.common_epsilon = self.common_epsilon * 1.05
+                else:
+                    self.epsilons[i, n] = self.epsilons[i, n] / 1.1
+                    self.common_epsilon = self.common_epsilon / 1.05
             if self.train_params:
                 if i == 0:
                     self.counter += 1
