@@ -47,8 +47,9 @@ class HMC(BaseTransitionModel):
         if self.n_distributions > 2:
             for i, val in enumerate(self.first_dist_p_accepts):
                 interesting_dict[f"dist1_p_accept_{i}"] = val.item()
-            for i, val in enumerate(self.last_dist_p_accepts):
-                interesting_dict[f"dist{self.n_distributions-3}_p_accept_{i}"] = val.item()
+            if self.n_distributions > 3:
+                for i, val in enumerate(self.last_dist_p_accepts):
+                    interesting_dict[f"dist{self.n_distributions-3}_p_accept_{i}"] = val.item()
             if self.train_params:
                 interesting_dict["epsilon_shared"] = self.epsilons["common"].item()
                 interesting_dict[f"epsilons_0_0_0"] = self.get_epsilon(0, 0)[0].cpu().item()
@@ -130,7 +131,7 @@ class HMC(BaseTransitionModel):
                 self.last_dist_p_accepts[n] = torch.mean(acceptance_probability).cpu().detach()
         if self.train_params:
             if self.counter < self.tune_period:
-                loss = torch.mean(U_proposed)
+                loss = torch.mean(U(current_q))
                 if not (torch.isinf(loss) or torch.isnan(loss)):
                     loss.backward()
                     grad_norm = torch.nn.utils.clip_grad_norm_(self.parameters(), 1)
