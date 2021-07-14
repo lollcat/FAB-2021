@@ -127,8 +127,8 @@ class AnnealedImportanceSampler(BaseImportanceSampler):
             samples, log_q = self.sampling_distribution(n_samples)
             nice_indices = ~(torch.isinf(log_q) | torch.isnan(log_q))
             samples = samples[nice_indices]
-            log_q = log_q[nice_indices]
-            log_p = self.target_distribution.log_prob(samples)
+            log_q = log_q[nice_indices].cpu().detach()
+            log_p = self.target_distribution.log_prob(samples).cpu().detach()
             log_w = log_p - log_q
         else:
             assert n_samples % batch_size == 0.0
@@ -139,11 +139,11 @@ class AnnealedImportanceSampler(BaseImportanceSampler):
                 samples_batch, log_q = self.sampling_distribution(n_samples)
                 nice_indices = ~(torch.isinf(log_q) | torch.isnan(log_q))
                 samples_batch = samples_batch[nice_indices]
-                log_q = log_q[nice_indices]
-                log_p = self.target_distribution.log_prob(samples_batch)
+                log_q = log_q[nice_indices].cpu().detach()
+                log_p = self.target_distribution.log_prob(samples_batch).cpu().detach()
                 log_w_batch = log_p - log_q
                 log_w.append(log_w_batch)
-                samples.append(samples_batch)
+                samples.append(samples_batch.cpu().detach())
             samples = torch.cat(samples, dim=0)
             log_w = torch.cat(log_w, dim=0)
         if drop_nan_and_infs:
