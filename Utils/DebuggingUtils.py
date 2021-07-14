@@ -1,6 +1,13 @@
 import torch
 import time
 
+def print_memory_stats(name=None):
+    print(f"\n{name}")
+    print(f"memory reserved {torch.cuda.memory_reserved()}")
+    print(f"memory allocated {torch.cuda.memory_allocated()}")
+    print(f"max memory reserved {torch.cuda.max_memory_reserved()}")
+    print(f"max memory allocated {torch.cuda.max_memory_allocated()}")
+
 class timer:
     def __init__(self, name, print=True, divisor=1):
         self.print = print
