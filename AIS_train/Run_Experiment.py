@@ -26,7 +26,7 @@ def plotter(*args, **kwargs):
 
 def run_experiment(dim, save_path, epochs, n_flow_steps, n_distributions,
                    flow_type="ReverseIAF", batch_size=int(1e3), seed=0,
-                   n_samples_expectation=int(1e5), save=True):
+                   n_samples_expectation=int(1e5), save=True, n_plots=5, train_AIS_params=True):
     local_var_dict = locals().copy()
     summary_results = "*********     Parameters      *******************\n\n"  # for writing to file
     for key in local_var_dict:
@@ -44,7 +44,7 @@ def run_experiment(dim, save_path, epochs, n_flow_steps, n_distributions,
     tester = AIS_trainer(target, learnt_sampler, loss_type=False, n_distributions=n_distributions
                          , n_steps_transition_operator=1,
                          step_size=1.0, transition_operator="HMC", learnt_dist_kwargs={"lr": 1e-4},
-                         loss_type_2="alpha_2", train_AIS_params=True, inner_loop_steps=5)
+                         loss_type_2="alpha_2", train_AIS_params=train_AIS_params, inner_loop_steps=5)
     summary_results += "\n\n *******************************    Results ********************* \n\n"
     expectation_before, info_dict_before = tester.AIS_train.calculate_expectation(n_samples_expectation,
                                                                                   expectation_function=expectation_function,
@@ -53,7 +53,7 @@ def run_experiment(dim, save_path, epochs, n_flow_steps, n_distributions,
        f"{info_dict_before['effective_sample_size'].item() / info_dict_before['normalised_sampling_weights'].shape[0]}" \
        f" calculated using {info_dict_before['normalised_sampling_weights'].shape[0]} samples \n"
 
-    history = tester.train(epochs, batch_size=batch_size, intermediate_plots=True, n_plots=10, plotting_func=plotter)
+    history = tester.train(epochs, batch_size=batch_size, intermediate_plots=True, n_plots=n_plots, plotting_func=plotter)
 
     if save:
         multipage(str(save_path / "plots_during_training.pdf"))
@@ -109,16 +109,16 @@ if __name__ == '__main__':
     from datetime import datetime
     current_time = datetime.now().strftime("%Y_%m_%d-%I_%M_%S_%p")
     dim = 2
-    epochs = 100
-    n_flow_steps = 1
-    n_distributions = 2
+    epochs = 1000
+    n_flow_steps = 5
+    n_distributions = 6
     experiment_name = None #"testing1"
-    flow_type = "RealNVP" # "ReverseIAF"
+    flow_type = "RealNVP"  # "ReverseIAF"
     save_path = f"{experiment_name}__" \
                 f"{dim}dim_{flow_type}_epochs{epochs}_flowsteps{n_flow_steps}_dist{n_distributions}__{current_time}"
     print(f"running experiment {save_path} \n\n")
     run_experiment(dim, save_path, epochs, n_flow_steps, n_distributions,
-                   flow_type, n_samples_expectation=int(1e3), save=False)
+                   flow_type, n_samples_expectation=int(1e3), save=False, train_AIS_params=True)
     print(f"\n\nfinished running experiment {save_path}")
 
 
