@@ -107,8 +107,8 @@ class HMC(BaseTransitionModel):
             accept = acceptance_probability > torch.rand(acceptance_probability.shape).to(q.device)
             current_q[accept] = q[accept]
 
+            p_accept = torch.mean(acceptance_probability)
             if self.auto_adjust_step_size:
-                p_accept = torch.mean(acceptance_probability)
                 if p_accept > self.target_p_accept: # too much accept
                     self.epsilons[i, n] = self.epsilons[i, n] * 1.1
                     self.common_epsilon = self.common_epsilon * 1.05
@@ -116,6 +116,11 @@ class HMC(BaseTransitionModel):
                     self.epsilons[i, n] = self.epsilons[i, n] / 1.1
                     self.common_epsilon = self.common_epsilon / 1.05
             if self.train_params:
+                if p_accept == 0.0:
+                    # if p_accept is zero then manually decrease step size, as this means that no acceptances so no
+                    # gradient flow to use
+                    self.epsilons[f"{i}_{n}"] = self.epsilons[f"{i}_{n}"] / 1.1
+                    self.common_epsilon = self.common_epsilon / 1.05
                 if i == 0:
                     self.counter += 1
             if i == 0: # save fist and last distribution info
