@@ -67,15 +67,18 @@ class FlowModel(nn.Module, BaseLearntDistribution):
         prior.set_default_validate_args(False)
         return prior
 
+
     def forward(self, batch_size=1):
         # for the forward pass of the model we generate x samples
         # this shouldn't be confused with the flows forward vs inverse
         return self.z_to_x(batch_size=batch_size)
 
+
     def widen(self, x):
         x = x*self.scaling_factor
         log_det = x.shape[-1]*torch.log(self.scaling_factor)
         return x, log_det
+
 
     def un_widen(self, x):
         x = x/self.scaling_factor

@@ -10,7 +10,7 @@ from Utils.plotting_utils import plot_3D
 
 def plot_samples_vs_contours_many_well(learnt_dist_manager, n_samples=1000, bounds=([-3, 3], [-3, 3]),
                                        n_points_contour=100, title=None, samples_q=None,
-                                       log_prob_contour=True, clamp_samples=50):
+                                       log_prob_contour=True, clamp_samples=10):
     # when we can't sample from target distribution
     if samples_q is None:
         samples_q = learnt_dist_manager.learnt_sampling_dist.sample((n_samples,))
