@@ -10,7 +10,7 @@ from Utils.plotting_utils import plot_3D
 
 def plot_samples_vs_contours_many_well(learnt_dist_manager, n_samples=1000, bounds=([-3, 3], [-3, 3]),
                                        n_points_contour=100, title=None, samples_q=None,
-                                       log_prob_contour=True, clamp_samples=10):
+                                       log_prob_contour=True, clamp_samples=10, alpha=0.2):
     # when we can't sample from target distribution
     if samples_q is None:
         samples_q = learnt_dist_manager.learnt_sampling_dist.sample((n_samples,))
@@ -32,7 +32,7 @@ def plot_samples_vs_contours_many_well(learnt_dist_manager, n_samples=1000, boun
     if len(axs.shape) == 1:  # need another axis for slicing
         axs = axs[np.newaxis, :]
     for i in range(n_plots):
-        axs[i, 0].plot(samples_q[:, i*2], samples_q[:, i*2+1], "o", alpha=0.2)
+        axs[i, 0].plot(samples_q[:, i*2], samples_q[:, i*2+1], "o", alpha=alpha)
         axs[i, 1].contour(x_points_dim1, x_points_dim2, p_x , levels=25)
     if title is not None:
         fig.suptitle(title)

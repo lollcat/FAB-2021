@@ -83,7 +83,7 @@ def run_experiment(dim, save_path, epochs, n_flow_steps, n_distributions,
                        f" calculated using {info_dict['normalised_sampling_weights'].shape[0]} samples \n"
     plot_samples_vs_contours_many_well(tester, n_samples=None,
                                        title=f"training epoch, samples from AIS",
-                                       samples_q=info_dict["samples"])
+                                       samples_q=info_dict["samples"], alpha=0.01)
     if save:
         multipage(str(save_path / "plots_AIS_samples_final.pdf"))
         plt.close("all")
@@ -95,7 +95,7 @@ def run_experiment(dim, save_path, epochs, n_flow_steps, n_distributions,
                                                                   drop_nan_and_infs=True)
     plot_samples_vs_contours_many_well(tester, n_samples=None,
                                        title=f"training epoch, samples from flow",
-                                       samples_q=info_dict_flo["samples"])
+                                       samples_q=info_dict_flo["samples"], alpha=0.01)
     if save:
         multipage(str(save_path / "plots_flo_samples_final.pdf"))
         plt.close("all")
@@ -115,7 +115,7 @@ if __name__ == '__main__':
     from datetime import datetime
     current_time = datetime.now().strftime("%Y_%m_%d-%I_%M_%S_%p")
     dim = 2
-    epochs = 1000
+    epochs = 10
     n_flow_steps = 5
     n_distributions = 3
     experiment_name = "testing5"
@@ -124,7 +124,7 @@ if __name__ == '__main__':
                 f"{dim}dim_{flow_type}_epochs{epochs}_flowsteps{n_flow_steps}_dist{n_distributions}__{current_time}"
     print(f"running experiment {save_path} \n\n")
     run_experiment(dim, save_path, epochs, n_flow_steps, n_distributions,
-                   flow_type, save=False, n_samples_expectation=int(1e3), train_AIS_params=False)
+                   flow_type, save=False, n_samples_expectation=int(1e4), train_AIS_params=False)
     print(f"\n\nfinished running experiment {save_path}")
 
 
