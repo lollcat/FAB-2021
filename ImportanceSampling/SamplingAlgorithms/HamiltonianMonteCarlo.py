@@ -117,8 +117,8 @@ class HMC(BaseTransitionModel):
                     self.epsilons[i, n] = self.epsilons[i, n] / 1.1
                     self.common_epsilon = self.common_epsilon / 1.05
             if self.train_params:
-                if p_accept == 0.0:
-                    # if p_accept is zero then manually decrease step size, as this means that no acceptances so no
+                if p_accept < 0.05:
+                    # if p_accept is very low manually decrease step size, as this means that no acceptances so no
                     # gradient flow to use
                     self.epsilons[f"{i}_{n}"].data = self.epsilons[f"{i}_{n}"].data / 1.5
                     self.epsilons["common"].data = self.epsilons["common"].data / 1.2
