@@ -108,7 +108,10 @@ class AIS_trainer(LearntDistributionManager):
                    "ESS": [],
                    }
         history.update(dict([(key, []) for key in self.AIS_train.transition_operator_class.interesting_info()]))
-
+        if hasattr(self.target_dist, "sample"):
+            history.update({'mean_log_prob_true_samples': []})
+        elif hasattr(self.target_dist, "test_set"):
+            history.update({'mean_log_q_x_test_samples': []})
         pbar = tqdm(range(epochs))
         for self.current_epoch in pbar:
             x_samples, log_w = self.AIS_train.run(batch_size)
@@ -150,10 +153,27 @@ class AIS_trainer(LearntDistributionManager):
                         except:
                             print("Couldn't calculate log prob over target distribution")
                             log_p_x = 0.0
-                        pbar.set_description(
-                            f"loss: {np.mean(history['loss'][-epoch_per_save_and_print:])},"
-                            f""f"log_p_x_post_AIS {np.mean(history['log_p_x_after_AIS'][-epoch_per_save_and_print:])},"
-                            f"ESS {np.mean(history['ESS'][-epoch_per_save_and_print:])}")
+                        if hasattr(self.target_dist, "sample"):
+                            true_samples = self.target_dist.sample((batch_size,))
+                            mean_log_q_x_true_samples = torch.mean(self.learnt_sampling_dist.log_prob(true_samples))
+                            history['mean_log_prob_true_samples'].append(mean_log_q_x_true_samples)
+                            pbar.set_description(
+                                f"loss: {np.mean(history['loss'][-epoch_per_save_and_print:])},"
+                                f""f"mean_log_prob_true_samples {mean_log_q_x_true_samples},"
+                                f"ESS {np.mean(history['ESS'][-epoch_per_save_and_print:])}")
+                        elif hasattr(self.target_dist, "test_set"):
+                            test_samples = self.target_dist.test_set(self.device)
+                            mean_log_q_x_test_samples = torch.mean(self.learnt_sampling_dist.log_prob(test_samples))
+                            history['mean_log_q_x_test_samples'].append(mean_log_q_x_test_samples)
+                            pbar.set_description(
+                                f"loss: {np.mean(history['loss'][-epoch_per_save_and_print:])},"
+                                f""f"mean_log_q_x_test_samples {mean_log_q_x_test_samples},"
+                                f"ESS {np.mean(history['ESS'][-epoch_per_save_and_print:])}")
+                        else:
+                            pbar.set_description(
+                                f"loss: {np.mean(history['loss'][-epoch_per_save_and_print:])},"
+                                f""f"log_p_x_post_AIS {np.mean(history['log_p_x_after_AIS'][-epoch_per_save_and_print:])},"
+                                f"ESS {np.mean(history['ESS'][-epoch_per_save_and_print:])}")
                 if intermediate_plots:
                     if self.current_epoch % epoch_per_plot == 0:
                         plotting_func(self, n_samples=plotting_batch_size,

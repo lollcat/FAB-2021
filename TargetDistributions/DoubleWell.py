@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+import itertools
 
 class Energy(torch.nn.Module):
     """
@@ -50,6 +51,17 @@ class ManyWellEnergy(DoubleWellEnergy):
         assert dim % 2 == 0
         self.n_wells = dim // 2
         super(ManyWellEnergy, self).__init__(dim=2, *args, **kwargs)
+        centre = 1.7
+        dim_1_vals_grid = torch.meshgrid([torch.tensor([-centre, centre])for _ in range(self.n_wells)])
+        dim_1_vals = torch.stack([torch.flatten(dim) for dim in dim_1_vals_grid], dim=-1)
+        n_modes = 2**self.n_wells
+        assert n_modes == dim_1_vals.shape[0]
+        self.test_set_ = torch.zeros((n_modes, dim))
+        self.test_set_[:, torch.arange(dim) % 2 == 0] = dim_1_vals
+
+
+    def test_set(self, device):
+        return (self.test_set_ + torch.randn_like(self.test_set_)*0.2).to(device)
 
     def log_prob(self, x):
         return torch.sum(
@@ -65,11 +77,20 @@ class ManyWellEnergy(DoubleWellEnergy):
 
 if __name__ == '__main__':
     from Utils.plotting_utils import plot_distribution
+    from FittedModels.utils.plotting_utils import plot_samples_vs_contours_many_well
     import matplotlib.pyplot as plt
-    target = DoubleWellEnergy(2, a=-0.5, b=-6)
+    target = ManyWellEnergy(2, a=-0.5, b=-6)
     dist = plot_distribution(target, bounds=[[-3, 3], [-3, 3]], n_points=100)
+    plt.plot(target.test_set_[:, 0], target.test_set_[:, 1], marker="o", c="black", markersize=15)
     plt.show()
 
-    target = ManyWellEnergy(4, a=-0.5, b=-6)
-    log_prob = target.log_prob(torch.randn((7, 4)))
+    dim = 6
+    target = ManyWellEnergy(dim, a=-0.5, b=-6)
+    log_prob = target.log_prob(torch.randn((7, dim)))
     print(log_prob)
+    class test_class:
+        target_dist = target
+        device = "cpu"
+    plot_samples_vs_contours_many_well(test_class, samples_q=target.test_set("cpu"))
+    plt.show()
+    print(target.log_prob(target.test_set("cpu")))

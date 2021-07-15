@@ -7,6 +7,7 @@ from Utils.plotting_utils import plot_3D
 
 
 
+
 def plot_samples_vs_contours_many_well(learnt_dist_manager, n_samples=1000, bounds=([-3, 3], [-3, 3]),
                                        n_points_contour=100, title=None, samples_q=None,
                                        log_prob_contour=True):
@@ -26,7 +27,7 @@ def plot_samples_vs_contours_many_well(learnt_dist_manager, n_samples=1000, boun
         p_x = p_x.reshape((n_points_contour, n_points_contour))
         x_points_dim1 = x_points[:, 0].reshape((n_points_contour, n_points_contour)).numpy()
         x_points_dim2 = x_points[:, 1].reshape((n_points_contour, n_points_contour)).numpy()
-    n_plots = int(learnt_dist_manager.learnt_sampling_dist.dim / 2)
+    n_plots = learnt_dist_manager.target_dist.n_wells
     fig, axs = plt.subplots(n_plots, 2, figsize=(7, 3 * n_plots), sharex="row", sharey="row")
     if len(axs.shape) == 1:  # need another axis for slicing
         axs = axs[np.newaxis, :]
@@ -36,6 +37,8 @@ def plot_samples_vs_contours_many_well(learnt_dist_manager, n_samples=1000, boun
     if title is not None:
         fig.suptitle(title)
     plt.tight_layout()
+
+
 
 
 
