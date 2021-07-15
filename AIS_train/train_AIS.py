@@ -155,7 +155,7 @@ class AIS_trainer(LearntDistributionManager):
                             log_p_x = 0.0
                         if hasattr(self.target_dist, "sample"):
                             true_samples = self.target_dist.sample((batch_size,))
-                            mean_log_q_x_true_samples = torch.mean(self.learnt_sampling_dist.log_prob(true_samples))
+                            mean_log_q_x_true_samples = torch.mean(self.learnt_sampling_dist.log_prob(true_samples)).item()
                             history['mean_log_prob_true_samples'].append(mean_log_q_x_true_samples)
                             pbar.set_description(
                                 f"loss: {np.mean(history['loss'][-epoch_per_save_and_print:])},"
@@ -163,7 +163,7 @@ class AIS_trainer(LearntDistributionManager):
                                 f"ESS {np.mean(history['ESS'][-epoch_per_save_and_print:])}")
                         elif hasattr(self.target_dist, "test_set"):
                             test_samples = self.target_dist.test_set(self.device)
-                            mean_log_q_x_test_samples = torch.mean(self.learnt_sampling_dist.log_prob(test_samples))
+                            mean_log_q_x_test_samples = torch.mean(self.learnt_sampling_dist.log_prob(test_samples)).item()
                             history['mean_log_q_x_test_samples'].append(mean_log_q_x_test_samples)
                             pbar.set_description(
                                 f"loss: {np.mean(history['loss'][-epoch_per_save_and_print:])},"
