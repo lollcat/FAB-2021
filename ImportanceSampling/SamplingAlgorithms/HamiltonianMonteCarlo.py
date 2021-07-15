@@ -8,7 +8,7 @@ class HMC(BaseTransitionModel):
     Following: https: // arxiv.org / pdf / 1206.1901.pdf
     """
     def __init__(self, n_distributions, epsilon, dim, n_outer=2, L=5, train_params=True,
-                 target_p_accept=0.65, lr=1e-3, auto_adjust_step_size=False,
+                 target_p_accept=0.65, lr=1e-2, auto_adjust_step_size=False,
                  tune_period=2000):
         super(HMC, self).__init__()
         self.dim = dim

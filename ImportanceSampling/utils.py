@@ -1,6 +1,6 @@
 import torch
 import math
-from ImportanceSampling.VanillaImportanceSampler import ImportanceSampling
+from ImportanceSampling.VanillaImportanceSampler import VanillaImportanceSampling as ImportanceSampling
 from typing import List
 import matplotlib.pyplot as plt
 

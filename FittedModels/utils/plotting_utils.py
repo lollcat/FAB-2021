@@ -10,11 +10,11 @@ from Utils.plotting_utils import plot_3D
 
 def plot_samples_vs_contours_many_well(learnt_dist_manager, n_samples=1000, bounds=([-3, 3], [-3, 3]),
                                        n_points_contour=100, title=None, samples_q=None,
-                                       log_prob_contour=True):
+                                       log_prob_contour=True, clamp_samples=100):
     # when we can't sample from target distribution
     if samples_q is None:
         samples_q = learnt_dist_manager.learnt_sampling_dist.sample((n_samples,))
-    samples_q = samples_q.cpu().detach().numpy()
+    samples_q = torch.clamp(samples_q, -clamp_samples, clamp_samples).cpu().detach().numpy()
     x_points_dim1 = torch.linspace(bounds[0][0], bounds[0][1], n_points_contour)
     x_points_dim2 = torch.linspace(bounds[1][0], bounds[1][1], n_points_contour)
     x_points = torch.tensor(list(itertools.product(x_points_dim1, x_points_dim2)))

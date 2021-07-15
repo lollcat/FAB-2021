@@ -115,7 +115,7 @@ if __name__ == '__main__':
     from datetime import datetime
     current_time = datetime.now().strftime("%Y_%m_%d-%I_%M_%S_%p")
     dim = 2
-    epochs = 100
+    epochs = 1000
     n_flow_steps = 5
     n_distributions = 3
     experiment_name = "testing5"
