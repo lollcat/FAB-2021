@@ -1,0 +1,22 @@
+*********     Parameters      *******************
+
+dim 16
+save_path testing4__16dim_ReverseIAF_epochs5000_flowsteps30_dist5__2021_07_14-11_26_52_PM
+epochs 5000
+n_flow_steps 30
+n_distributions 5
+flow_type ReverseIAF
+batch_size 1000
+seed 0
+n_samples_expectation 100000
+save True
+n_plots 5
+train_AIS_params True
+
+
+ *******************************    Results ********************* 
+
+ESS of AIS before training is 4.7459235899452744e-05 calculated using 100000 samples 
+ESS for samples from AIS  0.9730392143892713 calculated using 100000 samples 
+ESS for samples from AIS of repeat calc 0.8764218597047321 calculated using 100000 samples 
+ESS of flow model after training is 0.9558004049290445 calculated using 10000000 samples
