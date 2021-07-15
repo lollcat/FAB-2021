@@ -44,18 +44,20 @@ class HMC(BaseTransitionModel):
 
     def interesting_info(self):
         interesting_dict = {}
-        for i, val in enumerate(self.first_dist_p_accepts):
-            interesting_dict[f"dist1_p_accept_{i}"] = val.item()
-        for i, val in enumerate(self.last_dist_p_accepts):
-            interesting_dict[f"dist{self.n_distributions-3}_p_accept_{i}"] = val.item()
-        if self.train_params:
-            interesting_dict["epsilon_shared"] = self.epsilons["common"].item()
-            interesting_dict[f"epsilons_0_0_0"] = self.get_epsilon(0, 0)[0].cpu().item()
-            interesting_dict[f"epsilons_0_-1_0"] = self.get_epsilon(0, self.n_outer-1)[0].cpu().item()
-        else:
-            interesting_dict["epsilon_shared"] = self.common_epsilon.item()
-            interesting_dict[f"epsilons_0_0"] = self.epsilons[0, 0].cpu().item()
-            interesting_dict[f"epsilons_0_-1"] = self.epsilons[0, -1].cpu().item()
+        if self.n_distributions > 2:
+            for i, val in enumerate(self.first_dist_p_accepts):
+                interesting_dict[f"dist1_p_accept_{i}"] = val.item()
+            if self.n_distributions > 3:
+                for i, val in enumerate(self.last_dist_p_accepts):
+                    interesting_dict[f"dist{self.n_distributions-3}_p_accept_{i}"] = val.item()
+            if self.train_params:
+                interesting_dict["epsilon_shared"] = self.epsilons["common"].item()
+                interesting_dict[f"epsilons_0_0_0"] = self.get_epsilon(0, 0)[0].cpu().item()
+                interesting_dict[f"epsilons_0_-1_0"] = self.get_epsilon(0, self.n_outer-1)[0].cpu().item()
+            else:
+                interesting_dict["epsilon_shared"] = self.common_epsilon.item()
+                interesting_dict[f"epsilons_0_0"] = self.epsilons[0, 0].cpu().item()
+                interesting_dict[f"epsilons_0_-1"] = self.epsilons[0, -1].cpu().item()
         return interesting_dict
 
     def get_epsilon(self, i, n):
@@ -106,8 +108,8 @@ class HMC(BaseTransitionModel):
             accept = acceptance_probability > torch.rand(acceptance_probability.shape).to(q.device)
             current_q[accept] = q[accept]
 
+            p_accept = torch.mean(acceptance_probability)
             if self.auto_adjust_step_size:
-                p_accept = torch.mean(acceptance_probability)
                 if p_accept > self.target_p_accept: # too much accept
                     self.epsilons[i, n] = self.epsilons[i, n] * 1.1
                     self.common_epsilon = self.common_epsilon * 1.05
@@ -115,6 +117,11 @@ class HMC(BaseTransitionModel):
                     self.epsilons[i, n] = self.epsilons[i, n] / 1.1
                     self.common_epsilon = self.common_epsilon / 1.05
             if self.train_params:
+                if p_accept == 0.0:
+                    # if p_accept is zero then manually decrease step size, as this means that no acceptances so no
+                    # gradient flow to use
+                    self.epsilons[f"{i}_{n}"].data = self.epsilons[f"{i}_{n}"].data / 1.5
+                    self.epsilons["common"].data = self.epsilons["common"].data / 1.2
                 if i == 0:
                     self.counter += 1
             if i == 0: # save fist and last distribution info
@@ -124,7 +131,7 @@ class HMC(BaseTransitionModel):
                 self.last_dist_p_accepts[n] = torch.mean(acceptance_probability).cpu().detach()
         if self.train_params:
             if self.counter < self.tune_period:
-                loss = torch.mean(U_proposed)
+                loss = torch.mean(U(current_q))
                 if not (torch.isinf(loss) or torch.isnan(loss)):
                     loss.backward()
                     grad_norm = torch.nn.utils.clip_grad_norm_(self.parameters(), 1)
