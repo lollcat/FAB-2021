@@ -124,7 +124,7 @@ if __name__ == '__main__':
                 f"{dim}dim_{flow_type}_epochs{epochs}_flowsteps{n_flow_steps}_dist{n_distributions}__{current_time}"
     print(f"running experiment {save_path} \n\n")
     run_experiment(dim, save_path, epochs, n_flow_steps, n_distributions,
-                   flow_type, save=False, n_samples_expectation=int(1e3))
+                   flow_type, save=False, n_samples_expectation=int(1e3), train_AIS_params=False)
     print(f"\n\nfinished running experiment {save_path}")
 
 
