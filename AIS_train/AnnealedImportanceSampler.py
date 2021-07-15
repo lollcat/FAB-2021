@@ -14,7 +14,7 @@ class AnnealedImportanceSampler(BaseAIS):
     where 0 = b_0 < b_1 ... < b_d = 1
     """
     def __init__(self, loss_type, train_parameters, sampling_distribution, target_distribution,
-                 n_distributions=20, n_steps_transition_operator=10, distribution_spacing="geometric",
+                 n_distributions=20, n_steps_transition_operator=10, distribution_spacing="linear",
                  transition_operator="Metropolis", step_size=1.0, inner_loop_steps=5):
         # this changes meaning depending on algorithm, for Metropolis it scales noise, for HMC it is step size
         self.dim = sampling_distribution.dim
@@ -85,20 +85,22 @@ class AnnealedImportanceSampler(BaseAIS):
     def setup_n_distributions(self, n_distributions, distribution_spacing="geometric"):
         self.n_distributions = n_distributions
         assert self.n_distributions > 1
-        if self.n_distributions == 2:
-            print("running without any intermediate distributions")
-            self.B_space = np.linspace(0.0, 1.0, 2)
-            return
-        elif self.n_distributions == 3:
-            self.B_space = np.array([0.0, 0.5, 1.0])
-            return
-        n_linspace_points = max(int(n_distributions / 5), 2)  # rough heuristic, copying ratio used in example in AIS paper
-        n_geomspace_points = n_distributions - n_linspace_points
         if distribution_spacing == "geometric":
-            self.B_space = torch.tensor(list(np.linspace(0, 0.01, n_linspace_points)) +
-                                        list(np.geomspace(0.01, 1, n_geomspace_points)))
+            if self.n_distributions == 2:
+                print("running without any intermediate distributions")
+                self.B_space = np.linspace(0.0, 1.0, 2)
+                return
+            elif self.n_distributions == 3:
+                print("using linear spacing as there is only 1 intermediate distribution")
+                self.B_space = np.array([0.0, 0.5, 1.0])
+                return
+            n_linspace_points = max(int(n_distributions / 5),
+                                    2)  # rough heuristic, copying ratio used in example in AIS paper
+            n_geomspace_points = n_distributions - n_linspace_points
+            self.B_space = torch.tensor(list(np.linspace(0, 0.1-0.1/n_linspace_points, n_linspace_points)) +
+                                        list(np.geomspace(0.1, 1, n_geomspace_points)))
         elif distribution_spacing == "linear":
-            self.B_space = torch.linspace(0, 1, n_distributions)
+            self.B_space = torch.linspace(0.0, 1.0, n_distributions)
         else:
             raise Exception(f"distribution spacing incorrectly specified: '{distribution_spacing}',"
                             f"options are 'geometric' or 'linear'")
