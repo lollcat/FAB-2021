@@ -62,9 +62,9 @@ class HMC(BaseTransitionModel):
 
     def get_epsilon(self, i, n):
         if self.train_params:
-            return self.epsilons[f"{i}_{n}"] + self.epsilons["common"]
+            return torch.abs(self.epsilons[f"{i}_{n}"] + self.epsilons["common"])
         else:
-            return self.epsilons[i, n] + self.common_epsilon
+            return torch.abs(self.epsilons[i, n] + self.common_epsilon)
 
     def HMC_func(self, U, current_q, grad_U, i):
         # need this for grad function
