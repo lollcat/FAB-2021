@@ -10,10 +10,6 @@ class Energy(torch.nn.Module):
         super().__init__()
         self._dim = dim
 
-    @property
-    def dim(self):
-        return self._dim
-
     def _energy(self, x):
         raise NotImplementedError()
 
@@ -51,14 +47,29 @@ class ManyWellEnergy(DoubleWellEnergy):
         assert dim % 2 == 0
         self.n_wells = dim // 2
         super(ManyWellEnergy, self).__init__(dim=2, *args, **kwargs)
-        centre = 1.7
-        dim_1_vals_grid = torch.meshgrid([torch.tensor([-centre, centre])for _ in range(self.n_wells)])
-        dim_1_vals = torch.stack([torch.flatten(dim) for dim in dim_1_vals_grid], dim=-1)
-        n_modes = 2**self.n_wells
-        assert n_modes == dim_1_vals.shape[0]
-        self.test_set_ = torch.zeros((n_modes, dim))
-        self.test_set_[:, torch.arange(dim) % 2 == 0] = dim_1_vals
+        self.dim = dim
+        self.centre = 1.7
+        self.max_dim_for_all_modes = 1 # otherwise we get memory issues on huuuuge test set
+        if self.dim < self.max_dim_for_all_modes:
+            dim_1_vals_grid = torch.meshgrid([torch.tensor([-self.centre, self.centre])for _ in range(self.n_wells)])
+            dim_1_vals = torch.stack([torch.flatten(dim) for dim in dim_1_vals_grid], dim=-1)
+            n_modes = 2**self.n_wells
+            assert n_modes == dim_1_vals.shape[0]
+            self.test_set__ = torch.zeros((n_modes, dim))
+            self.test_set__[:, torch.arange(dim) % 2 == 0] = dim_1_vals
+        else:
+            print("using test set containing not all modes to prevent memory issues")
 
+    @property
+    def test_set_(self):
+        if self.dim < self.max_dim_for_all_modes:
+            return self.test_set__
+        else:
+            batch_size = int(1e3)
+            test_set = torch.zeros((batch_size, self.dim))
+            test_set[:, torch.arange(self.dim) % 2 == 0] = \
+                -self.centre + self.centre * 2 * torch.randint(high=2, size=(batch_size, int(self.dim/2)))
+            return test_set
 
     def test_set(self, device):
         return (self.test_set_ + torch.randn_like(self.test_set_)*0.2).to(device)

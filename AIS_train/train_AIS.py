@@ -93,12 +93,12 @@ class AIS_trainer(LearntDistributionManager):
               KPI_batch_size=int(1e4),
               allow_ignore_nan_loss=True, clip_grad_norm=True,
               max_grad_norm=1, plotting_batch_size=int(1e3),
-              jupyter=False):
+              jupyter=False, n_progress_updates=50):
         if jupyter:
             from tqdm import tqdm_notebook as tqdm
         else:
             from tqdm import tqdm
-        epoch_per_save_and_print = max(int(epochs / 50), 1)
+        epoch_per_save_and_print = max(int(epochs / n_progress_updates), 1)
         if intermediate_plots is True:
             epoch_per_plot = max(int(epochs / n_plots), 1)
         history = {"ESS": [],
@@ -112,9 +112,9 @@ class AIS_trainer(LearntDistributionManager):
                    }
         history.update(dict([(key, []) for key in self.AIS_train.transition_operator_class.interesting_info()]))
         if hasattr(self.target_dist, "sample"):
-            history.update({'mean_log_prob_true_samples': []})
+            history.update({'mean_log_prob_true_samples': [], 'min_log_prob_true_samples': []})
         elif hasattr(self.target_dist, "test_set"):
-            history.update({'mean_log_q_x_test_samples': []})
+            history.update({'mean_log_q_x_test_samples': [], 'min_log_q_x_test_samples': []})
         pbar = tqdm(range(epochs))
         for self.current_epoch in pbar:
             x_samples, log_w = self.AIS_train.run(batch_size)
@@ -164,16 +164,22 @@ class AIS_trainer(LearntDistributionManager):
                             log_p_x = 0.0
                         if hasattr(self.target_dist, "sample"):
                             true_samples = self.target_dist.sample((batch_size,))
-                            mean_log_q_x_true_samples = torch.mean(self.learnt_sampling_dist.log_prob(true_samples)).item()
+                            log_probs_true = self.learnt_sampling_dist.log_prob(true_samples)
+                            mean_log_q_x_true_samples = torch.mean(log_probs_true).item()
+                            min_log_q_x_true_samples = torch.min(log_probs_true).item()
                             history['mean_log_prob_true_samples'].append(mean_log_q_x_true_samples)
+                            history['min_log_prob_true_samples'].append(min_log_q_x_true_samples)
                             pbar.set_description(
                                 f"loss: {np.mean(history['loss'][-epoch_per_save_and_print:])},"
                                 f""f"mean_log_prob_true_samples {mean_log_q_x_true_samples},"
                                 f"ESS {history['ESS'][-1]}")
                         elif hasattr(self.target_dist, "test_set"):
                             test_samples = self.target_dist.test_set(self.device)
-                            mean_log_q_x_test_samples = torch.mean(self.learnt_sampling_dist.log_prob(test_samples)).item()
+                            log_probs_test = self.learnt_sampling_dist.log_prob(test_samples)
+                            mean_log_q_x_test_samples = torch.mean(log_probs_test).item()
+                            min_log_q_x_test_samples = torch.min(log_probs_test).item()
                             history['mean_log_q_x_test_samples'].append(mean_log_q_x_test_samples)
+                            history['min_log_q_x_test_samples'].append(min_log_q_x_test_samples)
                             pbar.set_description(
                                 f"loss: {np.mean(history['loss'][-epoch_per_save_and_print:])},"
                                 f""f"mean_log_q_x_test_samples {mean_log_q_x_test_samples},"

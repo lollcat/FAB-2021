@@ -114,11 +114,13 @@ def run_experiment(dim, save_path, epochs, n_flow_steps, n_distributions,
         with open(summary_results_path, "w") as g:
             g.write(summary_results)
 
+
+
 if __name__ == '__main__':
     from datetime import datetime
     current_time = datetime.now().strftime("%Y_%m_%d-%I_%M_%S_%p")
     dim = 2
-    epochs = 10
+    epochs = 1000
     n_flow_steps = 5
     n_distributions = 4
     experiment_name = "testing5"
