@@ -1,9 +1,5 @@
 
-Notebook = False
-if Notebook:
-    from tqdm import tqdm_notebook as tqdm
-else:
-    from tqdm import tqdm
+
 from FittedModels.train import LearntDistributionManager
 from FittedModels.utils.plotting_utils import plot_samples
 from AIS_train.AnnealedImportanceSampler import AnnealedImportanceSampler
@@ -96,7 +92,12 @@ class AIS_trainer(LearntDistributionManager):
               plotting_func=plot_samples, n_plots=3,
               KPI_batch_size=int(1e4),
               allow_ignore_nan_loss=True, clip_grad_norm=True,
-              max_grad_norm=1, plotting_batch_size=int(1e3)):
+              max_grad_norm=1, plotting_batch_size=int(1e3),
+              jupyter=False):
+        if jupyter:
+            from tqdm import tqdm_notebook as tqdm
+        else:
+            from tqdm import tqdm
         epoch_per_save_and_print = max(int(epochs / 50), 1)
         if intermediate_plots is True:
             epoch_per_plot = max(int(epochs / n_plots), 1)
@@ -168,7 +169,7 @@ class AIS_trainer(LearntDistributionManager):
                             pbar.set_description(
                                 f"loss: {np.mean(history['loss'][-epoch_per_save_and_print:])},"
                                 f""f"mean_log_prob_true_samples {mean_log_q_x_true_samples},"
-                                f"ESS {history['ESS']}")
+                                f"ESS {history['ESS'][-1]}")
                         elif hasattr(self.target_dist, "test_set"):
                             test_samples = self.target_dist.test_set(self.device)
                             mean_log_q_x_test_samples = torch.mean(self.learnt_sampling_dist.log_prob(test_samples)).item()
@@ -176,12 +177,12 @@ class AIS_trainer(LearntDistributionManager):
                             pbar.set_description(
                                 f"loss: {np.mean(history['loss'][-epoch_per_save_and_print:])},"
                                 f""f"mean_log_q_x_test_samples {mean_log_q_x_test_samples},"
-                                f"ESS {history['ESS']}")
+                                f"ESS {history['ESS'][-1]}")
                         else:
                             pbar.set_description(
                                 f"loss: {np.mean(history['loss'][-epoch_per_save_and_print:])},"
                                 f""f"log_p_x_post_AIS {np.mean(history['log_p_x_after_AIS'][-epoch_per_save_and_print:])},"
-                                f"ESS {history['ESS']}")
+                                f"ESS {history['ESS'][-1]}")
                 if intermediate_plots:
                     if self.current_epoch % epoch_per_plot == 0:
                         plotting_func(self, n_samples=plotting_batch_size,
