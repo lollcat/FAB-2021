@@ -137,7 +137,7 @@ class AnnealedImportanceSampler(BaseImportanceSampler):
                 samples = []
                 log_w = []
                 for i in range(n_batches):
-                    samples_batch, log_q = self.sampling_distribution(n_samples)
+                    samples_batch, log_q = self.sampling_distribution(batch_size)
                     nice_indices = (~(torch.isinf(log_q) | torch.isnan(log_q)))
                     samples_batch = samples_batch[nice_indices]
                     nice_indices = nice_indices.cpu().detach()
