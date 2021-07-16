@@ -12,6 +12,7 @@ import torch.nn.functional as F
 import torch.nn as nn
 import matplotlib.pyplot as plt
 import numpy as np
+from Utils.numerical_utils import quadratic_function as expectation_function
 
 
 class AIS_trainer(LearntDistributionManager):
@@ -96,16 +97,17 @@ class AIS_trainer(LearntDistributionManager):
               KPI_batch_size=int(1e4),
               allow_ignore_nan_loss=True, clip_grad_norm=True,
               max_grad_norm=1, plotting_batch_size=int(1e3)):
-        epoch_per_save_and_print = max(int(epochs / 100), 1)
+        epoch_per_save_and_print = max(int(epochs / 50), 1)
         if intermediate_plots is True:
             epoch_per_plot = max(int(epochs / n_plots), 1)
-        history = {"loss": [],
-                   "log_p_x_after_AIS": [],
+        history = {"ESS": [],
+                    "ESS_batch": [],
+                    "loss": [],
                    "log_w": [],
                    "kl": [],
                    "alpha_2_divergence": [],
                    "log_q_AIS_x": [],
-                   "ESS": [],
+                   "log_p_x_after_AIS": [],
                    }
         history.update(dict([(key, []) for key in self.AIS_train.transition_operator_class.interesting_info()]))
         if hasattr(self.target_dist, "sample"):
@@ -131,13 +133,19 @@ class AIS_trainer(LearntDistributionManager):
                 grad_norm = torch.nn.utils.clip_grad_norm_(self.learnt_sampling_dist.parameters(), max_grad_norm)
                 torch.nn.utils.clip_grad_value_(self.learnt_sampling_dist.parameters(), 1)
             self.optimizer.step()
+            if self.current_epoch % epoch_per_save_and_print == 0 or self.current_epoch == epochs:
+                # must do this outside of the torch.no_grad below
+                history["ESS"].append(
+                    self.AIS_train.calculate_expectation(
+                        KPI_batch_size, expectation_function,
+                        batch_size=int(1e3), drop_nan_and_infs=True)[1]['effective_sample_size'].item() / KPI_batch_size)
             with torch.no_grad(): # none of the below steps should require gradients
                 # save info
                 history["loss"].append(loss_1.item())
                 history["log_w"].append(torch.mean(log_w).item())
-                history["ESS"].append(
+                history["ESS_batch"].append(
                     self.AIS_train.effective_sample_size_unnormalised_log_weights(log_w, drop_nan=True).item() /
-                    log_w.shape[0])
+                    batch_size)
                 transition_operator_info = self.AIS_train.transition_operator_class.interesting_info()
                 for key in transition_operator_info:
                     history[key].append(transition_operator_info[key])
@@ -160,7 +168,7 @@ class AIS_trainer(LearntDistributionManager):
                             pbar.set_description(
                                 f"loss: {np.mean(history['loss'][-epoch_per_save_and_print:])},"
                                 f""f"mean_log_prob_true_samples {mean_log_q_x_true_samples},"
-                                f"ESS {np.mean(history['ESS'][-epoch_per_save_and_print:])}")
+                                f"ESS {history['ESS']}")
                         elif hasattr(self.target_dist, "test_set"):
                             test_samples = self.target_dist.test_set(self.device)
                             mean_log_q_x_test_samples = torch.mean(self.learnt_sampling_dist.log_prob(test_samples)).item()
@@ -168,12 +176,12 @@ class AIS_trainer(LearntDistributionManager):
                             pbar.set_description(
                                 f"loss: {np.mean(history['loss'][-epoch_per_save_and_print:])},"
                                 f""f"mean_log_q_x_test_samples {mean_log_q_x_test_samples},"
-                                f"ESS {np.mean(history['ESS'][-epoch_per_save_and_print:])}")
+                                f"ESS {history['ESS']}")
                         else:
                             pbar.set_description(
                                 f"loss: {np.mean(history['loss'][-epoch_per_save_and_print:])},"
                                 f""f"log_p_x_post_AIS {np.mean(history['log_p_x_after_AIS'][-epoch_per_save_and_print:])},"
-                                f"ESS {np.mean(history['ESS'][-epoch_per_save_and_print:])}")
+                                f"ESS {history['ESS']}")
                 if intermediate_plots:
                     if self.current_epoch % epoch_per_plot == 0:
                         plotting_func(self, n_samples=plotting_batch_size,

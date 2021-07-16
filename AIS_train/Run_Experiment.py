@@ -51,8 +51,8 @@ def run_experiment(dim, save_path, epochs, n_flow_steps, n_distributions,
                                                                                   expectation_function=expectation_function,
                                                                                   batch_size=int(1e3))
     summary_results += f"ESS of AIS before training is " \
-       f"{info_dict_before['effective_sample_size'].item() / info_dict_before['normalised_sampling_weights'].shape[0]}" \
-       f" calculated using {info_dict_before['normalised_sampling_weights'].shape[0]} samples \n"
+       f"{info_dict_before['effective_sample_size'].item() / n_samples_expectation}" \
+       f" calculated using {n_samples_expectation} samples \n"
 
     history = tester.train(epochs, batch_size=batch_size, intermediate_plots=True, n_plots=n_plots, plotting_func=plotter)
 
@@ -67,20 +67,22 @@ def run_experiment(dim, save_path, epochs, n_flow_steps, n_distributions,
         plt.close("all")
     else:
         plt.show()
+    torch.manual_seed(2)
     expectation, info_dict = tester.AIS_train.calculate_expectation(n_samples_expectation,
                                                                     expectation_function=expectation_function,
                                                                     batch_size=int(1e3),
                                                                     drop_nan_and_infs=True)
     summary_results += f"ESS for samples from AIS  "\
-        f"{info_dict['effective_sample_size'].item()/ info_dict['normalised_sampling_weights'].shape[0]}" \
-        f" calculated using {info_dict['normalised_sampling_weights'].shape[0]} samples \n"
+        f"{info_dict['effective_sample_size'].item()/ n_samples_expectation}" \
+        f" calculated using {n_samples_expectation} samples \n"
+    torch.manual_seed(3)
     expectation, info_dict = tester.AIS_train.calculate_expectation(n_samples_expectation,
                                                                     expectation_function=expectation_function,
                                                                     batch_size=int(1e3),
                                                                     drop_nan_and_infs=True)
     summary_results += f"ESS for samples from AIS of repeat calc " \
-                       f"{info_dict['effective_sample_size'].item() / info_dict['normalised_sampling_weights'].shape[0]}" \
-                       f" calculated using {info_dict['normalised_sampling_weights'].shape[0]} samples \n"
+                       f"{info_dict['effective_sample_size'].item() / n_samples_expectation}" \
+                       f" calculated using {n_samples_expectation} samples \n"
     plot_samples_vs_contours_many_well(tester, n_samples=None,
                                        title=f"training epoch, samples from AIS",
                                        samples_q=info_dict["samples"], alpha=0.01)
@@ -89,6 +91,7 @@ def run_experiment(dim, save_path, epochs, n_flow_steps, n_distributions,
         plt.close("all")
     else:
         plt.show()
+    torch.manual_seed(5)
     expectation_flo, info_dict_flo = tester.AIS_train.calculate_expectation_over_flow(n_samples_expectation,
                                                                   expectation_function=expectation_function,
                                                                   batch_size=int(1e3),
@@ -102,8 +105,8 @@ def run_experiment(dim, save_path, epochs, n_flow_steps, n_distributions,
     else:
         plt.show()
     summary_results += f"ESS of flow model after training is " \
-           f"{info_dict_flo['effective_sample_size'].item()/ info_dict_flo['normalised_sampling_weights'].shape[0]}" \
-           f" calculated using {info_dict_flo['normalised_sampling_weights'].shape[0]} samples"
+           f"{info_dict_flo['effective_sample_size'].item()/ n_samples_expectation}" \
+           f" calculated using {n_samples_expectation} samples"
 
     print(summary_results)
     if save:

@@ -106,7 +106,6 @@ class AnnealedImportanceSampler(BaseAIS):
                             f"options are 'geometric' or 'linear'")
 
 
-
 if __name__ == '__main__':
     torch.autograd.set_detect_anomaly(True)
     from FittedModels.Models.FlowModel import FlowModel
