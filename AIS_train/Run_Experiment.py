@@ -61,6 +61,7 @@ def run_experiment(dim, save_path, epochs, n_flow_steps, n_distributions,
 
     plot_history(history)
     if save:
+        tester.learnt_sampling_dist.save_model(save_path)
         plt.savefig(str(save_path / "histories.png"))
     plt.show()
     torch.manual_seed(2)
@@ -112,9 +113,9 @@ if __name__ == '__main__':
     from datetime import datetime
     current_time = datetime.now().strftime("%Y_%m_%d-%I_%M_%S_%p")
     dim = 2
-    epochs = 100
-    n_flow_steps = 5
-    n_distributions = 4
+    epochs = 5
+    n_flow_steps = 2
+    n_distributions = 3
     experiment_name = "testing5"
     flow_type = "ReverseIAF" # "RealNVP"
     save_path = f"{experiment_name}__" \

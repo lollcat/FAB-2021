@@ -49,6 +49,19 @@ class FlowModel(nn.Module, BaseLearntDistribution):
             self.Monitor_NaN = Monitor_NaN()
             self.register_nan_hooks()
 
+    def save_model(self, save_path):
+        model_description = str(self.class_args) + str(*self.class_kwargs)
+        summary_results_path = str(save_path / "model_info.txt")
+        model_path = str(save_path / "model")
+        with open(summary_results_path, "w") as g:
+            g.write(model_description)
+        torch.save(self.state_dict(), model_path)
+
+    def load_model(self, save_path):
+        model_path = str(save_path / "model")
+        self.load_state_dict(torch.load(model_path))
+        print("loaded model")
+
     def to(self, device):
         super(FlowModel, self).to(device)
         self.prior = self.get_prior()
