@@ -49,7 +49,7 @@ class ManyWellEnergy(DoubleWellEnergy):
         super(ManyWellEnergy, self).__init__(dim=2, *args, **kwargs)
         self.dim = dim
         self.centre = 1.7
-        self.max_dim_for_all_modes = 1 # otherwise we get memory issues on huuuuge test set
+        self.max_dim_for_all_modes = 40 # otherwise we get memory issues on huuuuge test set
         if self.dim < self.max_dim_for_all_modes:
             dim_1_vals_grid = torch.meshgrid([torch.tensor([-self.centre, self.centre])for _ in range(self.n_wells)])
             dim_1_vals = torch.stack([torch.flatten(dim) for dim in dim_1_vals_grid], dim=-1)

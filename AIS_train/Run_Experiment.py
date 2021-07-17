@@ -27,7 +27,7 @@ def plotter(*args, **kwargs):
 def run_experiment(dim, save_path, epochs, n_flow_steps, n_distributions,
                    flow_type="ReverseIAF", batch_size=int(1e3), seed=0,
                    n_samples_expectation=int(1e5), save=True, n_plots=5, train_AIS_params=False,
-                   step_size=1.0, lr_flow=1e-4):
+                   step_size=1.0, learnt_dist_kwargs={"lr": 1e-4}):
     local_var_dict = locals().copy()
     summary_results = "*********     Parameters      *******************\n\n"  # for writing to file
     for key in local_var_dict:
@@ -46,7 +46,7 @@ def run_experiment(dim, save_path, epochs, n_flow_steps, n_distributions,
                                n_flow_steps=n_flow_steps)
     tester = AIS_trainer(target, learnt_sampler, loss_type=False, n_distributions=n_distributions
                          , n_steps_transition_operator=1,
-                         step_size=step_size, transition_operator="HMC", learnt_dist_kwargs={"lr": lr_flow},
+                         step_size=step_size, transition_operator="HMC", learnt_dist_kwargs=learnt_dist_kwargs,
                          loss_type_2="alpha_2", train_AIS_params=train_AIS_params, inner_loop_steps=5)
     summary_results += "\n\n *******************************    Results ********************* \n\n"
     expectation_before, info_dict_before = tester.AIS_train.calculate_expectation(n_samples_expectation,
@@ -118,11 +118,11 @@ if __name__ == '__main__':
     n_distributions = 3
     experiment_name = "testing5"
     flow_type = "ReverseIAF" # "RealNVP"
-    save_path = f"{experiment_name}__" \
+    save_path = f"Results/{experiment_name}__" \
                 f"{dim}dim_{flow_type}_epochs{epochs}_flowsteps{n_flow_steps}_dist{n_distributions}__{current_time}"
     print(f"running experiment {save_path} \n\n")
     run_experiment(dim, save_path, epochs, n_flow_steps, n_distributions,
-                   flow_type, save=True, n_samples_expectation=int(1e3), train_AIS_params=False)
+                   flow_type, save=False, n_samples_expectation=int(1e3), train_AIS_params=False)
     print(f"\n\nfinished running experiment {save_path}")
 
 
