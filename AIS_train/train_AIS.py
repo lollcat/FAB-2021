@@ -9,6 +9,7 @@ import torch.nn as nn
 import matplotlib.pyplot as plt
 import numpy as np
 from Utils.numerical_utils import quadratic_function as expectation_function
+import pathlib
 
 
 class AIS_trainer(LearntDistributionManager):
@@ -93,7 +94,11 @@ class AIS_trainer(LearntDistributionManager):
               KPI_batch_size=int(1e4),
               allow_ignore_nan_loss=True, clip_grad_norm=True,
               max_grad_norm=1, plotting_batch_size=int(1e3),
-              jupyter=False, n_progress_updates=50):
+              jupyter=False, n_progress_updates=50, save=False, save_path=None):
+        if save is True:
+            assert save_path is not None
+            save_path = save_path / "training"
+            save_path.mkdir(parents=True, exist_ok=False)
         if jupyter:
             from tqdm import tqdm_notebook as tqdm
         else:
@@ -193,15 +198,24 @@ class AIS_trainer(LearntDistributionManager):
                     if self.current_epoch % epoch_per_plot == 0:
                         plotting_func(self, n_samples=plotting_batch_size,
                                       title=f"training epoch, samples from flow {self.current_epoch}")
+                        if save:
+                            plt.savefig(str(save_path /f"Samples_from_flow_epoch{self.current_epoch}.png"))
+                        plt.show()
                         # make sure plotting func has option to enter x_samples directly
                         plotting_func(self, n_samples=batch_size,
                                       title=f"training epoch, samples from AIS {self.current_epoch}",
                                       samples_q=x_samples.cpu().detach())
+                        if save:
+                            plt.savefig(str(save_path /f"Samples_from_AIS_epoch{self.current_epoch}.png"))
+                        plt.show()
                         if "re_sampled_x" in locals():
                             if re_sampled_x is not None:
                                 plotting_func(self, n_samples=batch_size,
                                               title=f"training epoch, samples from AIS re-sampled {self.current_epoch}",
                                               samples_q=re_sampled_x.cpu().detach())
+                                if save:
+                                    plt.savefig(str(save_path / f"Resampled_epoch{self.current_epoch}.png"))
+                                plt.show()
         return history
 
     def dreg_alpha_divergence_loss(self, log_w, drop_nans_and_infs=True):

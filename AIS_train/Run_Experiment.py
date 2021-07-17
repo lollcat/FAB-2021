@@ -26,7 +26,7 @@ def plotter(*args, **kwargs):
 
 def run_experiment(dim, save_path, epochs, n_flow_steps, n_distributions,
                    flow_type="ReverseIAF", batch_size=int(1e3), seed=0,
-                   n_samples_expectation=int(1e5), save=True, n_plots=5, train_AIS_params=True,
+                   n_samples_expectation=int(1e5), save=True, n_plots=5, train_AIS_params=False,
                    step_size=1.0, lr_flow=1e-4):
     local_var_dict = locals().copy()
     summary_results = "*********     Parameters      *******************\n\n"  # for writing to file
@@ -35,6 +35,8 @@ def run_experiment(dim, save_path, epochs, n_flow_steps, n_distributions,
     if save:
         save_path = pathlib.Path(save_path)
         save_path.mkdir(parents=True, exist_ok=False)
+    else:
+        save_path = None
 
     torch.set_default_dtype(torch.float64)
     torch.manual_seed(seed)
@@ -54,19 +56,13 @@ def run_experiment(dim, save_path, epochs, n_flow_steps, n_distributions,
        f"{info_dict_before['effective_sample_size'].item() / n_samples_expectation}" \
        f" calculated using {n_samples_expectation} samples \n"
 
-    history = tester.train(epochs, batch_size=batch_size, intermediate_plots=True, n_plots=n_plots, plotting_func=plotter)
+    history = tester.train(epochs, batch_size=batch_size, intermediate_plots=True, n_plots=n_plots,
+                           plotting_func=plotter, save_path=save_path, save=save)
 
-    if save:
-        multipage(str(save_path / "plots_during_training.pdf"))
-        plt.close("all")
-    else:
-        plt.show()
     plot_history(history)
     if save:
-        multipage(str(save_path / "histories.pdf"))
-        plt.close("all")
-    else:
-        plt.show()
+        plt.savefig(str(save_path / "histories.png"))
+    plt.show()
     torch.manual_seed(2)
     expectation, info_dict = tester.AIS_train.calculate_expectation(n_samples_expectation,
                                                                     expectation_function=expectation_function,
@@ -87,10 +83,8 @@ def run_experiment(dim, save_path, epochs, n_flow_steps, n_distributions,
                                        title=f"training epoch, samples from AIS",
                                        samples_q=info_dict["samples"], alpha=0.01)
     if save:
-        multipage(str(save_path / "plots_AIS_samples_final.pdf"))
-        plt.close("all")
-    else:
-        plt.show()
+        plt.savefig(str(save_path / "plots_AIS_samples_final.png"))
+    plt.show()
     torch.manual_seed(5)
     expectation_flo, info_dict_flo = tester.AIS_train.calculate_expectation_over_flow(n_samples_expectation,
                                                                   expectation_function=expectation_function,
@@ -100,10 +94,8 @@ def run_experiment(dim, save_path, epochs, n_flow_steps, n_distributions,
                                        title=f"training epoch, samples from flow",
                                        samples_q=info_dict_flo["samples"], alpha=0.01)
     if save:
-        multipage(str(save_path / "plots_flo_samples_final.pdf"))
-        plt.close("all")
-    else:
-        plt.show()
+        plt.savefig(str(save_path / "plots_flo_samples_final.png"))
+    plt.show()
     summary_results += f"ESS of flow model after training is " \
            f"{info_dict_flo['effective_sample_size'].item()/ n_samples_expectation}" \
            f" calculated using {n_samples_expectation} samples"
@@ -120,16 +112,16 @@ if __name__ == '__main__':
     from datetime import datetime
     current_time = datetime.now().strftime("%Y_%m_%d-%I_%M_%S_%p")
     dim = 2
-    epochs = 1000
+    epochs = 100
     n_flow_steps = 5
     n_distributions = 4
     experiment_name = "testing5"
-    flow_type = "RealNVP" #"ReverseIAF"
+    flow_type = "ReverseIAF" # "RealNVP"
     save_path = f"{experiment_name}__" \
                 f"{dim}dim_{flow_type}_epochs{epochs}_flowsteps{n_flow_steps}_dist{n_distributions}__{current_time}"
     print(f"running experiment {save_path} \n\n")
     run_experiment(dim, save_path, epochs, n_flow_steps, n_distributions,
-                   flow_type, save=False, n_samples_expectation=int(1e4), train_AIS_params=False)
+                   flow_type, save=True, n_samples_expectation=int(1e3), train_AIS_params=False)
     print(f"\n\nfinished running experiment {save_path}")
 
 
