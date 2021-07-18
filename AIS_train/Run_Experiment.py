@@ -51,7 +51,7 @@ def run_experiment(dim, save_path, epochs, n_flow_steps, n_distributions,
     summary_results += "\n\n *******************************    Results ********************* \n\n"
     expectation_before, info_dict_before = tester.AIS_train.calculate_expectation(n_samples_expectation,
                                                                                   expectation_function=expectation_function,
-                                                                                  batch_size=int(1e3))
+                                                                                  batch_size=batch_size)
     summary_results += f"ESS of AIS before training is " \
        f"{info_dict_before['effective_sample_size'].item() / n_samples_expectation}" \
        f" calculated using {n_samples_expectation} samples \n"
@@ -66,7 +66,7 @@ def run_experiment(dim, save_path, epochs, n_flow_steps, n_distributions,
     torch.manual_seed(2)
     expectation, info_dict = tester.AIS_train.calculate_expectation(n_samples_expectation,
                                                                     expectation_function=expectation_function,
-                                                                    batch_size=int(1e3),
+                                                                    batch_size=batch_size,
                                                                     drop_nan_and_infs=True)
     summary_results += f"ESS for samples from AIS  "\
         f"{info_dict['effective_sample_size'].item()/ n_samples_expectation}" \
@@ -74,7 +74,7 @@ def run_experiment(dim, save_path, epochs, n_flow_steps, n_distributions,
     torch.manual_seed(3)
     expectation, info_dict = tester.AIS_train.calculate_expectation(n_samples_expectation,
                                                                     expectation_function=expectation_function,
-                                                                    batch_size=int(1e3),
+                                                                    batch_size=batch_size,
                                                                     drop_nan_and_infs=True)
     summary_results += f"ESS for samples from AIS of repeat calc " \
                        f"{info_dict['effective_sample_size'].item() / n_samples_expectation}" \
@@ -88,7 +88,7 @@ def run_experiment(dim, save_path, epochs, n_flow_steps, n_distributions,
     torch.manual_seed(5)
     expectation_flo, info_dict_flo = tester.AIS_train.calculate_expectation_over_flow(n_samples_expectation,
                                                                   expectation_function=expectation_function,
-                                                                  batch_size=int(1e3),
+                                                                  batch_size=batch_size,
                                                                   drop_nan_and_infs=True)
     plot_samples_vs_contours_many_well(tester, n_samples=None,
                                        title=f"training epoch, samples from flow",
@@ -117,7 +117,8 @@ if __name__ == '__main__':
         epochs = int(1e5)
         n_flow_steps = 20
         n_distributions = 2 + 4
-        experiment_name = "mogdog_AdamW"
+        batch_size = int(3e3)
+        experiment_name = "mogdog_AdamW_lower_lr_bigger_batch"
         n_plots = 20
         learnt_dist_kwargs = {"lr": 1e-4, "optimizer": "AdamW"}
         flow_type = "ReverseIAF" # "RealNVP"
@@ -125,7 +126,8 @@ if __name__ == '__main__':
                     f"{dim}dim_{flow_type}_epochs{epochs}_flowsteps{n_flow_steps}_dist{n_distributions}__{current_time}"
         print(f"running experiment {save_path} \n\n")
         run_experiment(dim, save_path, epochs, n_flow_steps, n_distributions,
-                       flow_type, learnt_dist_kwargs=learnt_dist_kwargs, train_AIS_params=False, n_plots=n_plots)
+                       flow_type, learnt_dist_kwargs=learnt_dist_kwargs, train_AIS_params=False, n_plots=n_plots,
+                       batch_size=batch_size)
         print(f"\n\nfinished running experiment {save_path}")
 
     if testing_local is True:
