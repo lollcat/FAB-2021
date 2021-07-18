@@ -7,7 +7,21 @@ import numpy as np
 
 from matplotlib.backends.backend_pdf import PdfPages
 
-
+def plot_marginals(distribution, n_samples=1000, title=None, samples_q=None,
+                   clamp_samples=10, alpha=0.2):
+    if samples_q is None:
+        samples_q = distribution.sample((n_samples,))
+    samples_q = torch.clamp(samples_q, -clamp_samples, clamp_samples).cpu().detach().numpy()
+    fig, axs = plt.subplots(distribution.dim, distribution.target_dist.dim,
+                            figsize=(3*distribution.dim, 3 * distribution.dim),
+                            sharex="row", sharey="row")
+    for i in range(distribution.dim):
+        for j in range(distribution.dim):
+            if i != j:
+                axs[i, j].plot(samples_q[:, i], samples_q[:, j], "o", alpha=alpha)
+    if title is not None:
+        fig.suptitle(title)
+    plt.tight_layout()
 
 def multipage(filename, figs=None, dpi=200):
     """

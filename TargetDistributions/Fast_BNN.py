@@ -31,7 +31,7 @@ class custom_layer(nn.Module):
 
 class BNN_Fast(nn.Module):
     def __init__(self, weight_batch_size=64, x_dim=2, y_dim=2, n_hidden_layers=2, layer_width=10,
-                 linear_activations=False, fixed_variance=False, use_bias=True):
+                 linear_activations=False, fixed_variance=False, use_bias=True, linear_activations_output=True):
         super(BNN_Fast, self).__init__()
         self.weight_batch_size = weight_batch_size
         self.fixed_variance = fixed_variance
@@ -46,11 +46,11 @@ class BNN_Fast(nn.Module):
             in_dim = layer_width
         self.output_layer_means = custom_layer(weight_batch_size=weight_batch_size,
                                                input_dim=in_dim, layer_width=y_dim, use_bias=use_bias,
-                                               linear_activations=True)
+                                               linear_activations=linear_activations_output)
         if fixed_variance is False:
             self.output_layer_log_stds = custom_layer(weight_batch_size=weight_batch_size,
                                                input_dim=in_dim, layer_width=y_dim, use_bias=use_bias,
-                                               linear_activations=True)
+                                               linear_activations=linear_activations_output)
         else:
             self.register_buffer("log_stds", torch.ones((weight_batch_size, y_dim)))
 
@@ -109,11 +109,11 @@ class Target(nn.Module):
     The goal is to use this provide x & y data that we can use to get the posterior over weights of a BNN
     """
     def __init__(self, x_dim=2, y_dim=2, n_hidden_layers=2, layer_width=10,
-                 fixed_variance=False, linear_activations=False, use_bias=True):
+                 fixed_variance=False, linear_activations=False, use_bias=True, linear_activations_output=True):
         super(Target, self).__init__()
         self.model = BNN_Fast(weight_batch_size=1, x_dim=x_dim, y_dim=y_dim, n_hidden_layers=n_hidden_layers,
                               layer_width=layer_width, fixed_variance=fixed_variance,
-                        linear_activations=linear_activations, use_bias=use_bias)
+                        linear_activations=linear_activations, use_bias=use_bias, linear_activations_output=True)
         self.register_buffer("prior_loc", torch.zeros(x_dim))
         self.register_buffer("prior_covariance", torch.eye(x_dim))
 
@@ -135,17 +135,19 @@ class FastPosteriorBNN(BaseTargetDistribution):
      if we set n_hidden_layer=0, x_dim=1, y_dim=1 we should be able to visualise p(w | X, Y) in 3D
     """
     def __init__(self, n_datapoints=100, weight_batch_size=64, x_dim=2, y_dim=2, n_hidden_layers=1, layer_width=5,
-                 linear_activations=False, fixed_variance=False, use_bias=True):
+                 linear_activations=False, fixed_variance=False, use_bias=True, linear_activations_output=True):
         super(FastPosteriorBNN, self).__init__()
         self.model_kwargs = {"weight_batch_size": weight_batch_size, "x_dim": x_dim, "y_dim": y_dim,
                               "n_hidden_layers": n_hidden_layers, "layer_width": layer_width,
-                 "linear_activations": linear_activations, "fixed_variance": fixed_variance, "use_bias": use_bias}
+                 "linear_activations": linear_activations, "fixed_variance": fixed_variance, "use_bias": use_bias,
+                             "linear_activations_output": linear_activations_output}
         self.model = BNN_Fast(**self.model_kwargs)
         self.n_parameters = self.model.n_parameters
         self.register_buffer("prior_loc", torch.zeros(self.n_parameters))
         self.register_buffer("prior_covariance", torch.eye(self.n_parameters))
         self.target = Target(x_dim, y_dim, n_hidden_layers, layer_width,
-                             linear_activations=linear_activations, fixed_variance=fixed_variance, use_bias=use_bias)
+                             linear_activations=linear_activations, fixed_variance=fixed_variance, use_bias=use_bias,
+                             linear_activations_output=linear_activations_output)
         X, Y = self.target.sample(n_datapoints)
         self.register_buffer("X", X)
         self.register_buffer("Y", Y)
@@ -178,7 +180,8 @@ class FastPosteriorBNN(BaseTargetDistribution):
 
 if __name__ == '__main__':
     posterior_bnn = FastPosteriorBNN(n_datapoints=2, x_dim=1, y_dim=1, n_hidden_layers=0, layer_width=0
-                                 , linear_activations=False, fixed_variance=True, use_bias=True)
+                                 , linear_activations=False, fixed_variance=True, use_bias=True,
+                                     linear_activations_output=False)
 
     assert posterior_bnn.n_parameters == 2
     from Utils.plotting_utils import plot_distribution
