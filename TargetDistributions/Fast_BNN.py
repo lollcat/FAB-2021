@@ -187,7 +187,6 @@ if __name__ == '__main__':
     plot_distribution(posterior_bnn, n_points=100)
     plt.show()
 
-
     """ test whole thing
     weight_batch_size = 5
     posterior_bnn = FastPosteriorBNN(weight_batch_size=weight_batch_size, n_datapoints=10, x_dim=2, y_dim=2, n_hidden_layers=1, layer_width=3,

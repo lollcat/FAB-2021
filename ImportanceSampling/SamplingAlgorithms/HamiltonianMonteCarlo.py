@@ -138,7 +138,7 @@ class HMC(BaseTransitionModel):
                     torch.nn.utils.clip_grad_value_(self.parameters(), 1)
                     # torch.autograd.grad(loss, self.epsilons["0_1"], retain_graph=True)
                     self.optimizer.step()
-        return current_q.detach() # stop gradient flow
+        return current_q.detach()  # stop gradient flow
 
     def run(self, current_q, log_q_x, i):
         # currently mainly written with grad_log_q_x = None in mind

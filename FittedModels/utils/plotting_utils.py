@@ -6,8 +6,6 @@ import numpy as np
 from Utils.plotting_utils import plot_3D
 
 
-
-
 def plot_samples_vs_contours_many_well(learnt_dist_manager, n_samples=1000, bounds=([-3, 3], [-3, 3]),
                                        n_points_contour=100, title=None, samples_q=None,
                                        log_prob_contour=True, clamp_samples=10, alpha=0.2):

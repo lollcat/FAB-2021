@@ -106,7 +106,7 @@ def run_experiment(dim, save_path, epochs, n_flow_steps, n_distributions,
         summary_results_path = str(save_path / "results.txt")
         with open(summary_results_path, "w") as g:
             g.write(summary_results)
-
+    return tester
 
 
 if __name__ == '__main__':
@@ -118,16 +118,11 @@ if __name__ == '__main__':
     n_distributions = 3
     experiment_name = "testing5"
     flow_type = "ReverseIAF" # "RealNVP"
+    learnt_dist_kwargs = {"lr": 1e-3, "optimizer": "AdamW"}
     save_path = f"Results/{experiment_name}__" \
                 f"{dim}dim_{flow_type}_epochs{epochs}_flowsteps{n_flow_steps}_dist{n_distributions}__{current_time}"
     print(f"running experiment {save_path} \n\n")
     run_experiment(dim, save_path, epochs, n_flow_steps, n_distributions,
-                   flow_type, save=False, n_samples_expectation=int(1e3), train_AIS_params=False)
+                   flow_type, save=False, n_samples_expectation=int(1e3), train_AIS_params=False,
+                   learnt_dist_kwargs=learnt_dist_kwargs)
     print(f"\n\nfinished running experiment {save_path}")
-
-
-
-
-
-
-
