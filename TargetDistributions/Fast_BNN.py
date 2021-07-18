@@ -10,10 +10,10 @@ class custom_layer(nn.Module):
     def __init__(self, weight_batch_size, layer_width, input_dim, linear_activations=False, use_bias=True):
         super(custom_layer, self).__init__()
         self.use_bias = use_bias
-        self.weight = nn.parameter.Parameter(torch.zeros(weight_batch_size, input_dim, layer_width))
+        self.weight = nn.Parameter(torch.zeros(weight_batch_size, input_dim, layer_width))
         nn.init.normal_(self.weight, mean=0.0, std=1.0)
         if use_bias:
-            self.bias = nn.parameter.Parameter(torch.zeros(weight_batch_size, layer_width))
+            self.bias = nn.Parameter(torch.zeros(weight_batch_size, layer_width))
             nn.init.normal_(self.bias, mean=0.0, std=1.0)
 
         if linear_activations:
@@ -152,6 +152,11 @@ class FastPosteriorBNN(BaseTargetDistribution):
         self.register_buffer("X", X)
         self.register_buffer("Y", Y)
         self.batch_size_changed = False
+        self.device = "cpu" # initialised onto cpu
+
+    def to(self, device):
+        self.device = device
+        super(FastPosteriorBNN, self).to(device)
 
     def log_prob(self, w):
         if len(w.shape) == 1:
@@ -162,7 +167,7 @@ class FastPosteriorBNN(BaseTargetDistribution):
                       f"message comes up during training")
                 self.batch_size_changed = True
             self.model_kwargs["weight_batch_size"] = w.shape[0]
-            self.model = BNN_Fast(**self.model_kwargs)
+            self.model = BNN_Fast(**self.model_kwargs).to(self.device)
         """p(w | X, Y) proportional to p(w) p(Y | X, w)"""
         self.model.set_parameters(w)
         # keys = list(dict(model.state_dict()).keys())
@@ -190,14 +195,17 @@ if __name__ == '__main__':
     plot_distribution(posterior_bnn, n_points=100)
     plt.show()
 
-    """ test whole thing
+    #""" test whole thing
     weight_batch_size = 5
     posterior_bnn = FastPosteriorBNN(weight_batch_size=weight_batch_size, n_datapoints=10, x_dim=2, y_dim=2, n_hidden_layers=1, layer_width=3,
-                                     fixed_variance=True) #.to("cuda")
+                                     fixed_variance=True)
+    posterior_bnn.to("cuda")
     for _ in range(5):
-        samples_w = torch.randn(weight_batch_size, posterior_bnn.model.n_parameters) #.to("cuda")
+        samples_w = torch.randn(weight_batch_size, posterior_bnn.model.n_parameters).to("cuda")
         print(posterior_bnn.log_prob(samples_w))
-    """
+    #"""
+    posterior_bnn.log_prob(torch.randn(10, posterior_bnn.model.n_parameters).to("cuda"))
+    #
 
 
     """ Target Test
