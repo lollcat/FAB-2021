@@ -109,13 +109,15 @@ class Target(nn.Module):
     The goal is to use this provide x & y data that we can use to get the posterior over weights of a BNN
     """
     def __init__(self, x_dim=2, y_dim=2, n_hidden_layers=2, layer_width=10,
-                 fixed_variance=False, linear_activations=False, use_bias=True, linear_activations_output=True):
+                 fixed_variance=False, linear_activations=False, use_bias=True, linear_activations_output=True,
+                 prior_x_scaling=10.0):
         super(Target, self).__init__()
         self.model = BNN_Fast(weight_batch_size=1, x_dim=x_dim, y_dim=y_dim, n_hidden_layers=n_hidden_layers,
                               layer_width=layer_width, fixed_variance=fixed_variance,
-                        linear_activations=linear_activations, use_bias=use_bias, linear_activations_output=True)
+                        linear_activations=linear_activations, use_bias=use_bias,
+                              linear_activations_output=linear_activations_output)
         self.register_buffer("prior_loc", torch.zeros(x_dim))
-        self.register_buffer("prior_covariance", torch.eye(x_dim))
+        self.register_buffer("prior_covariance", torch.eye(x_dim)*prior_x_scaling)
 
     @property
     def prior(self):
@@ -152,15 +154,13 @@ class FastPosteriorBNN(BaseTargetDistribution):
         self.register_buffer("X", X)
         self.register_buffer("Y", Y)
         self.batch_size_changed = False
-        self.device = "cpu" # initialised onto cpu
+        self.device = "cpu"  # initialised onto cpu
 
     def to(self, device):
         self.device = device
         super(FastPosteriorBNN, self).to(device)
 
-    def log_prob(self, w):
-        if len(w.shape) == 1:
-            w = w[None, :]
+    def set_model_parameters(self, w):
         if self.model.weight_batch_size != w.shape[0]:
             if self.batch_size_changed is False:
                 print(f"changing model batch size to {w.shape[0]} (note that this will be occuring often if this "
@@ -170,6 +170,11 @@ class FastPosteriorBNN(BaseTargetDistribution):
             self.model = BNN_Fast(**self.model_kwargs).to(self.device)
         """p(w | X, Y) proportional to p(w) p(Y | X, w)"""
         self.model.set_parameters(w)
+
+    def log_prob(self, w):
+        if len(w.shape) == 1:
+            w = w[None, :]
+        self.set_model_parameters(w)
         # keys = list(dict(model.state_dict()).keys())
         # key = keys[1]
         # model.state_dict()[key] == self.model.state_dict()[key] # want these to be false
