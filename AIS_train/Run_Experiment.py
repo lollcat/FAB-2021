@@ -109,19 +109,39 @@ def run_experiment(dim, save_path, epochs, n_flow_steps, n_distributions,
 
 
 if __name__ == '__main__':
-    from datetime import datetime
-    current_time = datetime.now().strftime("%Y_%m_%d-%I_%M_%S_%p")
-    dim = 2
-    epochs = 5
-    n_flow_steps = 2
-    n_distributions = 3
-    experiment_name = "testing5"
-    flow_type = "ReverseIAF" # "RealNVP"
-    learnt_dist_kwargs = {"lr": 1e-3, "optimizer": "AdamW"}
-    save_path = f"Results/{experiment_name}__" \
-                f"{dim}dim_{flow_type}_epochs{epochs}_flowsteps{n_flow_steps}_dist{n_distributions}__{current_time}"
-    print(f"running experiment {save_path} \n\n")
-    run_experiment(dim, save_path, epochs, n_flow_steps, n_distributions,
-                   flow_type, save=True, n_samples_expectation=int(1e3), train_AIS_params=False,
-                   learnt_dist_kwargs=learnt_dist_kwargs)
-    print(f"\n\nfinished running experiment {save_path}")
+    testing_local = False
+    if not testing_local:
+        from datetime import datetime
+        current_time = datetime.now().strftime("%Y_%m_%d-%I_%M_%S_%p")
+        dim = 64
+        epochs = int(1e5)
+        n_flow_steps = 20
+        n_distributions = 2 + 4
+        experiment_name = "mogdog_AdamW"
+        n_plots = 20
+        learnt_dist_kwargs = {"lr": 1e-4, "optimizer": "AdamW"}
+        flow_type = "ReverseIAF" # "RealNVP"
+        save_path = f"Results/{experiment_name}__" \
+                    f"{dim}dim_{flow_type}_epochs{epochs}_flowsteps{n_flow_steps}_dist{n_distributions}__{current_time}"
+        print(f"running experiment {save_path} \n\n")
+        run_experiment(dim, save_path, epochs, n_flow_steps, n_distributions,
+                       flow_type, learnt_dist_kwargs=learnt_dist_kwargs, train_AIS_params=False, n_plots=n_plots)
+        print(f"\n\nfinished running experiment {save_path}")
+
+    if testing_local is True:
+        from datetime import datetime
+        current_time = datetime.now().strftime("%Y_%m_%d-%I_%M_%S_%p")
+        dim = 2
+        epochs = 5
+        n_flow_steps = 2
+        n_distributions = 3
+        experiment_name = "testing5"
+        flow_type = "ReverseIAF" # "RealNVP"
+        learnt_dist_kwargs = {"lr": 1e-3, "optimizer": "AdamW"}
+        save_path = f"Results/{experiment_name}__" \
+                    f"{dim}dim_{flow_type}_epochs{epochs}_flowsteps{n_flow_steps}_dist{n_distributions}__{current_time}"
+        print(f"running experiment {save_path} \n\n")
+        run_experiment(dim, save_path, epochs, n_flow_steps, n_distributions,
+                       flow_type, save=True, n_samples_expectation=int(1e3), train_AIS_params=False,
+                       learnt_dist_kwargs=learnt_dist_kwargs)
+        print(f"\n\nfinished running experiment {save_path}")
