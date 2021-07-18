@@ -5,6 +5,21 @@ import pandas as pd
 import numpy as np
 from Utils.plotting_utils import plot_3D
 
+def plot_marginals(learnt_dist_manager, n_samples=1000, title=None, samples_q=None,
+                   clamp_samples=10, alpha=0.2):
+    if samples_q is None:
+        samples_q = learnt_dist_manager.learnt_sampling_dist.sample((n_samples,))
+    samples_q = torch.clamp(samples_q, -clamp_samples, clamp_samples).cpu().detach().numpy()
+    fig, axs = plt.subplots(learnt_dist_manager.target_dist.dim, learnt_dist_manager.target_dist.dim,
+                            figsize=(3*learnt_dist_manager.target_dist.dim, 3 * learnt_dist_manager.target_dist.dim),
+                            sharex="row", sharey="row")
+    for i in range(learnt_dist_manager.target_dist.dim):
+        for j in range(learnt_dist_manager.target_dist.dim):
+            if i != j:
+                axs[i, j].plot(samples_q[:, i], samples_q[:, j], "o", alpha=alpha)
+    if title is not None:
+        fig.suptitle(title)
+    plt.tight_layout()
 
 def plot_samples_vs_contours_many_well(learnt_dist_manager, n_samples=1000, bounds=([-3, 3], [-3, 3]),
                                        n_points_contour=100, title=None, samples_q=None,
