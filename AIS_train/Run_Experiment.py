@@ -61,7 +61,6 @@ def run_experiment(dim, save_path, epochs, n_flow_steps, n_distributions,
 
     plot_history(history)
     if save:
-        tester.learnt_sampling_dist.save_model(save_path)
         plt.savefig(str(save_path / "histories.png"))
     plt.show()
     torch.manual_seed(2)
@@ -123,6 +122,6 @@ if __name__ == '__main__':
                 f"{dim}dim_{flow_type}_epochs{epochs}_flowsteps{n_flow_steps}_dist{n_distributions}__{current_time}"
     print(f"running experiment {save_path} \n\n")
     run_experiment(dim, save_path, epochs, n_flow_steps, n_distributions,
-                   flow_type, save=False, n_samples_expectation=int(1e3), train_AIS_params=False,
+                   flow_type, save=True, n_samples_expectation=int(1e3), train_AIS_params=False,
                    learnt_dist_kwargs=learnt_dist_kwargs)
     print(f"\n\nfinished running experiment {save_path}")

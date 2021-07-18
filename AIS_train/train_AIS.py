@@ -1,4 +1,4 @@
-
+import pandas as pd
 
 from FittedModels.train import LearntDistributionManager
 from FittedModels.utils.plotting_utils import plot_samples
@@ -97,7 +97,9 @@ class AIS_trainer(LearntDistributionManager):
               jupyter=False, n_progress_updates=50, save=False, save_path=None):
         if save is True:
             assert save_path is not None
-            save_path = save_path / "training"
+            from datetime import datetime
+            current_time = datetime.now().strftime("%Y_%m_%d-%I_%M_%S_%p")
+            save_path = save_path / f"training{current_time}"
             save_path.mkdir(parents=True, exist_ok=False)
         if jupyter:
             from tqdm import tqdm_notebook as tqdm
@@ -216,6 +218,11 @@ class AIS_trainer(LearntDistributionManager):
                                 if save:
                                     plt.savefig(str(save_path / f"Resampled_epoch{self.current_epoch}.png"))
                                 plt.show()
+        if save:
+            import pickle
+            with open(str(save_path / "history.pkl"), "wb") as f:
+                pickle.dump(history, f)
+            self.learnt_sampling_dist.save_model(save_path)
         return history
 
     def dreg_alpha_divergence_loss(self, log_w, drop_nans_and_infs=True):
