@@ -25,14 +25,13 @@ def plotter(tester, n_samples=int(1e3),
 if __name__ == '__main__':
     torch.manual_seed(2)
     n_plots = 5
-    epochs = 100
+    epochs = 10
     step_size = 1.0
     batch_size = int(1e3)
 
     n_samples_estimation = int(1e4)
     flow_type = "ReverseIAF"  # "ReverseIAF_MIX" #"ReverseIAF" #IAF"  # "RealNVP"
     n_flow_steps = 3
-
 
     target = FastPosteriorBNN(weight_batch_size=batch_size, n_datapoints=10, x_dim=2, y_dim=1, n_hidden_layers=1, layer_width=3
                              , linear_activations=False, fixed_variance=False, use_bias=True)

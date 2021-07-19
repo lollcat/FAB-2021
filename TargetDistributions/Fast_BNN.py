@@ -1,3 +1,5 @@
+import itertools
+
 import torch
 import torch.nn.functional as F
 import torch.nn as nn
@@ -110,7 +112,7 @@ class Target(nn.Module):
     """
     def __init__(self, x_dim=2, y_dim=2, n_hidden_layers=2, layer_width=10,
                  fixed_variance=False, linear_activations=False, use_bias=True, linear_activations_output=True,
-                 prior_x_scaling=10.0):
+                 prior_x_scaling=30.0):
         super(Target, self).__init__()
         self.model = BNN_Fast(weight_batch_size=1, x_dim=x_dim, y_dim=y_dim, n_hidden_layers=n_hidden_layers,
                               layer_width=layer_width, fixed_variance=fixed_variance,
@@ -118,6 +120,7 @@ class Target(nn.Module):
                               linear_activations_output=linear_activations_output)
         self.register_buffer("prior_loc", torch.zeros(x_dim))
         self.register_buffer("prior_covariance", torch.eye(x_dim)*prior_x_scaling)
+        self.register_buffer("flat_weights", self.get_flat_weights())
 
     @property
     def prior(self):
@@ -129,6 +132,20 @@ class Target(nn.Module):
         x = self.prior.sample((n_points,))[:, None, :] # expand dim as in this case the we have a weight_batch_size=1
         y = self.model(x)
         return x, y
+
+
+    def get_flat_weights(self):
+        # to check this, make sure that if we run self.model.set_parameters(w_flat) that nothing changes
+        w_flat = torch.zeros((1, self.model.n_parameters))
+        param_counter = 0
+        for name, parameter in self.model.named_parameters():
+            n_params = parameter.numel()
+            w_flat[:, param_counter:param_counter + n_params] = torch.flatten(parameter)
+            param_counter += n_params
+        return w_flat
+
+
+
 
 class FastPosteriorBNN(BaseTargetDistribution):
     """
@@ -155,6 +172,54 @@ class FastPosteriorBNN(BaseTargetDistribution):
         self.register_buffer("Y", Y)
         self.batch_size_changed = False
         self.device = "cpu"  # initialised onto cpu
+        self.register_buffer("equivalent_w_flat_from_symmetry", self.generate_dataset_from_symmetries())
+
+    def test_set(self, device):
+        assert device == self.device
+        return self.equivalent_w_flat_from_symmetry
+
+
+    @torch.no_grad()
+    def generate_dataset_from_symmetries(self, named_params=None):
+        if self.model_kwargs["n_hidden_layers"] == 0:
+            print("no hidden layers, so no symetries")
+            return self.target.flat_weights
+        permutations = list(itertools.permutations(list(range(self.model_kwargs["layer_width"]))))
+        n_permutations = len(permutations)
+        # state dicts are just to keep track of things, but equivalent_w_flat is what we will use
+        if named_params is None:
+            named_params = self.target.model.named_parameters()
+        equivalent_state_dicts = [self.target.model.state_dict() for _ in
+                                  range(n_permutations)]
+        equivalent_w_flat = torch.zeros((n_permutations, self.n_parameters))
+        param_counter = 0
+        for name, parameter in named_params:
+            n_params = parameter.numel()
+            for i, perumutation in enumerate(permutations):
+                if "hidden_layers" in name:
+                    if "bias" in name:
+                        layer_symmetry = parameter[:, perumutation]
+                    else:
+                        if "0" in name: # first layer
+                            layer_symmetry = parameter[:, :, perumutation]
+                        else:
+                            # layer to layer connection
+                            layer_symmetry = parameter[:, :, perumutation][:, perumutation, :]
+                    equivalent_state_dicts[i][name] = layer_symmetry
+                    equivalent_w_flat[i, param_counter:param_counter + n_params] = torch.flatten(layer_symmetry)
+                else:  # final layer
+                    if "weight" in name:
+                        layer_symmetry = parameter[:, perumutation, :]
+                        equivalent_state_dicts[i][name] = layer_symmetry
+                        equivalent_w_flat[i, param_counter:param_counter + n_params] = torch.flatten(layer_symmetry)
+                    else: # if bias then there is no syymetry,
+                        layer_symmetry = parameter
+                        equivalent_state_dicts[i][name] = layer_symmetry
+                        equivalent_w_flat[i, param_counter:param_counter + n_params] = torch.flatten(layer_symmetry)
+
+            param_counter += n_params
+        return equivalent_w_flat
+
 
     def to(self, device):
         self.device = device
@@ -188,6 +253,12 @@ class FastPosteriorBNN(BaseTargetDistribution):
         return torch.distributions.multivariate_normal.MultivariateNormal(
             loc=self.prior_loc, covariance_matrix=self.prior_covariance)
 
+def check_consistent_weight_flattening(posterior_bnn):
+    set_1 = [param for param in posterior_bnn.target.model.parameters()]
+    posterior_bnn.target.model.set_parameters(posterior_bnn.target.flat_weights)
+    set_2 = [param for param in posterior_bnn.target.model.parameters()]
+    print([s1 == s2 for s1, s2 in zip(set_1, set_2)])
+
 if __name__ == '__main__':
     posterior_bnn = FastPosteriorBNN(n_datapoints=2, x_dim=1, y_dim=1, n_hidden_layers=0, layer_width=0
                                  , linear_activations=False, fixed_variance=True, use_bias=True,
@@ -202,8 +273,13 @@ if __name__ == '__main__':
 
     #""" test whole thing
     weight_batch_size = 5
-    posterior_bnn = FastPosteriorBNN(weight_batch_size=weight_batch_size, n_datapoints=10, x_dim=2, y_dim=2, n_hidden_layers=1, layer_width=3,
+    posterior_bnn = FastPosteriorBNN(weight_batch_size=weight_batch_size, n_datapoints=10, x_dim=2, y_dim=2, n_hidden_layers=2, layer_width=3,
                                      fixed_variance=True)
+    equivalent_w_flat = posterior_bnn.generate_dataset_from_symmetries()
+    print(posterior_bnn.log_prob(equivalent_w_flat))
+    print(posterior_bnn.log_prob(posterior_bnn.target.flat_weights))
+    check_consistent_weight_flattening(posterior_bnn)
+    print(posterior_bnn.test_set("cpu").shape)
     posterior_bnn.to("cuda")
     for _ in range(5):
         samples_w = torch.randn(weight_batch_size, posterior_bnn.model.n_parameters).to("cuda")
