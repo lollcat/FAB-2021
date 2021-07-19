@@ -7,6 +7,30 @@ import torch.nn as nn
 from TargetDistributions.base import BaseTargetDistribution
 
 
+def plot_data_generating_process(posterior_bnn):
+    x_space = torch.linspace(-15, 15, 20)[:, None, None]
+    posterior = posterior_bnn.target.model.posterior_y_given_x(x_space)
+    mean = posterior.loc.detach()
+    upper_bound = torch.squeeze(mean) + torch.squeeze(torch.sqrt(posterior.covariance_matrix) * 1.96).detach()
+    lower_bound = torch.squeeze(mean) - torch.squeeze(torch.sqrt(posterior.covariance_matrix) * 1.96).detach()
+
+    plt.plot(torch.squeeze(posterior_bnn.X), torch.squeeze(posterior_bnn.Y), "o", label="dataset")
+    plt.plot(torch.squeeze(x_space), torch.squeeze(mean), "-", c="black", label="mean")
+    plt.plot(torch.squeeze(x_space), torch.squeeze(upper_bound), "--", c="black", label="1.96 std")
+    plt.legend()
+    plt.plot(torch.squeeze(x_space), torch.squeeze(lower_bound), "--", c="black")
+
+def plot_fitted_model(samples_w , posterior_bnn, bound=15):
+    posterior_bnn.set_model_parameters(samples_w)
+    x_space = torch.linspace(-bound, bound, 20)[:, None, None].to(posterior_bnn.device)
+    posterior = posterior_bnn.model.posterior_y_given_x(x_space)
+    mean = torch.squeeze(posterior.loc.detach())
+    plt.plot(torch.squeeze(x_space), torch.squeeze(mean), "-", c="black", alpha=0.5)
+    plt.plot(torch.squeeze(posterior_bnn.X), torch.squeeze(posterior_bnn.Y), "o")
+    plt.legend()
+
+
+
 class custom_layer(nn.Module):
     # designed to compute a forward pass for a batch of weights
     def __init__(self, weight_batch_size, layer_width, input_dim, linear_activations=False, use_bias=True):
@@ -114,6 +138,7 @@ class Target(nn.Module):
                  fixed_variance=False, linear_activations=False, use_bias=True, linear_activations_output=True,
                  prior_x_scaling=30.0):
         super(Target, self).__init__()
+        self.x_dim = x_dim
         self.model = BNN_Fast(weight_batch_size=1, x_dim=x_dim, y_dim=y_dim, n_hidden_layers=n_hidden_layers,
                               layer_width=layer_width, fixed_variance=fixed_variance,
                         linear_activations=linear_activations, use_bias=use_bias,
@@ -132,6 +157,18 @@ class Target(nn.Module):
         x = self.prior.sample((n_points,))[:, None, :] # expand dim as in this case the we have a weight_batch_size=1
         y = self.model(x)
         return x, y
+
+    def generate_nice_dataset(self, n_datapoints):
+        assert self.x_dim == 1  # "only works for 1 dimensional x
+        x, y = self.sample(n_datapoints*10)
+        bottom_x = n_datapoints // 2
+        top_x = n_datapoints - bottom_x
+        indices = torch.argsort(torch.squeeze(x))
+        indices_selected = torch.cat([indices[0:bottom_x], indices[-top_x:]])
+        x = x[indices_selected]
+        y = y[indices_selected]
+        return x, y
+
 
 
     def get_flat_weights(self):
@@ -167,7 +204,7 @@ class FastPosteriorBNN(BaseTargetDistribution):
         self.target = Target(x_dim, y_dim, n_hidden_layers, layer_width,
                              linear_activations=linear_activations, fixed_variance=fixed_variance, use_bias=use_bias,
                              linear_activations_output=linear_activations_output)
-        X, Y = self.target.sample(n_datapoints)
+        X, Y = self.target.generate_nice_dataset(n_datapoints) #sample(n_datapoints)
         self.register_buffer("X", X)
         self.register_buffer("Y", Y)
         self.batch_size_changed = False
@@ -273,8 +310,10 @@ if __name__ == '__main__':
 
     #""" test whole thing
     weight_batch_size = 5
-    posterior_bnn = FastPosteriorBNN(weight_batch_size=weight_batch_size, n_datapoints=10, x_dim=2, y_dim=2, n_hidden_layers=2, layer_width=3,
+    posterior_bnn = FastPosteriorBNN(weight_batch_size=weight_batch_size, n_datapoints=10, x_dim=1, y_dim=1, n_hidden_layers=2, layer_width=3,
                                      fixed_variance=True)
+    plot_data_generating_process(posterior_bnn)
+    plt.show()
     equivalent_w_flat = posterior_bnn.generate_dataset_from_symmetries()
     print(posterior_bnn.log_prob(equivalent_w_flat))
     print(posterior_bnn.log_prob(posterior_bnn.target.flat_weights))

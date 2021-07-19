@@ -33,7 +33,7 @@ if __name__ == '__main__':
     flow_type = "ReverseIAF"  # "ReverseIAF_MIX" #"ReverseIAF" #IAF"  # "RealNVP"
     n_flow_steps = 3
 
-    target = FastPosteriorBNN(weight_batch_size=batch_size, n_datapoints=10, x_dim=2, y_dim=1, n_hidden_layers=1, layer_width=3
+    target = FastPosteriorBNN(weight_batch_size=batch_size, n_datapoints=10, x_dim=1, y_dim=1, n_hidden_layers=1, layer_width=3
                              , linear_activations=False, fixed_variance=False, use_bias=True)
     dim = target.n_parameters
     print(f"running a BNN with {dim} weights")
