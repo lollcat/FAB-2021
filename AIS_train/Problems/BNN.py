@@ -49,4 +49,5 @@ if __name__ == '__main__':
                            plotting_func=plotter, n_plots=n_plots)
     plot_history(history)
     plt.show()
+    
 

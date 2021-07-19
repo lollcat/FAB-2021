@@ -7,26 +7,33 @@ import torch.nn as nn
 from TargetDistributions.base import BaseTargetDistribution
 
 
-def plot_data_generating_process(posterior_bnn):
-    x_space = torch.linspace(-15, 15, 20)[:, None, None]
+def plot_data_generating_process(posterior_bnn, bound=15):
+    x_space = torch.linspace(-bound, bound, 20)[:, None, None].to(posterior_bnn.device)
     posterior = posterior_bnn.target.model.posterior_y_given_x(x_space)
     mean = posterior.loc.detach()
-    upper_bound = torch.squeeze(mean) + torch.squeeze(torch.sqrt(posterior.covariance_matrix) * 1.96).detach()
-    lower_bound = torch.squeeze(mean) - torch.squeeze(torch.sqrt(posterior.covariance_matrix) * 1.96).detach()
+    upper_bound = (torch.squeeze(mean) + torch.squeeze(torch.sqrt(posterior.covariance_matrix) * 1.96).detach())
+    lower_bound = (torch.squeeze(mean) - torch.squeeze(torch.sqrt(posterior.covariance_matrix) * 1.96).detach())
+    mean = torch.squeeze(mean).cpu()
+    upper_bound = torch.squeeze(upper_bound).cpu()
+    lower_bound = torch.squeeze(lower_bound ).cpu()
+    x_space = torch.squeeze(x_space).cpu()
+    X_points, Y_points = torch.squeeze(posterior_bnn.X.cpu()), torch.squeeze(posterior_bnn.Y).cpu()
 
-    plt.plot(torch.squeeze(posterior_bnn.X), torch.squeeze(posterior_bnn.Y), "o", label="dataset")
-    plt.plot(torch.squeeze(x_space), torch.squeeze(mean), "-", c="black", label="mean")
-    plt.plot(torch.squeeze(x_space), torch.squeeze(upper_bound), "--", c="black", label="1.96 std")
+    plt.plot(X_points, Y_points, "o", label="dataset")
+    plt.plot( x_space, mean, "-", c="black", label="mean")
+    plt.plot( x_space, upper_bound, "--", c="black", label="1.96 std")
     plt.legend()
-    plt.plot(torch.squeeze(x_space), torch.squeeze(lower_bound), "--", c="black")
+    plt.plot(x_space, lower_bound, "--", c="black")
 
 def plot_fitted_model(samples_w , posterior_bnn, bound=15):
     posterior_bnn.set_model_parameters(samples_w)
     x_space = torch.linspace(-bound, bound, 20)[:, None, None].to(posterior_bnn.device)
     posterior = posterior_bnn.model.posterior_y_given_x(x_space)
-    mean = torch.squeeze(posterior.loc.detach())
-    plt.plot(torch.squeeze(x_space), torch.squeeze(mean), "-", c="black", alpha=0.5)
-    plt.plot(torch.squeeze(posterior_bnn.X), torch.squeeze(posterior_bnn.Y), "o")
+    mean = torch.squeeze(posterior.loc.detach()).cpu()
+    x_space = torch.squeeze(x_space).cpu()
+    X_points, Y_points = torch.squeeze(posterior_bnn.X.cpu()), torch.squeeze(posterior_bnn.Y).cpu()
+    plt.plot(x_space, mean, "-", c="black", alpha=0.5)
+    plt.plot(X_points, Y_points, "o")
     plt.legend()
 
 
@@ -136,7 +143,7 @@ class Target(nn.Module):
     """
     def __init__(self, x_dim=2, y_dim=2, n_hidden_layers=2, layer_width=10,
                  fixed_variance=False, linear_activations=False, use_bias=True, linear_activations_output=True,
-                 prior_x_scaling=30.0):
+                 prior_x_scaling=100.0):
         super(Target, self).__init__()
         self.x_dim = x_dim
         self.model = BNN_Fast(weight_batch_size=1, x_dim=x_dim, y_dim=y_dim, n_hidden_layers=n_hidden_layers,
