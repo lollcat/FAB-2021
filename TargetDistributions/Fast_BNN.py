@@ -3,6 +3,7 @@ import itertools
 import torch
 import torch.nn.functional as F
 import torch.nn as nn
+import matplotlib.pyplot as plt
 
 from TargetDistributions.base import BaseTargetDistribution
 
