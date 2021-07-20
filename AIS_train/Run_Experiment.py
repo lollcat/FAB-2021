@@ -6,8 +6,7 @@ if not os.getcwd() in sys.path:
     sys.path.append(os.getcwd())
 import torch
 from Utils.plotting_utils import multipage
-from TargetDistributions.DoubleWell import ManyWellEnergy
-from FittedModels.utils.plotting_utils import plot_samples_vs_contours_many_well
+
 
 from FittedModels.Models.FlowModel import FlowModel
 from AIS_train.train_AIS import AIS_trainer
@@ -21,13 +20,12 @@ from Utils.numerical_utils import MC_estimate_true_expectation
 from Utils.numerical_utils import quadratic_function as expectation_function
 from Utils.DebuggingUtils import print_memory_stats
 
-def plotter(*args, **kwargs):
-    plot_samples_vs_contours_many_well(*args, **kwargs)
+
 
 def run_experiment(dim, save_path, epochs, n_flow_steps, n_distributions,
                    flow_type="ReverseIAF", batch_size=int(1e3), seed=0,
                    n_samples_expectation=int(1e5), save=True, n_plots=5, train_AIS_params=False,
-                   step_size=1.0, learnt_dist_kwargs={"lr": 1e-4}):
+                   step_size=1.0, learnt_dist_kwargs={"lr": 1e-4}, problem="ManyWell"):
     local_var_dict = locals().copy()
     summary_results = "*********     Parameters      *******************\n\n"  # for writing to file
     for key in local_var_dict:
@@ -40,9 +38,34 @@ def run_experiment(dim, save_path, epochs, n_flow_steps, n_distributions,
 
     torch.set_default_dtype(torch.float64)
     torch.manual_seed(seed)
-    target = ManyWellEnergy(dim=dim, a=-0.5, b=-6)
+    if problem == "ManyWell":
+        from TargetDistributions.DoubleWell import ManyWellEnergy
+        from FittedModels.utils.plotting_utils import plot_samples_vs_contours_many_well
+        target = ManyWellEnergy(dim=dim, a=-0.5, b=-6)
+        def plotter(*args, **kwargs):
+            plot_samples_vs_contours_many_well(*args, **kwargs)
 
-    learnt_sampler = FlowModel(x_dim=dim, scaling_factor=2.0, flow_type=flow_type,
+        scaling_factor_flow = 2.0
+    elif problem == "MoG":
+        from TargetDistributions.MoG import MoG
+        from FittedModels.utils.plotting_utils import plot_marginals
+        target = MoG(dim, diagonal_covariance=False, cov_scaling=0.1, min_cov=0.0, loc_scaling=8.0, n_mixes=dim,
+                     uniform_component_probs=True)
+        scaling_factor_flow = 2.0
+        samples_target = target.sample((batch_size,)).detach().cpu()
+        clamp_at = float(torch.max(samples_target))
+        plot_marginals(None, n_samples=None, title=f"samples from target",
+                samples_q=samples_target, dim=dim, clamp_samples=float(torch.max(torch.abs(samples_target))))
+        if save:
+            plt.savefig(str(save_path / "target_samples.png"))
+        plt.show()
+        def plotter(*args, **kwargs):
+            plot_marginals(*args, **kwargs, clamp_samples=clamp_at)
+
+    else:
+        raise Exception
+
+    learnt_sampler = FlowModel(x_dim=dim, scaling_factor=scaling_factor_flow, flow_type=flow_type,
                                n_flow_steps=n_flow_steps)
     tester = AIS_trainer(target, learnt_sampler, loss_type=False, n_distributions=n_distributions
                          , n_steps_transition_operator=1,
@@ -79,9 +102,8 @@ def run_experiment(dim, save_path, epochs, n_flow_steps, n_distributions,
     summary_results += f"ESS for samples from AIS of repeat calc " \
                        f"{info_dict['effective_sample_size'].item() / n_samples_expectation}" \
                        f" calculated using {n_samples_expectation} samples \n"
-    plot_samples_vs_contours_many_well(tester, n_samples=None,
-                                       title=f"training epoch, samples from AIS",
-                                       samples_q=info_dict["samples"], alpha=0.01)
+    plotter(tester, n_samples=None, title=f"Samples from AIS after training",
+            samples_q=info_dict["samples"], alpha=0.01)
     if save:
         plt.savefig(str(save_path / "plots_AIS_samples_final.png"))
     plt.show()
@@ -90,9 +112,8 @@ def run_experiment(dim, save_path, epochs, n_flow_steps, n_distributions,
                                                                   expectation_function=expectation_function,
                                                                   batch_size=batch_size,
                                                                   drop_nan_and_infs=True)
-    plot_samples_vs_contours_many_well(tester, n_samples=None,
-                                       title=f"training epoch, samples from flow",
-                                       samples_q=info_dict_flo["samples"], alpha=0.01)
+    plotter(tester, n_samples=None, title=f"Samples from flow after trainin",
+            samples_q=info_dict_flo["samples"], alpha=0.01)
     if save:
         plt.savefig(str(save_path / "plots_flo_samples_final.png"))
     plt.show()
@@ -109,10 +130,11 @@ def run_experiment(dim, save_path, epochs, n_flow_steps, n_distributions,
 
 
 if __name__ == '__main__':
-    testing_local = False
+    testing_local = True
     if not testing_local:
         from datetime import datetime
         current_time = datetime.now().strftime("%Y_%m_%d-%I_%M_%S_%p")
+        problem = "ManyWell"
         dim = 64
         epochs = int(1e5)
         n_flow_steps = 20
@@ -128,14 +150,15 @@ if __name__ == '__main__':
         print(f"running experiment {save_path} \n\n")
         run_experiment(dim, save_path, epochs, n_flow_steps, n_distributions,
                        flow_type, learnt_dist_kwargs=learnt_dist_kwargs, train_AIS_params=False, n_plots=n_plots,
-                       batch_size=batch_size, n_samples_expectation=n_samples_expectation)
+                       batch_size=batch_size, n_samples_expectation=n_samples_expectation, problem=problem)
         print(f"\n\nfinished running experiment {save_path}")
 
     else:
         from datetime import datetime
         current_time = datetime.now().strftime("%Y_%m_%d-%I_%M_%S_%p")
-        dim = 2
-        epochs = 5
+        problem = "ManyWell" # "MoG" #
+        dim = 4
+        epochs = 2
         n_flow_steps = 2
         n_distributions = 3
         experiment_name = "testing5"
@@ -145,6 +168,6 @@ if __name__ == '__main__':
                     f"{dim}dim_{flow_type}_epochs{epochs}_flowsteps{n_flow_steps}_dist{n_distributions}__{current_time}"
         print(f"running experiment {save_path} \n\n")
         run_experiment(dim, save_path, epochs, n_flow_steps, n_distributions,
-                       flow_type, save=True, n_samples_expectation=int(1e3), train_AIS_params=False,
-                       learnt_dist_kwargs=learnt_dist_kwargs)
-        print(f"\n\nfinished running experiment {save_path}")
+                       flow_type, save=False, n_samples_expectation=int(1e3), train_AIS_params=False,
+                       learnt_dist_kwargs=learnt_dist_kwargs, problem=problem)
+        print(f"\n\n finished running experiment {save_path}")

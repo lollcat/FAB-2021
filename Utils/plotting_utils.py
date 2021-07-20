@@ -12,7 +12,7 @@ def plot_marginals(distribution, n_samples=1000, title=None, samples_q=None,
     if samples_q is None:
         samples_q = distribution.sample((n_samples,))
     samples_q = torch.clamp(samples_q, -clamp_samples, clamp_samples).cpu().detach().numpy()
-    fig, axs = plt.subplots(distribution.dim, distribution.target_dist.dim,
+    fig, axs = plt.subplots(distribution.dim, distribution.dim,
                             figsize=(3*distribution.dim, 3 * distribution.dim),
                             sharex="row", sharey="row")
     for i in range(distribution.dim):

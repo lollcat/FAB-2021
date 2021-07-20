@@ -42,25 +42,35 @@ class custom_MoG(BaseTargetDistribution):
 class MoG(BaseTargetDistribution):
     # mog with random mean and var
     def __init__(self, dim : int =2, n_mixes: int =5,
-                 min_cov: float=0.5, loc_scaling: float=3.0):
+                 min_cov: float=0.5, loc_scaling: float=3.0, diagonal_covariance=True,
+                 cov_scaling=1.0, uniform_component_probs = False):
         super(MoG, self).__init__()
         self.dim = dim
         self.n_mixes = n_mixes
         self.distributions = []
         locs = []
-        covs = []
+        scale_trils = []
         for i in range(n_mixes):
             loc = torch.randn(dim)*loc_scaling
-            covariance = torch.diag(torch.rand(dim) + min_cov)
+            if diagonal_covariance:
+                scale_tril = torch.diag(torch.rand(dim)*cov_scaling + min_cov)
+            else:
+                # https://stackoverflow.com/questions/58176501/how-do-you-generate-positive-definite-matrix-in-pytorch
+                Sigma_k = torch.rand(dim, dim) * cov_scaling + min_cov
+                Sigma_k = torch.mm(Sigma_k, Sigma_k.t())
+                Sigma_k.add_(torch.eye(dim))
+                scale_tril = torch.tril(Sigma_k)
             locs.append(loc[None, :])
-            covs.append(covariance[None, :, :])
+            scale_trils.append(scale_tril[None, :, :])
 
         locs = torch.cat(locs)
-        covs = torch.cat(covs)
-
-        self.register_buffer("cat_probs", torch.rand(n_mixes))
+        scale_trils = torch.cat(scale_trils)
+        if uniform_component_probs:
+             self.register_buffer("cat_probs", torch.ones(n_mixes))
+        else:
+            self.register_buffer("cat_probs", torch.rand(n_mixes))
         self.register_buffer("locs", locs)
-        self.register_buffer("covs", covs)
+        self.register_buffer("scale_trils", scale_trils)
         self.distribution = self.get_distribution
 
     def to(self, device):
@@ -70,7 +80,7 @@ class MoG(BaseTargetDistribution):
     @property
     def get_distribution(self):
         mix = torch.distributions.Categorical(self.cat_probs)
-        com = torch.distributions.MultivariateNormal(self.locs, self.covs)
+        com = torch.distributions.MultivariateNormal(self.locs, scale_tril=self.scale_trils)
         return torch.distributions.MixtureSameFamily(mixture_distribution=mix, component_distribution=com)
 
     def log_prob(self, x: torch.Tensor):
@@ -146,13 +156,19 @@ class Difficult_MoG(BaseTargetDistribution):
 
 if __name__ == '__main__':
     import matplotlib.pyplot as plt
-    from Utils.plotting_utils import plot_distribution
-    size = 2
-    dist = MoG(size)
+    size = 20
+    dist = MoG(size, diagonal_covariance=False, cov_scaling=0.1, min_cov=0.0, loc_scaling=8.0, n_mixes=size,
+               uniform_component_probs=True)
     samples = dist.sample((10,)) #torch.randn((10,size))
     log_probs = dist.log_prob(samples)
     print(log_probs)
     print(log_probs.shape)
-    plot_distribution(dist, n_points=300)
+    if size == 2:
+        from Utils.plotting_utils import plot_distribution
+        plot_distribution(dist, n_points=300)
+    else:
+        from Utils.plotting_utils import plot_marginals
+        plot_marginals(distribution=dist, n_samples=1000, clamp_samples=30)
+        plt.savefig("Mog_tst.png")
     plt.show()
     print(dist.sample((10,)))
