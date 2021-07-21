@@ -25,7 +25,8 @@ from Utils.DebuggingUtils import print_memory_stats
 def run_experiment(dim, save_path, epochs, n_flow_steps, n_distributions,
                    flow_type="ReverseIAF", batch_size=int(1e3), seed=0,
                    n_samples_expectation=int(1e5), save=True, n_plots=5, train_AIS_params=False,
-                   step_size=1.0, learnt_dist_kwargs={"lr": 1e-4}, problem="ManyWell"):
+                   step_size=1.0, learnt_dist_kwargs={"lr": 1e-4}, problem="ManyWell",
+                   non_default_flow_width = None):
     local_var_dict = locals().copy()
     summary_results = "*********     Parameters      *******************\n\n"  # for writing to file
     for key in local_var_dict:
@@ -45,13 +46,19 @@ def run_experiment(dim, save_path, epochs, n_flow_steps, n_distributions,
         def plotter(*args, **kwargs):
             plot_samples_vs_contours_many_well(*args, **kwargs)
 
-        scaling_factor_flow = 2.0
+        if non_default_flow_width is None:
+            scaling_factor_flow = 2.0
+        else:
+            scaling_factor_flow = non_default_flow_width
     elif problem == "MoG":
         from TargetDistributions.MoG import MoG
         from FittedModels.utils.plotting_utils import plot_marginals
         target = MoG(dim, diagonal_covariance=False, cov_scaling=0.1, min_cov=0.0, loc_scaling=8.0, n_mixes=dim,
                      uniform_component_probs=True)
-        scaling_factor_flow = 10.0
+        if non_default_flow_width is None:
+            scaling_factor_flow = 10.0
+        else:
+            scaling_factor_flow = non_default_flow_width
         samples_target = target.sample((batch_size,)).detach().cpu()
         clamp_at = float(torch.max(samples_target))
         plot_marginals(None, n_samples=None, title=f"samples from target",
