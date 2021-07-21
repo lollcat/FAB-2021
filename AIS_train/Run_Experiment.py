@@ -51,7 +51,7 @@ def run_experiment(dim, save_path, epochs, n_flow_steps, n_distributions,
         from FittedModels.utils.plotting_utils import plot_marginals
         target = MoG(dim, diagonal_covariance=False, cov_scaling=0.1, min_cov=0.0, loc_scaling=8.0, n_mixes=dim,
                      uniform_component_probs=True)
-        scaling_factor_flow = 2.0
+        scaling_factor_flow = 10.0
         samples_target = target.sample((batch_size,)).detach().cpu()
         clamp_at = float(torch.max(samples_target))
         plot_marginals(None, n_samples=None, title=f"samples from target",
@@ -141,7 +141,7 @@ if __name__ == '__main__':
         n_distributions = 2 + 4
         batch_size = int(3e3)
         n_samples_expectation = int(batch_size * 100)
-        experiment_name = "mogdog_AdamW_lower_lr_bigger_batch"
+        experiment_name = "mogdog_AdamW_bigger_batch"
         n_plots = 20
         learnt_dist_kwargs = {"lr": 1e-4, "optimizer": "AdamW"}
         flow_type = "ReverseIAF" # "RealNVP"

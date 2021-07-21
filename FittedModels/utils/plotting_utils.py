@@ -20,9 +20,9 @@ def plot_marginals(learnt_dist_manager, n_samples=1000, title=None, samples_q=No
             if i != j:
                 axs[i, j].plot(samples_q[:, i], samples_q[:, j], "o", alpha=alpha)
                 axs[i, j].set_xlim(-clamp_samples, clamp_samples)
+    plt.tight_layout()
     if title != None:
         fig.suptitle(title)
-    plt.tight_layout()
 
 def plot_samples_vs_contours_many_well(learnt_dist_manager, n_samples=1000,
                                        n_points_contour=100, title=None, samples_q=None,
