@@ -35,7 +35,8 @@ class HMC(BaseTransitionModel):
         self.target_p_accept = target_p_accept
         self.first_dist_p_accepts = [torch.tensor([0.0]) for _ in range(n_outer)]
         self.last_dist_p_accepts = [torch.tensor([0.0]) for _ in range(n_outer)]
-        self.distance_sqrd = 0
+        self.weighted_mean_square_distance = 0
+        self.average_distance = 0
 
     def register_nan_hooks(self):
         for parameter in self.parameters():
@@ -57,12 +58,12 @@ class HMC(BaseTransitionModel):
                 interesting_dict[f"epsilons_0_0_-1"] = self.get_epsilon(0, 0)[-1].cpu().item()
                 interesting_dict[f"epsilons_0_-1_0"] = self.get_epsilon(0, self.n_outer-1)[0].cpu().item()
                 interesting_dict[f"epsilons_0_-1_-1"] = self.get_epsilon(0, self.n_outer - 1)[-1].cpu().item()
-                interesting_dict["distance**2"] = self.distance_sqrd
             else:
                 interesting_dict["epsilon_shared"] = self.common_epsilon.item()
                 interesting_dict[f"epsilons_0_0"] = self.epsilons[0, 0].cpu().item()
                 interesting_dict[f"epsilons_0_-1"] = self.epsilons[0, -1].cpu().item()
-                interesting_dict["distance**2"] = self.distance_sqrd
+            interesting_dict["average_distance"] = self.average_distance
+            interesting_dict[f"p_accept_weighted_mean_square_distance"] = self.weighted_mean_square_distance
         return interesting_dict
 
     def get_epsilon(self, i, n):
@@ -126,7 +127,7 @@ class HMC(BaseTransitionModel):
                     self.epsilons[i, n] = self.epsilons[i, n] / 1.1
                     self.common_epsilon = self.common_epsilon / 1.05
             if self.train_params:
-                if p_accept < 0.05:
+                if p_accept < 0.05 or (self.counter < 100 and p_accept < 0.5):
                     # if p_accept is very low manually decrease step size, as this means that no acceptances so no
                     # gradient flow to use
                     self.epsilons[f"{i}_{n}"].data = self.epsilons[f"{i}_{n}"].data / 1.5
@@ -139,11 +140,13 @@ class HMC(BaseTransitionModel):
             elif i == self.n_distributions - 3:
                 self.last_dist_p_accepts[n] = torch.mean(acceptance_probability).cpu().detach()
 
-        distance_sqrd = torch.mean((original_q - current_q) ** 2)
-        self.distance_sqrd = distance_sqrd.detach()
+        distance = torch.linalg.norm(original_q - current_q, ord=2, dim=-1)
+        weighted_mean_square_distance = torch.mean(acceptance_probability*distance**2)
+        self.weighted_mean_square_distance = weighted_mean_square_distance.detach().cpu()
+        self.average_distance = torch.mean(distance.detach().cpu())
         if self.train_params:
             if self.tune_period is False or self.counter < self.tune_period:
-                loss = - distance_sqrd
+                loss = - weighted_mean_square_distance
                 if not (torch.isinf(loss) or torch.isnan(loss)):
                     loss.backward()
                     grad_norm = torch.nn.utils.clip_grad_norm_(self.parameters(), 1)
@@ -184,7 +187,7 @@ if __name__ == '__main__':
     learnt_sampler = DiagonalGaussian(dim=dim, log_std_initial_scaling=1.0)
     hmc = HMC(n_distributions=n_distributions_pretend, n_outer=1, epsilon=1.0, L=5, dim=dim, train_params=True,
               auto_adjust_step_size=False)
-    n = 1000
+    n = 500
     history = {}
     history.update(dict([(key, []) for key in hmc.interesting_info()]))
     for i in tqdm(range(n)):
