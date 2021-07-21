@@ -9,7 +9,7 @@ class HMC(BaseTransitionModel):
     """
     def __init__(self, n_distributions, epsilon, dim, n_outer=2, L=5, train_params=True,
                  target_p_accept=0.65, lr=1e-3, auto_adjust_step_size=False,
-                 tune_period=1000):
+                 tune_period=False):
         super(HMC, self).__init__()
         self.dim = dim
         self.train_params = train_params
@@ -18,10 +18,10 @@ class HMC(BaseTransitionModel):
             self.counter = 0
             self.epsilons = nn.ParameterDict()
             # have to store epsilons like this otherwise we get weird erros
-            self.epsilons["common"] = nn.Parameter(torch.tensor([epsilon]))
+            self.epsilons["common"] = nn.Parameter(torch.tensor([epsilon*0.5]))
             for i in range(n_distributions-2):
                 for n in range(n_outer):
-                    self.epsilons[f"{i}_{n}"] = nn.Parameter(torch.zeros(dim))
+                    self.epsilons[f"{i}_{n}"] = nn.Parameter(torch.ones(dim)*epsilon*0.5)
             self.optimizer = torch.optim.AdamW(self.parameters(), lr=lr)
             self.Monitor_NaN = Monitor_NaN()
             self.register_nan_hooks()
@@ -35,6 +35,7 @@ class HMC(BaseTransitionModel):
         self.target_p_accept = target_p_accept
         self.first_dist_p_accepts = [torch.tensor([0.0]) for _ in range(n_outer)]
         self.last_dist_p_accepts = [torch.tensor([0.0]) for _ in range(n_outer)]
+        self.distance_sqrd = 0
 
     def register_nan_hooks(self):
         for parameter in self.parameters():
@@ -53,11 +54,15 @@ class HMC(BaseTransitionModel):
             if self.train_params:
                 interesting_dict["epsilon_shared"] = self.epsilons["common"].item()
                 interesting_dict[f"epsilons_0_0_0"] = self.get_epsilon(0, 0)[0].cpu().item()
+                interesting_dict[f"epsilons_0_0_-1"] = self.get_epsilon(0, 0)[-1].cpu().item()
                 interesting_dict[f"epsilons_0_-1_0"] = self.get_epsilon(0, self.n_outer-1)[0].cpu().item()
+                interesting_dict[f"epsilons_0_-1_-1"] = self.get_epsilon(0, self.n_outer - 1)[-1].cpu().item()
+                interesting_dict["distance**2"] = self.distance_sqrd
             else:
                 interesting_dict["epsilon_shared"] = self.common_epsilon.item()
                 interesting_dict[f"epsilons_0_0"] = self.epsilons[0, 0].cpu().item()
                 interesting_dict[f"epsilons_0_-1"] = self.epsilons[0, -1].cpu().item()
+                interesting_dict["distance**2"] = self.distance_sqrd
         return interesting_dict
 
     def get_epsilon(self, i, n):
@@ -68,13 +73,13 @@ class HMC(BaseTransitionModel):
 
     def HMC_func(self, U, current_q, grad_U, i):
         # need this for grad function
-        current_q = current_q.clone().detach().requires_grad_(True)
-        current_q = torch.clone(current_q)  # so we can do in place operations, kinda weird hack
+        original_q = torch.clone(current_q).detach()
+        current_q = current_q.detach()  # block grad flow
         # base function for HMC written in terms of potential energy function U
         for n in range(self.n_outer):
             if self.train_params:
                 self.optimizer.zero_grad()
-            epsilon = self.get_epsilon(i, n)
+            epsilon = self.get_epsilon(i, n).detach()
             q = current_q
             p = torch.randn_like(q)
             current_p = p
@@ -83,6 +88,10 @@ class HMC(BaseTransitionModel):
 
             # Now loop through position and momentum leapfrogs
             for l in range(self.L):
+                if l == self.L - 1:
+                    epsilon = self.get_epsilon(i, n)
+                else:
+                    epsilon = self.get_epsilon(i, n).detach()
                 # Make full step for position
                 q = q + epsilon * p
                 # Make a full step for the momentum if not at end of trajectory
@@ -129,9 +138,12 @@ class HMC(BaseTransitionModel):
                 self.first_dist_p_accepts[n] = torch.mean(acceptance_probability).cpu().detach()
             elif i == self.n_distributions - 3:
                 self.last_dist_p_accepts[n] = torch.mean(acceptance_probability).cpu().detach()
+
+        distance_sqrd = torch.mean((original_q - current_q) ** 2)
+        self.distance_sqrd = distance_sqrd.detach()
         if self.train_params:
-            if self.counter < self.tune_period:
-                loss = torch.mean(U(current_q))
+            if self.tune_period is False or self.counter < self.tune_period:
+                loss = - distance_sqrd
                 if not (torch.isinf(loss) or torch.isnan(loss)):
                     loss.backward()
                     grad_norm = torch.nn.utils.clip_grad_norm_(self.parameters(), 1)
@@ -150,6 +162,7 @@ class HMC(BaseTransitionModel):
             return - log_q_x(x)
 
         def grad_U(q: torch.Tensor):
+            q = q.clone().detach().requires_grad_(True) #  need this to get gradients
             y = U(q)
             return torch.autograd.grad(y, q, grad_outputs=torch.ones_like(y))[0]
 
@@ -160,34 +173,43 @@ if __name__ == '__main__':
     torch.autograd.set_detect_anomaly(True)
     from TargetDistributions.MoG import MoG
     from FittedModels.Models.DiagonalGaussian import DiagonalGaussian
+    from FittedModels.utils.plotting_utils import plot_history
     import matplotlib.pyplot as plt
+    from tqdm import tqdm
     n_samples = 4000
-    n_distributions_pretend = 4
+    n_distributions_pretend = 3
     dim = 2
     torch.manual_seed(2)
     target = MoG(dim=dim, n_mixes=5, loc_scaling=5)
-    learnt_sampler = DiagonalGaussian(dim=dim, log_std_initial_scaling=2.0)
-    hmc = HMC(n_distributions=n_distributions_pretend, n_outer=40, epsilon=1.0, L=6, dim=dim, train_params=True,
+    learnt_sampler = DiagonalGaussian(dim=dim, log_std_initial_scaling=1.0)
+    hmc = HMC(n_distributions=n_distributions_pretend, n_outer=1, epsilon=1.0, L=5, dim=dim, train_params=True,
               auto_adjust_step_size=False)
-    n = 5
-    for i in range(n):
+    n = 1000
+    history = {}
+    history.update(dict([(key, []) for key in hmc.interesting_info()]))
+    for i in tqdm(range(n)):
         for j in range(n_distributions_pretend-2):
             sampler_samples = learnt_sampler(n_samples)[0]
             x_HMC = hmc.run(sampler_samples, target.log_prob, j)
-        if i == 0 or i == n-1:
-            print(hmc.interesting_info())
-
-
-    sampler_samples = sampler_samples.cpu().detach()
-    x_HMC = x_HMC.cpu().detach()
-    plt.plot(sampler_samples[:, 0], sampler_samples[:, 1], "o", alpha=0.5)
-    plt.title("sampler samples")
+        transition_operator_info = hmc.interesting_info()
+        for key in transition_operator_info:
+            history[key].append(transition_operator_info[key])
+        if i == 0 or i == n - 1 or i == int(n/2):
+            sampler_samples = sampler_samples.cpu().detach()
+            x_HMC = x_HMC.cpu().detach()
+            plt.plot(x_HMC[:, 0], x_HMC[:, 1], "o", alpha=0.5)
+            plt.title("HMC samples")
+            plt.show()
+    plot_history(history)
     plt.show()
-    plt.plot(x_HMC[:, 0], x_HMC[:, 1], "o", alpha=0.5)
-    plt.title("annealed samples")
-    plt.show()
+
     true_samples = target.sample((n_samples,)).cpu().detach()
     plt.plot(true_samples[:, 0], true_samples[:, 1], "o", alpha=0.5)
     plt.title("true samples")
     plt.show()
+
+    plt.plot(sampler_samples[:, 0], sampler_samples[:, 1], "o", alpha=0.5)
+    plt.title("sampler samples")
+    plt.show()
+
 

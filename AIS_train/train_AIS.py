@@ -363,7 +363,7 @@ if __name__ == '__main__':
     batch_size = int(1e3)
     dim = 2
     n_samples_estimation = int(1e4)
-    flow_type = "ReverseIAF"  #"ReverseIAF_MIX" #"ReverseIAF" #IAF"  # "RealNVP"
+    flow_type = "RealNVP" # "ReverseIAF"  #"ReverseIAF_MIX" #"ReverseIAF" #IAF"  #
     n_flow_steps = 5
     from TargetDistributions.MoG import Difficult_MoG
     #target = Difficult_MoG(loc_scaling = 3.0, cov_scaling=1.0)

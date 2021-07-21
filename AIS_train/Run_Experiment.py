@@ -145,7 +145,7 @@ if __name__ == '__main__':
         n_plots = 20
         learnt_dist_kwargs = {"lr": 1e-4, "optimizer": "AdamW"}
         flow_type = "ReverseIAF" # "RealNVP"
-        save_path = f"Results/{experiment_name}__" \
+        save_path = f"Results/{experiment_name}__{problem}" \
                     f"{dim}dim_{flow_type}_epochs{epochs}_flowsteps{n_flow_steps}_dist{n_distributions}__{current_time}"
         print(f"running experiment {save_path} \n\n")
         run_experiment(dim, save_path, epochs, n_flow_steps, n_distributions,
