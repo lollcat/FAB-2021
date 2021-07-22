@@ -54,10 +54,11 @@ class HMC(BaseTransitionModel):
                     interesting_dict[f"dist{self.n_distributions-3}_p_accept_{i}"] = val.item()
             if self.train_params:
                 interesting_dict["epsilon_shared"] = self.epsilons["common"].item()
-                interesting_dict[f"epsilons_0_0_0"] = self.get_epsilon(0, 0)[0].cpu().item()
-                interesting_dict[f"epsilons_0_0_-1"] = self.get_epsilon(0, 0)[-1].cpu().item()
-                interesting_dict[f"epsilons_0_-1_0"] = self.get_epsilon(0, self.n_outer-1)[0].cpu().item()
-                interesting_dict[f"epsilons_0_-1_-1"] = self.get_epsilon(0, self.n_outer - 1)[-1].cpu().item()
+
+                interesting_dict[f"epsilons_0_0_0"] = self.epsilons[f"{0}_{0}"][0].cpu().item()
+                interesting_dict[f"epsilons_0_0_-1"] = self.epsilons[f"{0}_{0}"][-1].cpu().item()
+                interesting_dict[f"epsilons_0_-1_0"] = self.epsilons[f"{0}_{self.n_outer-1}"][0].cpu().item()
+                interesting_dict[f"epsilons_0_-1_-1"] = self.epsilons[f"{0}_{self.n_outer-1}"][-1].cpu().item()
             else:
                 interesting_dict["epsilon_shared"] = self.common_epsilon.item()
                 interesting_dict[f"epsilons_0_0"] = self.epsilons[0, 0].cpu().item()
@@ -73,11 +74,13 @@ class HMC(BaseTransitionModel):
             return torch.abs(self.epsilons[i, n] + self.common_epsilon)
 
     def HMC_func(self, U, current_q, grad_U, i):
+        characteristic_length = torch.std(current_q.detach(), dim=0)
+        loss = 0
         # need this for grad function
-        original_q = torch.clone(current_q).detach()
         current_q = current_q.detach()  # block grad flow
         # base function for HMC written in terms of potential energy function U
         for n in range(self.n_outer):
+            original_q = torch.clone(current_q).detach()
             if self.train_params:
                 self.optimizer.zero_grad()
             epsilon = self.get_epsilon(i, n).detach()
@@ -140,10 +143,15 @@ class HMC(BaseTransitionModel):
             elif i == self.n_distributions - 3:
                 self.last_dist_p_accepts[n] = torch.mean(acceptance_probability).cpu().detach()
 
-        distance = torch.linalg.norm(original_q - current_q, ord=2, dim=-1)
-        weighted_mean_square_distance = torch.mean(acceptance_probability*distance**2)
-        self.weighted_mean_square_distance = weighted_mean_square_distance.detach().cpu()
-        self.average_distance = torch.mean(distance.detach().cpu())
+            distance = torch.linalg.norm((original_q - current_q)/characteristic_length, ord=2, dim=-1)
+            weighted_mean_square_distance = torch.mean(acceptance_probability*distance**2)
+            if i == 0:
+                self.weighted_mean_square_distance = weighted_mean_square_distance.detach().cpu()
+                self.average_distance = torch.mean(distance.detach().cpu())
+            if self.train_params:
+                if self.tune_period is False or self.counter < self.tune_period:
+                    loss = loss + 1.0/weighted_mean_square_distance \
+                           - weighted_mean_square_distance
         if self.train_params:
             if self.tune_period is False or self.counter < self.tune_period:
                 loss = - weighted_mean_square_distance
@@ -179,15 +187,16 @@ if __name__ == '__main__':
     from FittedModels.utils.plotting_utils import plot_history
     import matplotlib.pyplot as plt
     from tqdm import tqdm
-    n_samples = 4000
+    n_samples = 1000
     n_distributions_pretend = 3
     dim = 2
+    train_params = True
     torch.manual_seed(2)
     target = MoG(dim=dim, n_mixes=5, loc_scaling=5)
     learnt_sampler = DiagonalGaussian(dim=dim, log_std_initial_scaling=1.0)
-    hmc = HMC(n_distributions=n_distributions_pretend, n_outer=1, epsilon=1.0, L=5, dim=dim, train_params=True,
-              auto_adjust_step_size=False)
-    n = 500
+    hmc = HMC(n_distributions=n_distributions_pretend, n_outer=1, epsilon=1.0, L=5, dim=dim, train_params=train_params,
+              auto_adjust_step_size=not train_params)
+    n = 1000
     history = {}
     history.update(dict([(key, []) for key in hmc.interesting_info()]))
     for i in tqdm(range(n)):
@@ -198,7 +207,6 @@ if __name__ == '__main__':
         for key in transition_operator_info:
             history[key].append(transition_operator_info[key])
         if i == 0 or i == n - 1 or i == int(n/2):
-            sampler_samples = sampler_samples.cpu().detach()
             x_HMC = x_HMC.cpu().detach()
             plt.plot(x_HMC[:, 0], x_HMC[:, 1], "o", alpha=0.5)
             plt.title("HMC samples")
@@ -211,6 +219,7 @@ if __name__ == '__main__':
     plt.title("true samples")
     plt.show()
 
+    sampler_samples = learnt_sampler(n_samples)[0].cpu().detach()
     plt.plot(sampler_samples[:, 0], sampler_samples[:, 1], "o", alpha=0.5)
     plt.title("sampler samples")
     plt.show()
