@@ -7,14 +7,15 @@ class HMC(BaseTransitionModel):
     """
     Following: https: // arxiv.org / pdf / 1206.1901.pdf
     """
-    def __init__(self, n_distributions, epsilon, dim, n_outer=2, L=5, train_params=True,
-                 target_p_accept=0.65, lr=1e-3, auto_adjust_step_size=False,
-                 tune_period=False):
+    def __init__(self, n_distributions, dim, epsilon=1.0, n_outer=1, L=5, step_tuning_method="No-U",
+                 target_p_accept=0.65, lr=1e-3, tune_period=False):
         super(HMC, self).__init__()
+        assert step_tuning_method in ["p_accept", "Expected_target_prob", "No-U"]
         self.dim = dim
-        self.train_params = train_params
         self.tune_period = tune_period
-        if train_params:
+        self.step_tuning_method = step_tuning_method
+        if step_tuning_method in ["Expected_target_prob", "No-U"]:
+            self.train_params = True
             self.counter = 0
             self.epsilons = nn.ParameterDict()
             # have to store epsilons like this otherwise we get weird erros
@@ -26,16 +27,16 @@ class HMC(BaseTransitionModel):
             self.Monitor_NaN = Monitor_NaN()
             self.register_nan_hooks()
         else:
+            self.train_params = False
             self.register_buffer("common_epsilon", torch.tensor([epsilon*0.5]))
             self.register_buffer("epsilons", torch.ones([n_distributions, n_outer])*epsilon*0.5)
         self.n_outer = n_outer
         self.L = L
         self.n_distributions = n_distributions
-        self.auto_adjust_step_size = auto_adjust_step_size
         self.target_p_accept = target_p_accept
         self.first_dist_p_accepts = [torch.tensor([0.0]) for _ in range(n_outer)]
         self.last_dist_p_accepts = [torch.tensor([0.0]) for _ in range(n_outer)]
-        self.weighted_mean_square_distance = 0
+        self.weighted_scaled_mean_square_distance = 0
         self.average_distance = 0
 
     def register_nan_hooks(self):
@@ -54,7 +55,6 @@ class HMC(BaseTransitionModel):
                     interesting_dict[f"dist{self.n_distributions-3}_p_accept_{i}"] = val.item()
             if self.train_params:
                 interesting_dict["epsilon_shared"] = self.epsilons["common"].item()
-
                 interesting_dict[f"epsilons_0_0_0"] = self.epsilons[f"{0}_{0}"][0].cpu().item()
                 interesting_dict[f"epsilons_0_0_-1"] = self.epsilons[f"{0}_{0}"][-1].cpu().item()
                 interesting_dict[f"epsilons_0_-1_0"] = self.epsilons[f"{0}_{self.n_outer-1}"][0].cpu().item()
@@ -64,7 +64,7 @@ class HMC(BaseTransitionModel):
                 interesting_dict[f"epsilons_0_0"] = self.epsilons[0, 0].cpu().item()
                 interesting_dict[f"epsilons_0_-1"] = self.epsilons[0, -1].cpu().item()
             interesting_dict["average_distance"] = self.average_distance
-            interesting_dict[f"p_accept_weighted_mean_square_distance"] = self.weighted_mean_square_distance
+            interesting_dict[f"p_accept_weighted_mean_square_distance"] = self.weighted_scaled_mean_square_distance
         return interesting_dict
 
     def get_epsilon(self, i, n):
@@ -74,10 +74,15 @@ class HMC(BaseTransitionModel):
             return torch.abs(self.epsilons[i, n] + self.common_epsilon)
 
     def HMC_func(self, U, current_q, grad_U, i):
+        if self.step_tuning_method == "Expected_target_prob":
+            # need this for grad function
+            current_q = current_q.clone().detach().requires_grad_(True)
+            current_q = torch.clone(current_q)  # so we can do in place operations, kinda weird hac
+        else:
+            current_q = current_q.detach()  # otherwise just need to block grad flow
         characteristic_length = torch.std(current_q.detach(), dim=0)
         loss = 0
         # need this for grad function
-        current_q = current_q.detach()  # block grad flow
         # base function for HMC written in terms of potential energy function U
         for n in range(self.n_outer):
             original_q = torch.clone(current_q).detach()
@@ -92,10 +97,9 @@ class HMC(BaseTransitionModel):
 
             # Now loop through position and momentum leapfrogs
             for l in range(self.L):
-                if l == self.L - 1:
-                    epsilon = self.get_epsilon(i, n)
-                else:
-                    epsilon = self.get_epsilon(i, n).detach()
+                epsilon = self.get_epsilon(i, n)
+                if (l != self.L - 1 and self.step_tuning_method == "No-U") or not self.train_params:
+                    epsilon = epsilon.detach()
                 # Make full step for position
                 q = q + epsilon * p
                 # Make a full step for the momentum if not at end of trajectory
@@ -122,14 +126,14 @@ class HMC(BaseTransitionModel):
             current_q[accept] = q[accept]
 
             p_accept = torch.mean(acceptance_probability)
-            if self.auto_adjust_step_size:
+            if self.step_tuning_method == "p_accept":
                 if p_accept > self.target_p_accept: # too much accept
                     self.epsilons[i, n] = self.epsilons[i, n] * 1.1
                     self.common_epsilon = self.common_epsilon * 1.05
                 else:
                     self.epsilons[i, n] = self.epsilons[i, n] / 1.1
                     self.common_epsilon = self.common_epsilon / 1.05
-            if self.train_params:
+            elif self.step_tuning_method == "No-U":
                 if p_accept < 0.05 or (self.counter < 100 and p_accept < 0.5):
                     # if p_accept is very low manually decrease step size, as this means that no acceptances so no
                     # gradient flow to use
@@ -143,18 +147,20 @@ class HMC(BaseTransitionModel):
             elif i == self.n_distributions - 3:
                 self.last_dist_p_accepts[n] = torch.mean(acceptance_probability).cpu().detach()
 
-            distance = torch.linalg.norm((original_q - current_q)/characteristic_length, ord=2, dim=-1)
-            weighted_mean_square_distance = torch.mean(acceptance_probability*distance**2)
-            if i == 0:
-                self.weighted_mean_square_distance = weighted_mean_square_distance.detach().cpu()
-                self.average_distance = torch.mean(distance.detach().cpu())
-            if self.train_params:
+            if i == 0 or self.step_tuning_method == "No-U":
+                distance = torch.linalg.norm((original_q - current_q), ord=2, dim=-1)
+                distance_scaled = torch.linalg.norm((original_q - current_q) / characteristic_length, ord=2, dim=-1)
+                weighted_scaled_mean_square_distance = torch.mean(acceptance_probability * distance_scaled ** 2)
+                if i == 0:
+                    self.weighted_scaled_mean_square_distance = weighted_scaled_mean_square_distance.detach().cpu()
+                    self.average_distance = torch.mean(distance.detach().cpu())
                 if self.tune_period is False or self.counter < self.tune_period:
-                    loss = loss + 1.0/weighted_mean_square_distance \
-                           - weighted_mean_square_distance
+                    loss = loss + 1.0/weighted_scaled_mean_square_distance - weighted_scaled_mean_square_distance
+
         if self.train_params:
             if self.tune_period is False or self.counter < self.tune_period:
-                loss = - weighted_mean_square_distance
+                if self.step_tuning_method == "Expected_target_prob":
+                    loss = torch.mean(U(current_q))
                 if not (torch.isinf(loss) or torch.isnan(loss)):
                     loss.backward()
                     grad_norm = torch.nn.utils.clip_grad_norm_(self.parameters(), 1)
@@ -194,9 +200,10 @@ if __name__ == '__main__':
     torch.manual_seed(2)
     target = MoG(dim=dim, n_mixes=5, loc_scaling=5)
     learnt_sampler = DiagonalGaussian(dim=dim, log_std_initial_scaling=1.0)
-    hmc = HMC(n_distributions=n_distributions_pretend, n_outer=1, epsilon=1.0, L=5, dim=dim, train_params=train_params,
-              auto_adjust_step_size=not train_params)
-    n = 1000
+    hmc = HMC(n_distributions=n_distributions_pretend, n_outer=1, epsilon=1.0, L=5, dim=dim,
+              step_tuning_method="p_accept")
+    # "Expected_target_prob", "No-U", "p_accept"
+    n = 100
     history = {}
     history.update(dict([(key, []) for key in hmc.interesting_info()]))
     for i in tqdm(range(n)):

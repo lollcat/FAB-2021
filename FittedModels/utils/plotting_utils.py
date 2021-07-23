@@ -12,16 +12,38 @@ def plot_marginals(learnt_dist_manager, n_samples=1000, title=None, samples_q=No
     if samples_q == None:
         samples_q = learnt_dist_manager.learnt_sampling_dist.sample((n_samples,))
     samples_q = torch.clamp(samples_q, -clamp_samples, clamp_samples).cpu().detach().numpy()
-    fig, axs = plt.subplots(dim, dim,
-                            figsize=(3*dim, 3 * dim),
-                            sharex="row", sharey="row")
-    if title != None:
-        fig.suptitle(title)
-    for i in range(dim):
-        for j in range(dim):
-            if i != j:
-                axs[i, j].plot(samples_q[:, i], samples_q[:, j], "o", alpha=alpha)
-                axs[i, j].set_xlim(-clamp_samples, clamp_samples)
+    if dim == 2:
+        if learnt_dist_manager is not None:
+            n_points_contour = 200
+            x_points_dim1 = torch.linspace(-clamp_samples, clamp_samples, n_points_contour)
+            x_points_dim2 = torch.linspace(-clamp_samples, clamp_samples, n_points_contour)
+            x_points = torch.tensor(list(itertools.product(x_points_dim1, x_points_dim2)))
+            p_x = learnt_dist_manager.target_dist.log_prob(x_points.to(learnt_dist_manager.device))
+            p_x = torch.clamp_min(p_x, -1000)
+            p_x = p_x.cpu().detach().numpy()
+            p_x = p_x.reshape((n_points_contour, n_points_contour))
+            x_points_dim1 = x_points[:, 0].reshape((n_points_contour, n_points_contour)).numpy()
+            x_points_dim2 = x_points[:, 1].reshape((n_points_contour, n_points_contour)).numpy()
+            plt.contour(x_points_dim1, x_points_dim2, p_x, levels=80)
+            plt.xlabel(r"$x_1$")
+            plt.ylabel(r"$x_2$")
+        plt.plot(samples_q[:, 0], samples_q[:, 1], "o", alpha=alpha)
+        plt.xlim(-clamp_samples, clamp_samples)
+        plt.ylim(-clamp_samples, clamp_samples)
+        if title != None:
+            plt.suptitle(title)
+    else:
+        fig, axs = plt.subplots(dim, dim,
+                                figsize=(3*dim, 3 * dim),
+                                sharex="row", sharey="row")
+        if title != None:
+            fig.suptitle(title)
+        for i in range(dim):
+            for j in range(dim):
+                if i != j:
+                    axs[i, j].plot(samples_q[:, i], samples_q[:, j], "o", alpha=alpha)
+                    axs[i, j].set_xlim(-clamp_samples, clamp_samples)
+                    axs[i, j].set_ylim(-clamp_samples, clamp_samples)
     #plt.tight_layout()
 
 def plot_samples_vs_contours_many_well(learnt_dist_manager, n_samples=1000,

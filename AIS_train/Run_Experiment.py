@@ -24,8 +24,7 @@ from Utils.DebuggingUtils import print_memory_stats
 
 def run_experiment(dim, save_path, epochs, n_flow_steps, n_distributions,
                    flow_type="ReverseIAF", batch_size=int(1e3), seed=0,
-                   n_samples_expectation=int(1e5), save=True, n_plots=5, train_AIS_params=False,
-                   step_size=1.0, learnt_dist_kwargs={"lr": 1e-4}, problem="ManyWell",
+                   n_samples_expectation=int(1e5), save=True, n_plots=5, HMC_transition_args={}, learnt_dist_kwargs={"lr": 1e-4}, problem="ManyWell",
                    non_default_flow_width = None):
     local_var_dict = locals().copy()
     summary_results = "*********     Parameters      *******************\n\n"  # for writing to file
@@ -60,7 +59,7 @@ def run_experiment(dim, save_path, epochs, n_flow_steps, n_distributions,
         else:
             scaling_factor_flow = non_default_flow_width
         samples_target = target.sample((batch_size,)).detach().cpu()
-        clamp_at = float(torch.max(samples_target))
+        clamp_at = round(float(torch.max(torch.abs(samples_target)) + 0.5))
         plot_marginals(None, n_samples=None, title=f"samples from target",
                 samples_q=samples_target, dim=dim, clamp_samples=float(torch.max(torch.abs(samples_target))))
         if save:
@@ -74,10 +73,9 @@ def run_experiment(dim, save_path, epochs, n_flow_steps, n_distributions,
 
     learnt_sampler = FlowModel(x_dim=dim, scaling_factor=scaling_factor_flow, flow_type=flow_type,
                                n_flow_steps=n_flow_steps)
-    tester = AIS_trainer(target, learnt_sampler, loss_type=False, n_distributions=n_distributions
-                         , n_steps_transition_operator=1,
-                         step_size=step_size, transition_operator="HMC", learnt_dist_kwargs=learnt_dist_kwargs,
-                         loss_type_2="alpha_2", train_AIS_params=train_AIS_params, inner_loop_steps=5)
+    tester = AIS_trainer(target, learnt_sampler, n_distributions=n_distributions
+                         , tranistion_operator_kwargs=HMC_transition_args, transition_operator="HMC",
+                         learnt_dist_kwargs=learnt_dist_kwargs)
     summary_results += "\n\n *******************************    Results ********************* \n\n"
     expectation_before, info_dict_before = tester.AIS_train.calculate_expectation(n_samples_expectation,
                                                                                   expectation_function=expectation_function,
@@ -150,16 +148,19 @@ if __name__ == '__main__':
         batch_size = int(3e3)
         n_samples_expectation = int(batch_size * 100)
         experiment_name = "mogdog_AdamW_bigger_batch"
-        n_plots = 20
+        n_plots = 10
         learnt_dist_kwargs = {"lr": 1e-4, "optimizer": "AdamW"}
         flow_type = "ReverseIAF" # "RealNVP"
+        HMC_transition_args = {"step_tuning_method": "No-U"}  # "Expected_target_prob", "No-U", "p_accept"
         save_path = f"Results/{experiment_name}__{problem}" \
                     f"{dim}dim_{flow_type}_epochs{epochs}_flowsteps{n_flow_steps}_dist{n_distributions}" \
-                    f"__{current_time}__trainAISparams{train_AIS_params}"
+                    f"__{current_time}__trainAISparams{train_AIS_params}_" \
+                    f"HMC{HMC_transition_args['step_tuning_method']}"
         print(f"running experiment {save_path} \n\n")
         run_experiment(dim, save_path, epochs, n_flow_steps, n_distributions,
-                       flow_type, learnt_dist_kwargs=learnt_dist_kwargs, train_AIS_params=train_AIS_params, n_plots=n_plots,
-                       batch_size=batch_size, n_samples_expectation=n_samples_expectation, problem=problem)
+                       flow_type, learnt_dist_kwargs=learnt_dist_kwargs, n_plots=n_plots,
+                       batch_size=batch_size, n_samples_expectation=n_samples_expectation, problem=problem,
+                       HMC_transition_args=HMC_transition_args)
         print(f"\n\nfinished running experiment {save_path}")
 
     else:
@@ -174,12 +175,15 @@ if __name__ == '__main__':
         experiment_name = "testing5"
         train_AIS_params = False
         flow_type = "ReverseIAF" # "RealNVP" #
+        HMC_transition_args = {"step_tuning_method": "No-U"} # "Expected_target_prob", "No-U", "p_accept"
         learnt_dist_kwargs = {"lr": 2e-4, "optimizer": "AdamW"}
         save_path = f"Results/{experiment_name}__{problem}" \
                     f"{dim}dim_{flow_type}_epochs{epochs}_flowsteps{n_flow_steps}_dist{n_distributions}" \
-                    f"__{current_time}__trainAISparams{train_AIS_params}"
+                    f"__{current_time}__trainAISparams{train_AIS_params}_" \
+                    f"HMC{HMC_transition_args['step_tuning_method']}"
         print(f"running experiment {save_path} \n\n")
         run_experiment(dim, save_path, epochs, n_flow_steps, n_distributions,
-                       flow_type, save=False, n_samples_expectation=int(1e3), train_AIS_params=train_AIS_params,
-                       learnt_dist_kwargs=learnt_dist_kwargs, problem=problem, n_plots=n_plots)
+                       flow_type, save=False, n_samples_expectation=int(1e3),
+                       learnt_dist_kwargs=learnt_dist_kwargs, problem=problem, n_plots=n_plots,
+                       HMC_transition_args=HMC_transition_args)
         print(f"\n\n finished running experiment {save_path}")
