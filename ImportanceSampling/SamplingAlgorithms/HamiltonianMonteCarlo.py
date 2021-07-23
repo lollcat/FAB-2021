@@ -57,8 +57,9 @@ class HMC(BaseTransitionModel):
                 interesting_dict["epsilon_shared"] = self.epsilons["common"].item()
                 interesting_dict[f"epsilons_0_0_0"] = self.epsilons[f"{0}_{0}"][0].cpu().item()
                 interesting_dict[f"epsilons_0_0_-1"] = self.epsilons[f"{0}_{0}"][-1].cpu().item()
-                interesting_dict[f"epsilons_0_-1_0"] = self.epsilons[f"{0}_{self.n_outer-1}"][0].cpu().item()
-                interesting_dict[f"epsilons_0_-1_-1"] = self.epsilons[f"{0}_{self.n_outer-1}"][-1].cpu().item()
+                if self.n_outer != 1:
+                    interesting_dict[f"epsilons_0_-1_0"] = self.epsilons[f"{0}_{self.n_outer-1}"][0].cpu().item()
+                    interesting_dict[f"epsilons_0_-1_-1"] = self.epsilons[f"{0}_{self.n_outer-1}"][-1].cpu().item()
             else:
                 interesting_dict["epsilon_shared"] = self.common_epsilon.item()
                 interesting_dict[f"epsilons_0_0"] = self.epsilons[0, 0].cpu().item()
@@ -133,8 +134,8 @@ class HMC(BaseTransitionModel):
                 else:
                     self.epsilons[i, n] = self.epsilons[i, n] / 1.1
                     self.common_epsilon = self.common_epsilon / 1.05
-            elif self.step_tuning_method == "No-U":
-                if p_accept < 0.05 or (self.counter < 100 and p_accept < 0.5):
+            else: # self.step_tuning_method == "No-U":
+                if p_accept < 0.05 or (self.counter < 100 and p_accept < 0.4):
                     # if p_accept is very low manually decrease step size, as this means that no acceptances so no
                     # gradient flow to use
                     self.epsilons[f"{i}_{n}"].data = self.epsilons[f"{i}_{n}"].data / 1.5
@@ -148,14 +149,19 @@ class HMC(BaseTransitionModel):
                 self.last_dist_p_accepts[n] = torch.mean(acceptance_probability).cpu().detach()
 
             if i == 0 or self.step_tuning_method == "No-U":
-                distance = torch.linalg.norm((original_q - current_q), ord=2, dim=-1)
                 distance_scaled = torch.linalg.norm((original_q - current_q) / characteristic_length, ord=2, dim=-1)
-                weighted_scaled_mean_square_distance = torch.mean(acceptance_probability * distance_scaled ** 2)
+                weighted_scaled_mean_square_distance = acceptance_probability * distance_scaled ** 2
                 if i == 0:
-                    self.weighted_scaled_mean_square_distance = weighted_scaled_mean_square_distance.detach().cpu()
-                    self.average_distance = torch.mean(distance.detach().cpu())
-                if self.tune_period is False or self.counter < self.tune_period:
-                    loss = loss + 1.0/weighted_scaled_mean_square_distance - weighted_scaled_mean_square_distance
+                    self.weighted_scaled_mean_square_distance = \
+                        torch.mean(weighted_scaled_mean_square_distance).detach().cpu()
+                    self.average_distance = \
+                        torch.mean(torch.linalg.norm((original_q - current_q), ord=2, dim=-1).detach().cpu())
+
+                if (self.tune_period is False or self.counter < self.tune_period) and self.step_tuning_method == "No-U":
+                    # remove zeros so we don't get infs when we divide
+                    weighted_scaled_mean_square_distance[weighted_scaled_mean_square_distance == 0.0] = 1.0
+                    loss = loss + torch.mean(1.0/weighted_scaled_mean_square_distance -
+                                             weighted_scaled_mean_square_distance)
 
         if self.train_params:
             if self.tune_period is False or self.counter < self.tune_period:
@@ -181,7 +187,7 @@ class HMC(BaseTransitionModel):
         def grad_U(q: torch.Tensor):
             q = q.clone().detach().requires_grad_(True) #  need this to get gradients
             y = U(q)
-            return torch.autograd.grad(y, q, grad_outputs=torch.ones_like(y))[0]
+            return torch.clamp(torch.autograd.grad(y, q, grad_outputs=torch.ones_like(y))[0], max=1e6, min=-1e6)
 
         current_q = self.HMC_func(U, current_q, grad_U, i)
         return current_q

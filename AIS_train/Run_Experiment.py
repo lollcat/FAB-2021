@@ -140,7 +140,6 @@ if __name__ == '__main__':
         from datetime import datetime
         current_time = datetime.now().strftime("%Y_%m_%d-%I_%M_%S_%p")
         problem = "ManyWell"
-        train_AIS_params = True
         dim = 64
         epochs = int(1e5)
         n_flow_steps = 20
@@ -154,7 +153,7 @@ if __name__ == '__main__':
         HMC_transition_args = {"step_tuning_method": "No-U"}  # "Expected_target_prob", "No-U", "p_accept"
         save_path = f"Results/{experiment_name}__{problem}" \
                     f"{dim}dim_{flow_type}_epochs{epochs}_flowsteps{n_flow_steps}_dist{n_distributions}" \
-                    f"__{current_time}__trainAISparams{train_AIS_params}_" \
+                    f"__{current_time}" \
                     f"HMC{HMC_transition_args['step_tuning_method']}"
         print(f"running experiment {save_path} \n\n")
         run_experiment(dim, save_path, epochs, n_flow_steps, n_distributions,
@@ -168,18 +167,17 @@ if __name__ == '__main__':
         current_time = datetime.now().strftime("%Y_%m_%d-%I_%M_%S_%p")
         problem = "ManyWell" # "MoG" #
         dim = 4
-        epochs = 200
+        epochs = 1000
         n_flow_steps = 5
-        n_plots = 3
+        n_plots = 2
         n_distributions = 2 + 1
         experiment_name = "testing5"
-        train_AIS_params = False
         flow_type = "ReverseIAF" # "RealNVP" #
-        HMC_transition_args = {"step_tuning_method": "No-U"} # "Expected_target_prob", "No-U", "p_accept"
+        HMC_transition_args = {"step_tuning_method": "No-U"} # "Expected_target_prob", , "p_accept""p_accept"
         learnt_dist_kwargs = {"lr": 2e-4, "optimizer": "AdamW"}
         save_path = f"Results/{experiment_name}__{problem}" \
                     f"{dim}dim_{flow_type}_epochs{epochs}_flowsteps{n_flow_steps}_dist{n_distributions}" \
-                    f"__{current_time}__trainAISparams{train_AIS_params}_" \
+                    f"__{current_time}" \
                     f"HMC{HMC_transition_args['step_tuning_method']}"
         print(f"running experiment {save_path} \n\n")
         run_experiment(dim, save_path, epochs, n_flow_steps, n_distributions,

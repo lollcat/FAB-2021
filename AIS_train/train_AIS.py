@@ -359,14 +359,15 @@ if __name__ == '__main__':
 
     torch.manual_seed(2)
     n_plots = 5
-    epochs = 200
+    epochs = 1000
     step_size = 1.0
     batch_size = int(1e3)
     dim = 2
     n_samples_estimation = int(1e4)
     flow_type = "RealNVP"  # "ReverseIAF"  #"ReverseIAF_MIX" #"ReverseIAF" #IAF"  #
     n_flow_steps = 5
-    HMC_transition_operator_args = {"step_tuning_method": "Expected_target_prob"} # "Expected_target_prob", "No-U", "p_accept"
+    HMC_transition_operator_args = {"step_tuning_method": "p_accept"} # "Expected_target_prob", "No-U", "p_accept"
+    print(HMC_transition_operator_args)
     target = MoG(dim=dim, n_mixes=5, min_cov=1, loc_scaling=10)
     true_expectation = MC_estimate_true_expectation(target, expectation_function, int(1e5))
     fig = plot_distribution(target, bounds=[[-30, 20], [-20, 20]])
