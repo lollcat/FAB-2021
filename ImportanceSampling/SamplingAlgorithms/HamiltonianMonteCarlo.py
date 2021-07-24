@@ -71,15 +71,20 @@ class HMC(BaseTransitionModel):
                     interesting_dict[f"dist{self.n_distributions-3}_p_accept_{i}"] = val.item()
             if self.train_params:
                 interesting_dict["epsilon_shared"] = self.epsilons["common"].item()
-                interesting_dict[f"epsilons_0_0_0"] = self.epsilons[f"{0}_{0}"][0].cpu().item()
-                interesting_dict[f"epsilons_0_0_-1"] = self.epsilons[f"{0}_{0}"][-1].cpu().item()
-                if self.n_outer != 1:
-                    interesting_dict[f"epsilons_0_-1_0"] = self.epsilons[f"{0}_{self.n_outer-1}"][0].cpu().item()
-                    interesting_dict[f"epsilons_0_-1_-1"] = self.epsilons[f"{0}_{self.n_outer-1}"][-1].cpu().item()
+                interesting_dict[f"epsilons_dist0_0_dim0"] = self.epsilons[f"{0}_{0}"][0].cpu().item()
+                interesting_dict[f"epsilons_dist0_0_dim-1"] = self.epsilons[f"{0}_{0}"][-1].cpu().item()
+                if self.n_distributions > 3:
+                    last_dist_n = self.n_distributions - 2 - 1  # (we -1 to account for indexing starting at 0)
+                    interesting_dict[f"epsilons_dist{last_dist_n}_0_dim0"] = \
+                        self.epsilons[f"{last_dist_n}_{0}"][0].cpu().item()
+                    interesting_dict[f"epsilons_dist{last_dist_n}_0_dim-1"] = \
+                        self.epsilons[f"{last_dist_n}_{0}"][-1].cpu().item()
             else:
                 interesting_dict["epsilon_shared"] = self.common_epsilon.item()
-                interesting_dict[f"epsilons_0_0"] = self.epsilons[0, 0].cpu().item()
-                interesting_dict[f"epsilons_0_-1"] = self.epsilons[0, -1].cpu().item()
+                interesting_dict[f"epsilons_dist0_loop0"] = self.epsilons[0, 0].cpu().item()
+                if self.n_distributions > 3:
+                    last_dist_n = self.n_distributions - 2 - 1  # (we -1 to account for indexing starting at 0)
+                    interesting_dict[f"epsilons_dist{last_dist_n}_loop0"] = self.epsilons[last_dist_n, 0].cpu().item()
             interesting_dict["average_distance"] = self.average_distance
             interesting_dict[f"p_accept_weighted_mean_square_distance"] = self.weighted_scaled_mean_square_distance
         return interesting_dict

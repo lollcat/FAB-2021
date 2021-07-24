@@ -140,15 +140,15 @@ if __name__ == '__main__':
         from datetime import datetime
         current_time = datetime.now().strftime("%Y_%m_%d-%I_%M_%S_%p")
         problem = "ManyWell"
-        dim = 64
-        epochs = int(2e4)
+        dim = 32
+        epochs = int(5e3)
         n_flow_steps = 20
         n_distributions = 2 + 4
         batch_size = int(5e4)
         n_samples_expectation = int(1e6)
-        experiment_name = "Gecko"
+        experiment_name = "HMC_compare"
         n_plots = 10
-        learnt_dist_kwargs = {"lr": 1e-4, "optimizer": "AdamW"}
+        learnt_dist_kwargs = {"lr": 1e-3, "optimizer": "AdamW"}
         flow_type = "ReverseIAF" # "RealNVP"
         HMC_transition_args = {"step_tuning_method": "p_accept"}  # "Expected_target_prob", "No-U", "p_accept"
         save_path = f"Results/{experiment_name}__{problem}" \
