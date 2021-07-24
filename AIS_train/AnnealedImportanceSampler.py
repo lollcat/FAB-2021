@@ -38,7 +38,14 @@ class AnnealedImportanceSampler(BaseAIS):
         self.sampling_distribution.set_requires_grad(False)
         with torch.no_grad():
             x_new, log_prob_p0 = self.sampling_distribution(n_runs)
-            log_prob_p0 = self.sampling_distribution.log_prob(x_new)
+            nan_indices = (torch.sum(torch.isnan(x_new) | torch.isinf(x_new), dim=-1) |
+                          torch.isinf(log_prob_p0) | torch.isnan(log_prob_p0)).bool()
+            n_nan_indices = torch.sum(nan_indices)
+            if n_nan_indices != 0:
+                print(f"{n_nan_indices} nan encountered in sampling from flow")
+                # replace with legit samples
+                x_new[nan_indices] = x_new[~nan_indices][:n_nan_indices]
+                log_prob_p0[nan_indices] = log_prob_p0[~nan_indices][:n_nan_indices]
             log_w += self.intermediate_unnormalised_log_prob(x_new, 1) - log_prob_p0
         for j in range(1, self.n_distributions-1):
             x_new, log_w = self.perform_transition(x_new, log_w, j)

@@ -131,7 +131,7 @@ def run_experiment(dim, save_path, epochs, n_flow_steps, n_distributions,
         summary_results_path = str(save_path / "results.txt")
         with open(summary_results_path, "w") as g:
             g.write(summary_results)
-    return tester
+    return tester, history
 
 
 if __name__ == '__main__':
@@ -157,7 +157,7 @@ if __name__ == '__main__':
                     f"HMC{HMC_transition_args['step_tuning_method']}"
         print(f"running experiment {save_path} \n\n")
         assert n_samples_expectation % batch_size == 0
-        run_experiment(dim, save_path, epochs, n_flow_steps, n_distributions,
+        tester, history = run_experiment(dim, save_path, epochs, n_flow_steps, n_distributions,
                        flow_type, learnt_dist_kwargs=learnt_dist_kwargs, n_plots=n_plots,
                        batch_size=batch_size, n_samples_expectation=n_samples_expectation, problem=problem,
                        HMC_transition_args=HMC_transition_args)
@@ -181,7 +181,7 @@ if __name__ == '__main__':
                     f"__{current_time}" \
                     f"HMC{HMC_transition_args['step_tuning_method']}"
         print(f"running experiment {save_path} \n\n")
-        run_experiment(dim, save_path, epochs, n_flow_steps, n_distributions,
+        tester, history = run_experiment(dim, save_path, epochs, n_flow_steps, n_distributions,
                        flow_type, save=False, n_samples_expectation=int(1e3),
                        learnt_dist_kwargs=learnt_dist_kwargs, problem=problem, n_plots=n_plots,
                        HMC_transition_args=HMC_transition_args)
