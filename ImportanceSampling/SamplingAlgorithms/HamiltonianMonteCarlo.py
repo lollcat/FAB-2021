@@ -9,6 +9,9 @@ class HMC(BaseTransitionModel):
     """
     def __init__(self, n_distributions, dim, epsilon=1.0, n_outer=1, L=5, step_tuning_method="No-U",
                  target_p_accept=0.65, lr=1e-3, tune_period=False):
+        self.class_args = locals().copy()
+        del(self.class_args["self"])
+        del(self.class_args["__class__"])
         super(HMC, self).__init__()
         assert step_tuning_method in ["p_accept", "Expected_target_prob", "No-U"]
         self.dim = dim
@@ -29,7 +32,7 @@ class HMC(BaseTransitionModel):
         else:
             self.train_params = False
             self.register_buffer("common_epsilon", torch.tensor([epsilon*0.5]))
-            self.register_buffer("epsilons", torch.ones([n_distributions, n_outer])*epsilon*0.5)
+            self.register_buffer("epsilons", torch.ones([n_distributions-2, n_outer])*epsilon*0.5)
         self.n_outer = n_outer
         self.L = L
         self.n_distributions = n_distributions
@@ -38,6 +41,19 @@ class HMC(BaseTransitionModel):
         self.last_dist_p_accepts = [torch.tensor([0.0]) for _ in range(n_outer)]
         self.weighted_scaled_mean_square_distance = 0
         self.average_distance = 0
+
+    def save_model(self, save_path):
+        model_description = str(self.class_args)
+        summary_results_path = str(save_path / "HMC_model_info.txt")
+        model_path = str(save_path / "HMC_model")
+        with open(summary_results_path, "w") as g:
+            g.write(model_description)
+        torch.save(self.state_dict(), model_path)
+
+    def load_model(self, save_path):
+        model_path = str(save_path / "HMC_model")
+        self.load_state_dict(torch.load(model_path))
+        print("loaded HMC model")
 
     def register_nan_hooks(self):
         for parameter in self.parameters():

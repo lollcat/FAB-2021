@@ -141,21 +141,22 @@ if __name__ == '__main__':
         current_time = datetime.now().strftime("%Y_%m_%d-%I_%M_%S_%p")
         problem = "ManyWell"
         dim = 64
-        epochs = int(1e5)
+        epochs = int(2e4)
         n_flow_steps = 20
         n_distributions = 2 + 4
-        batch_size = int(3e3)
-        n_samples_expectation = int(batch_size * 100)
-        experiment_name = "mogdog_AdamW_bigger_batch"
+        batch_size = int(5e4)
+        n_samples_expectation = int(1e6)
+        experiment_name = "Gecko"
         n_plots = 10
         learnt_dist_kwargs = {"lr": 1e-4, "optimizer": "AdamW"}
         flow_type = "ReverseIAF" # "RealNVP"
-        HMC_transition_args = {"step_tuning_method": "No-U"}  # "Expected_target_prob", "No-U", "p_accept"
+        HMC_transition_args = {"step_tuning_method": "p_accept"}  # "Expected_target_prob", "No-U", "p_accept"
         save_path = f"Results/{experiment_name}__{problem}" \
                     f"{dim}dim_{flow_type}_epochs{epochs}_flowsteps{n_flow_steps}_dist{n_distributions}" \
                     f"__{current_time}" \
                     f"HMC{HMC_transition_args['step_tuning_method']}"
         print(f"running experiment {save_path} \n\n")
+        assert n_samples_expectation % batch_size == 0
         run_experiment(dim, save_path, epochs, n_flow_steps, n_distributions,
                        flow_type, learnt_dist_kwargs=learnt_dist_kwargs, n_plots=n_plots,
                        batch_size=batch_size, n_samples_expectation=n_samples_expectation, problem=problem,
@@ -167,13 +168,13 @@ if __name__ == '__main__':
         current_time = datetime.now().strftime("%Y_%m_%d-%I_%M_%S_%p")
         problem = "ManyWell" # "MoG" #
         dim = 4
-        epochs = 1000
+        epochs = 500
         n_flow_steps = 5
         n_plots = 2
-        n_distributions = 2 + 1
+        n_distributions = 2 + 2
         experiment_name = "testing5"
         flow_type = "ReverseIAF" # "RealNVP" #
-        HMC_transition_args = {"step_tuning_method": "No-U"} # "Expected_target_prob", , "p_accept""p_accept"
+        HMC_transition_args = {"step_tuning_method": "p_accept"} # "Expected_target_prob","No-U" ,"p_accept"
         learnt_dist_kwargs = {"lr": 2e-4, "optimizer": "AdamW"}
         save_path = f"Results/{experiment_name}__{problem}" \
                     f"{dim}dim_{flow_type}_epochs{epochs}_flowsteps{n_flow_steps}_dist{n_distributions}" \

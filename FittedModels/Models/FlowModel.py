@@ -60,7 +60,7 @@ class FlowModel(nn.Module, BaseLearntDistribution):
     def load_model(self, save_path):
         model_path = str(save_path / "model")
         self.load_state_dict(torch.load(model_path))
-        print("loaded model")
+        print("loaded flow model")
 
     def to(self, device):
         super(FlowModel, self).to(device)

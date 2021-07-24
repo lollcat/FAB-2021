@@ -204,18 +204,19 @@ class AIS_trainer(LearntDistributionManager):
                         if save:
                             plt.savefig(str(save_path /f"Samples_from_flow_epoch{self.current_epoch}.png"))
                         plt.show()
+                        n_samples_AIS_plot = min(batch_size, plotting_batch_size) # so plots look consistent
                         # make sure plotting func has option to enter x_samples directly
-                        plotting_func(self, n_samples=batch_size,
+                        plotting_func(self, n_samples=n_samples_AIS_plot ,
                                       title=f"epoch {self.current_epoch}: samples from AIS",
-                                      samples_q=x_samples.cpu().detach())
+                                      samples_q=x_samples[:n_samples_AIS_plot].cpu().detach())
                         if save:
                             plt.savefig(str(save_path /f"Samples_from_AIS_epoch{self.current_epoch}.png"))
                         plt.show()
                         if "re_sampled_x" in locals():
                             if re_sampled_x is not None:
-                                plotting_func(self, n_samples=batch_size,
+                                plotting_func(self, n_samples=n_samples_AIS_plot,
                                               title=f"epoch {self.current_epoch}: re-sampled samples from AIS",
-                                              samples_q=re_sampled_x.cpu().detach())
+                                              samples_q=re_sampled_x[:n_samples_AIS_plot].cpu().detach())
                                 if save:
                                     plt.savefig(str(save_path / f"Resampled_epoch{self.current_epoch}.png"))
                                 plt.show()
@@ -224,6 +225,7 @@ class AIS_trainer(LearntDistributionManager):
             with open(str(save_path / "history.pkl"), "wb") as f:
                 pickle.dump(history, f)
             self.learnt_sampling_dist.save_model(save_path)
+            self.AIS_train.transition_operator_class.save_model(save_path)
         return history
 
     def dreg_alpha_divergence_loss(self, log_w, drop_nans_and_infs=True):
