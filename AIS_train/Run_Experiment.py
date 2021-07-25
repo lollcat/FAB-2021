@@ -63,7 +63,7 @@ def run_experiment(dim, save_path, epochs, n_flow_steps, n_distributions,
         plot_marginals(None, n_samples=None, title=f"samples from target",
                 samples_q=samples_target, dim=dim, clamp_samples=float(torch.max(torch.abs(samples_target))))
         if save:
-            plt.savefig(str(save_path / "target_samples.png"))
+            plt.savefig(str(save_path / "target_samples.eps"),  format='eps')
         plt.show()
         def plotter(*args, **kwargs):
             plot_marginals(*args, **kwargs, clamp_samples=clamp_at)
@@ -89,7 +89,7 @@ def run_experiment(dim, save_path, epochs, n_flow_steps, n_distributions,
 
     plot_history(history)
     if save:
-        plt.savefig(str(save_path / "histories.png"))
+        plt.savefig(str(save_path / "histories.eps"),  format='eps')
     plt.show()
     torch.manual_seed(2)
     expectation, info_dict = tester.AIS_train.calculate_expectation(n_samples_expectation,
@@ -110,7 +110,7 @@ def run_experiment(dim, save_path, epochs, n_flow_steps, n_distributions,
     plotter(tester, n_samples=None, title=f"Samples from AIS after training",
             samples_q=info_dict["samples"], alpha=0.01)
     if save:
-        plt.savefig(str(save_path / "plots_AIS_samples_final.png"))
+        plt.savefig(str(save_path / "plots_AIS_samples_final.eps"),  format='eps')
     plt.show()
     torch.manual_seed(5)
     expectation_flo, info_dict_flo = tester.AIS_train.calculate_expectation_over_flow(n_samples_expectation,
@@ -120,7 +120,7 @@ def run_experiment(dim, save_path, epochs, n_flow_steps, n_distributions,
     plotter(tester, n_samples=None, title=f"Samples from flow after trainin",
             samples_q=info_dict_flo["samples"], alpha=0.01)
     if save:
-        plt.savefig(str(save_path / "plots_flo_samples_final.png"))
+        plt.savefig(str(save_path / "plots_flo_samples_final.eps"),  format='eps')
     plt.show()
     summary_results += f"ESS of flow model after training is " \
            f"{info_dict_flo['effective_sample_size'].item()/ n_samples_expectation}" \
@@ -148,7 +148,8 @@ if __name__ == '__main__':
         n_samples_expectation = int(batch_size*100)
         experiment_name = "glenbeach"
         n_plots = 10
-        learnt_dist_kwargs = {"lr": 1e-4, "optimizer": "AdamW"}
+        learnt_dist_kwargs = {"lr": 1e-4, "optimizer": "AdamW",
+                              "use_memory_buffer": True}
         flow_type = "ReverseIAF" # "RealNVP"
         # "Expected_target_prob", "No-U", "p_accept", "No-U-unscaled"
         HMC_transition_args = {"step_tuning_method": "No-U"}
@@ -177,7 +178,8 @@ if __name__ == '__main__':
         flow_type = "RealNVP" # "ReverseIAF" #
         # "Expected_target_prob", "No-U", "p_accept", "No-U-unscaled"
         HMC_transition_args = {"step_tuning_method": "No-U"} # "Expected_target_prob","No-U" ,"p_accept"
-        learnt_dist_kwargs = {"lr": 2e-4, "optimizer": "AdamW"}
+        learnt_dist_kwargs = {"lr": 2e-4, "optimizer": "AdamW",
+                              "use_memory_buffer": True}
         save_path = f"Results/{experiment_name}__{problem}" \
                     f"{dim}dim_{flow_type}_epochs{epochs}_flowsteps{n_flow_steps}_dist{n_distributions}" \
                     f"__{current_time}" \

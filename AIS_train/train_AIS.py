@@ -10,6 +10,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from Utils.numerical_utils import quadratic_function as expectation_function
 import pathlib
+from collections import deque
 
 
 class AIS_trainer(LearntDistributionManager):
@@ -19,7 +20,8 @@ class AIS_trainer(LearntDistributionManager):
     def __init__(self, target_distribution, fitted_model,
                  n_distributions=2+2, loss_type=False, transition_operator="HMC",
                  AIS_kwargs={}, tranistion_operator_kwargs={}, use_GPU = True,
-                 optimizer="AdamW", lr=1e-3):
+                 optimizer="AdamW", lr=1e-3, use_memory_buffer=False,
+                 memory_n_batches=100, allow_ignore_nan_loss=True, clip_grad_norm=True):
         self.AIS_train = AnnealedImportanceSampler(loss_type, fitted_model, target_distribution,
                                                    transition_operator=transition_operator,
                                                    n_distributions=n_distributions,
@@ -29,6 +31,9 @@ class AIS_trainer(LearntDistributionManager):
             self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         else:
             self.device = "cpu"
+        self.allow_ignore_nan_loss = allow_ignore_nan_loss
+        self.clip_grad_norm = clip_grad_norm
+        self.max_grad_norm = 1.0
         self.alpha = 2.0
         self.alpha_one_minus_alpha_sign = -1
         self.importance_sampler = self.AIS_train
@@ -38,6 +43,9 @@ class AIS_trainer(LearntDistributionManager):
         torch_optimizer = getattr(torch.optim, optimizer)
         self.optimizer = torch_optimizer(self.learnt_sampling_dist.parameters(), lr=lr)
         self.to(device=self.device)
+        self.use_memory_buffer = use_memory_buffer
+        if self.use_memory_buffer:
+            self.memory_buffer = deque(maxlen=memory_n_batches)
 
     def to(self, device):
         """device is cuda or cpu"""
@@ -47,12 +55,41 @@ class AIS_trainer(LearntDistributionManager):
         self.target_dist.to(self.device)
         self.AIS_train.to(device)
 
+    def train_loop_with_memory(self, x_samples, log_w):
+        total_loss = 0
+        self.memory_buffer.append((x_samples.detach().cpu(), log_w.detach().cpu()))
+        for i, (x_samples, log_w) in enumerate(reversed(self.memory_buffer)):
+            x_samples = x_samples.to(self.device)
+            log_w = log_w.to(self.device)
+            if i == 0:
+                loss, re_sampled_x = self.train_inner_loop(x_samples, log_w)
+            else:
+                loss = self.train_inner_loop(x_samples, log_w)[0]
+            total_loss += torch.nan_to_num(loss)
+        return total_loss, re_sampled_x
+
+
+
+    def train_inner_loop(self, x_samples, log_w):
+        self.optimizer.zero_grad()
+        loss, re_sampled_x = self.loss(x_samples, log_w)
+        if torch.isnan(loss) or torch.isinf(loss):
+            if self.allow_ignore_nan_loss:
+                print("Nan/Inf loss encountered in loss_1")
+                return loss, re_sampled_x
+            else:
+                raise Exception("Nan/Inf loss_1 encountered")
+        loss.backward()
+        if self.clip_grad_norm is True:
+            grad_norm = torch.nn.utils.clip_grad_norm_(self.learnt_sampling_dist.parameters(), self.max_grad_norm)
+            torch.nn.utils.clip_grad_value_(self.learnt_sampling_dist.parameters(), 1)
+        self.optimizer.step()
+        return loss, re_sampled_x
+
 
     def train(self, epochs=100, batch_size=1000, intermediate_plots=False,
               plotting_func=plot_samples, n_plots=3,
-              KPI_batch_size=int(1e4),
-              allow_ignore_nan_loss=True, clip_grad_norm=True,
-              max_grad_norm=1, plotting_batch_size=int(1e3),
+              KPI_batch_size=int(1e4), plotting_batch_size=int(1e3),
               jupyter=False, n_progress_updates=20, save=False, save_path=None):
         if save is True:
             assert save_path is not None
@@ -83,19 +120,10 @@ class AIS_trainer(LearntDistributionManager):
         pbar = tqdm(range(epochs))
         for self.current_epoch in pbar:
             x_samples, log_w = self.AIS_train.run(batch_size)
-            self.optimizer.zero_grad()
-            loss, re_sampled_x = self.loss(x_samples, log_w)
-            if torch.isnan(loss) or torch.isinf(loss):
-                if allow_ignore_nan_loss:
-                    print("Nan/Inf loss encountered in loss_1")
-                    continue
-                else:
-                    raise Exception("Nan/Inf loss_1 encountered")
-            loss.backward()
-            if clip_grad_norm is True:
-                grad_norm = torch.nn.utils.clip_grad_norm_(self.learnt_sampling_dist.parameters(), max_grad_norm)
-                torch.nn.utils.clip_grad_value_(self.learnt_sampling_dist.parameters(), 1)
-            self.optimizer.step()
+            if self.use_memory_buffer:
+                loss, re_sampled_x = self.train_loop_with_memory(x_samples, log_w)
+            else:
+                loss, re_sampled_x = self.train_inner_loop(x_samples, log_w)
             if self.current_epoch % epoch_per_save_and_print == 0 or self.current_epoch == epochs:
                 # must do this outside of the torch.no_grad below
                 history["ESS"].append(
@@ -155,7 +183,7 @@ class AIS_trainer(LearntDistributionManager):
                         plotting_func(self, n_samples=plotting_batch_size,
                                       title=f"epoch {self.current_epoch}: samples from flow")
                         if save:
-                            plt.savefig(str(save_path /f"Samples_from_flow_epoch{self.current_epoch}.png"))
+                            plt.savefig(str(save_path /f"Samples_from_flow_epoch{self.current_epoch}.eps"),  format='eps')
                         plt.show()
                         n_samples_AIS_plot = min(batch_size, plotting_batch_size) # so plots look consistent
                         # make sure plotting func has option to enter x_samples directly
@@ -163,7 +191,7 @@ class AIS_trainer(LearntDistributionManager):
                                       title=f"epoch {self.current_epoch}: samples from AIS",
                                       samples_q=x_samples[:n_samples_AIS_plot].cpu().detach())
                         if save:
-                            plt.savefig(str(save_path /f"Samples_from_AIS_epoch{self.current_epoch}.png"))
+                            plt.savefig(str(save_path /f"Samples_from_AIS_epoch{self.current_epoch}.eps"),  format='eps')
                         plt.show()
                         if "re_sampled_x" in locals():
                             if re_sampled_x is not None:
@@ -171,7 +199,7 @@ class AIS_trainer(LearntDistributionManager):
                                               title=f"epoch {self.current_epoch}: re-sampled samples from AIS",
                                               samples_q=re_sampled_x[:n_samples_AIS_plot].cpu().detach())
                                 if save:
-                                    plt.savefig(str(save_path / f"Resampled_epoch{self.current_epoch}.png"))
+                                    plt.savefig(str(save_path / f"Resampled_epoch{self.current_epoch}.eps"),  format='eps')
                                 plt.show()
         if save:
             import pickle
@@ -244,7 +272,8 @@ if __name__ == '__main__':
     learnt_sampler = FlowModel(x_dim=dim, scaling_factor=1.0, flow_type=flow_type, n_flow_steps=n_flow_steps)
     tester = AIS_trainer(target, learnt_sampler, n_distributions=6,
                          transition_operator="HMC", lr=5e-4,
-                         tranistion_operator_kwargs=HMC_transition_operator_args)
+                         tranistion_operator_kwargs=HMC_transition_operator_args,
+                         use_memory_buffer=False)
     plot_samples(tester)
     plt.show()
 
