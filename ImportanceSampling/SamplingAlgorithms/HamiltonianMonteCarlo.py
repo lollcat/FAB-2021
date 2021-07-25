@@ -13,11 +13,11 @@ class HMC(BaseTransitionModel):
         del(self.class_args["self"])
         del(self.class_args["__class__"])
         super(HMC, self).__init__()
-        assert step_tuning_method in ["p_accept", "Expected_target_prob", "No-U"]
+        assert step_tuning_method in ["p_accept", "Expected_target_prob", "No-U", "No-U-unscaled"]
         self.dim = dim
         self.tune_period = tune_period
         self.step_tuning_method = step_tuning_method
-        if step_tuning_method in ["Expected_target_prob", "No-U"]:
+        if step_tuning_method in ["Expected_target_prob", "No-U", "No-U-unscaled"]:
             self.train_params = True
             self.counter = 0
             self.epsilons = nn.ParameterDict()
@@ -39,7 +39,6 @@ class HMC(BaseTransitionModel):
         self.target_p_accept = target_p_accept
         self.first_dist_p_accepts = [torch.tensor([0.0]) for _ in range(n_outer)]
         self.last_dist_p_accepts = [torch.tensor([0.0]) for _ in range(n_outer)]
-        self.weighted_scaled_mean_square_distance = 0
         self.average_distance = 0
 
     def save_model(self, save_path):
@@ -86,7 +85,6 @@ class HMC(BaseTransitionModel):
                     last_dist_n = self.n_distributions - 2 - 1  # (we -1 to account for indexing starting at 0)
                     interesting_dict[f"epsilons_dist{last_dist_n}_loop0"] = self.epsilons[last_dist_n, 0].cpu().item()
             interesting_dict["average_distance"] = self.average_distance
-            interesting_dict[f"p_accept_weighted_mean_square_distance"] = self.weighted_scaled_mean_square_distance
         return interesting_dict
 
     def get_epsilon(self, i, n):
@@ -102,7 +100,8 @@ class HMC(BaseTransitionModel):
             current_q = torch.clone(current_q)  # so we can do in place operations, kinda weird hac
         else:
             current_q = current_q.detach()  # otherwise just need to block grad flow
-        characteristic_length = torch.std(current_q.detach(), dim=0)
+        if self.step_tuning_method == "No-U":
+            characteristic_length = torch.std(current_q.detach(), dim=0)
         loss = 0
         # need this for grad function
         # base function for HMC written in terms of potential energy function U
@@ -169,15 +168,16 @@ class HMC(BaseTransitionModel):
             elif i == self.n_distributions - 3:
                 self.last_dist_p_accepts[n] = torch.mean(acceptance_probability).cpu().detach()
 
-            if i == 0 or self.step_tuning_method == "No-U":
+            if i == 0 or self.step_tuning_method == "No-U-unscaled":
+                distance = torch.linalg.norm((original_q - current_q), ord=2, dim=-1)
+                if i == 0:
+                    self.average_distance = torch.mean(distance).detach().cpu()
+                if self.step_tuning_method == "No-U-unscaled":
+                    weighted_mean_square_distance = acceptance_probability * distance ** 2
+                    loss = loss + torch.mean(weighted_mean_square_distance)
+            if self.step_tuning_method == "No-U":
                 distance_scaled = torch.linalg.norm((original_q - current_q) / characteristic_length, ord=2, dim=-1)
                 weighted_scaled_mean_square_distance = acceptance_probability * distance_scaled ** 2
-                if i == 0:
-                    self.weighted_scaled_mean_square_distance = \
-                        torch.mean(weighted_scaled_mean_square_distance).detach().cpu()
-                    self.average_distance = \
-                        torch.mean(torch.linalg.norm((original_q - current_q), ord=2, dim=-1).detach().cpu())
-
                 if (self.tune_period is False or self.counter < self.tune_period) and self.step_tuning_method == "No-U":
                     # remove zeros so we don't get infs when we divide
                     weighted_scaled_mean_square_distance[weighted_scaled_mean_square_distance == 0.0] = 1.0

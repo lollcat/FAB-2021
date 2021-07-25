@@ -141,7 +141,7 @@ if __name__ == '__main__':
         current_time = datetime.now().strftime("%Y_%m_%d-%I_%M_%S_%p")
         problem = "ManyWell"
         dim = 32
-        epochs = int(5e3)
+        epochs = int(1e5)
         n_flow_steps = 20
         n_distributions = 2 + 4
         batch_size = int(1e3)
@@ -150,7 +150,8 @@ if __name__ == '__main__':
         n_plots = 10
         learnt_dist_kwargs = {"lr": 1e-4, "optimizer": "AdamW"}
         flow_type = "ReverseIAF" # "RealNVP"
-        HMC_transition_args = {"step_tuning_method": "p_accept"}  # "Expected_target_prob", "No-U", "p_accept"
+        # "Expected_target_prob", "No-U", "p_accept", "No-U-unscaled"
+        HMC_transition_args = {"step_tuning_method": "p_accept"}
         save_path = f"Results/{experiment_name}__{problem}" \
                     f"{dim}dim_{flow_type}_epochs{epochs}_flowsteps{n_flow_steps}_dist{n_distributions}" \
                     f"__{current_time}" \
@@ -174,7 +175,8 @@ if __name__ == '__main__':
         n_distributions = 2 + 2
         experiment_name = "testing5"
         flow_type = "ReverseIAF" # "RealNVP" #
-        HMC_transition_args = {"step_tuning_method": "p_accept"} # "Expected_target_prob","No-U" ,"p_accept"
+        # "Expected_target_prob", "No-U", "p_accept", "No-U-unscaled"
+        HMC_transition_args = {"step_tuning_method": "No-U"} # "Expected_target_prob","No-U" ,"p_accept"
         learnt_dist_kwargs = {"lr": 2e-4, "optimizer": "AdamW"}
         save_path = f"Results/{experiment_name}__{problem}" \
                     f"{dim}dim_{flow_type}_epochs{epochs}_flowsteps{n_flow_steps}_dist{n_distributions}" \
