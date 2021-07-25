@@ -29,6 +29,7 @@ class AnnealedImportanceSampler(BaseAIS):
         else:
             raise NotImplementedError  # "We currently just focus on using HMC, but we do have a version of Metropolis
             # and NUTS that should be easy to introduce as options here
+        self.found_nans = 0
 
     def to(self, device):
         self.transition_operator_class.to(device)
@@ -42,7 +43,10 @@ class AnnealedImportanceSampler(BaseAIS):
                           torch.isinf(log_prob_p0) | torch.isnan(log_prob_p0)).bool()
             n_nan_indices = torch.sum(nan_indices)
             if n_nan_indices != 0:
-                print(f"{n_nan_indices} nan encountered in sampling from flow")
+                if n_nan_indices > self.found_nans:
+                    # this is just so we don't print too often ruining the progress bar
+                    print(f"{n_nan_indices} nan encountered in sampling from flow")
+                    self.found_nans = n_nan_indices # save
                 # replace with legit samples
                 x_new[nan_indices] = x_new[~nan_indices][:n_nan_indices]
                 log_prob_p0[nan_indices] = log_prob_p0[~nan_indices][:n_nan_indices]
