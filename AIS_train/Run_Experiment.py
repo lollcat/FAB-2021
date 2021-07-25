@@ -75,7 +75,7 @@ def run_experiment(dim, save_path, epochs, n_flow_steps, n_distributions,
                                n_flow_steps=n_flow_steps)
     tester = AIS_trainer(target, learnt_sampler, n_distributions=n_distributions
                          , tranistion_operator_kwargs=HMC_transition_args, transition_operator="HMC",
-                         learnt_dist_kwargs=learnt_dist_kwargs)
+                         **learnt_dist_kwargs)
     summary_results += "\n\n *******************************    Results ********************* \n\n"
     expectation_before, info_dict_before = tester.AIS_train.calculate_expectation(n_samples_expectation,
                                                                                   expectation_function=expectation_function,
