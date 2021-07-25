@@ -63,7 +63,7 @@ def run_experiment(dim, save_path, epochs, n_flow_steps, n_distributions,
         plot_marginals(None, n_samples=None, title=f"samples from target",
                 samples_q=samples_target, dim=dim, clamp_samples=float(torch.max(torch.abs(samples_target))))
         if save:
-            plt.savefig(str(save_path / "target_samples.eps"),  format='eps')
+            plt.savefig(str(save_path / "target_samples.pdf"))
         plt.show()
         def plotter(*args, **kwargs):
             plot_marginals(*args, **kwargs, clamp_samples=clamp_at)
@@ -89,7 +89,7 @@ def run_experiment(dim, save_path, epochs, n_flow_steps, n_distributions,
 
     plot_history(history)
     if save:
-        plt.savefig(str(save_path / "histories.eps"),  format='eps')
+        plt.savefig(str(save_path / "histories.pdf"))
     plt.show()
     torch.manual_seed(2)
     expectation, info_dict = tester.AIS_train.calculate_expectation(n_samples_expectation,
@@ -110,7 +110,7 @@ def run_experiment(dim, save_path, epochs, n_flow_steps, n_distributions,
     plotter(tester, n_samples=None, title=f"Samples from AIS after training",
             samples_q=info_dict["samples"], alpha=0.01)
     if save:
-        plt.savefig(str(save_path / "plots_AIS_samples_final.eps"),  format='eps')
+        plt.savefig(str(save_path / "plots_AIS_samples_final.pdf"))
     plt.show()
     torch.manual_seed(5)
     expectation_flo, info_dict_flo = tester.AIS_train.calculate_expectation_over_flow(n_samples_expectation,
@@ -120,7 +120,7 @@ def run_experiment(dim, save_path, epochs, n_flow_steps, n_distributions,
     plotter(tester, n_samples=None, title=f"Samples from flow after trainin",
             samples_q=info_dict_flo["samples"], alpha=0.01)
     if save:
-        plt.savefig(str(save_path / "plots_flo_samples_final.eps"),  format='eps')
+        plt.savefig(str(save_path / "plots_flo_samples_final.pdf"))
     plt.show()
     summary_results += f"ESS of flow model after training is " \
            f"{info_dict_flo['effective_sample_size'].item()/ n_samples_expectation}" \
@@ -190,7 +190,7 @@ if __name__ == '__main__':
                     f"HMC{HMC_transition_args['step_tuning_method']}__use_memory{use_memory}"
         print(f"running experiment {save_path} \n\n")
         tester, history = run_experiment(dim, save_path, epochs, n_flow_steps, n_distributions,
-                       flow_type, save=False, n_samples_expectation=int(1e3),
+                       flow_type, save=True, n_samples_expectation=int(1e3),
                        learnt_dist_kwargs=learnt_dist_kwargs, problem=problem, n_plots=n_plots,
                        HMC_transition_args=HMC_transition_args)
         print(f"\n\n finished running experiment {save_path}")

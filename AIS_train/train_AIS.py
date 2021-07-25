@@ -183,7 +183,7 @@ class AIS_trainer(LearntDistributionManager):
                         plotting_func(self, n_samples=plotting_batch_size,
                                       title=f"epoch {self.current_epoch}: samples from flow")
                         if save:
-                            plt.savefig(str(save_path /f"Samples_from_flow_epoch{self.current_epoch}.eps"),  format='eps')
+                            plt.savefig(str(save_path /f"Samples_from_flow_epoch{self.current_epoch}.pdf"))
                         plt.show()
                         n_samples_AIS_plot = min(batch_size, plotting_batch_size) # so plots look consistent
                         # make sure plotting func has option to enter x_samples directly
@@ -191,7 +191,7 @@ class AIS_trainer(LearntDistributionManager):
                                       title=f"epoch {self.current_epoch}: samples from AIS",
                                       samples_q=x_samples[:n_samples_AIS_plot].cpu().detach())
                         if save:
-                            plt.savefig(str(save_path /f"Samples_from_AIS_epoch{self.current_epoch}.eps"),  format='eps')
+                            plt.savefig(str(save_path /f"Samples_from_AIS_epoch{self.current_epoch}.pdf"))
                         plt.show()
                         if "re_sampled_x" in locals():
                             if re_sampled_x is not None:
@@ -199,7 +199,7 @@ class AIS_trainer(LearntDistributionManager):
                                               title=f"epoch {self.current_epoch}: re-sampled samples from AIS",
                                               samples_q=re_sampled_x[:n_samples_AIS_plot].cpu().detach())
                                 if save:
-                                    plt.savefig(str(save_path / f"Resampled_epoch{self.current_epoch}.eps"),  format='eps')
+                                    plt.savefig(str(save_path / f"Resampled_epoch{self.current_epoch}.pdf"))
                                 plt.show()
         if save:
             import pickle
