@@ -21,7 +21,7 @@ class IAF(BaseFlow):
             x = torch.exp(s) * x + m
             log_determinant += torch.sum(s, dim=1)
         else:
-            sigma = torch.sigmoid(s)
+            sigma = torch.sigmoid(s)*2 # reparameterise to start at 1 when we init autoregressive NN to 0
             x = sigma*x + (1-sigma)*m
             log_determinant += torch.sum(torch.log(sigma), dim=1)
         if self.reversed:
@@ -42,7 +42,7 @@ class IAF(BaseFlow):
                 z[:, i] = (x[:, i] - m[:, i])*torch.exp(-s[:, i])
                 log_determinant -= s[:, i]
             else:
-                sigma = torch.sigmoid(s)
+                sigma = torch.sigmoid(s)*2 # reparameterise to start at 1 when we init autoregressive NN to 0
                 z[:, i] = (x[:, i] - (1-sigma[:, i])*m[:, i]) / sigma[:, i]
                 log_determinant -= torch.log(sigma[:, i])
         return z, log_determinant

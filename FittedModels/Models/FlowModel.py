@@ -224,7 +224,7 @@ if __name__ == '__main__':
     import matplotlib.pyplot as plt
     torch.set_default_dtype(torch.float64)
     torch.manual_seed(1)
-    model = FlowModel(x_dim=2, flow_type="ReverseIAF_MIX",
+    model = FlowModel(x_dim=2, flow_type="RealNVP",
                       n_flow_steps=4, scaling_factor=1.5, init_zeros=False)
     model(100)
     x, log_prob = model.forward(100)

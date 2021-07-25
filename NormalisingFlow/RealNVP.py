@@ -5,13 +5,14 @@ from NormalisingFlow.Nets.MLP import MLP
 from NormalisingFlow.base import BaseFlow
 
 class RealNVP(BaseFlow):
-    def __init__(self, x_dim, nodes_per_x=2, n_hidden_layers=1, reversed=False, use_exp=False):
+    def __init__(self, x_dim, nodes_per_x=2, n_hidden_layers=1, reversed=False, use_exp=False, init_zeros=True):
         super(RealNVP, self).__init__()
         self.use_exp = use_exp
         self.d = x_dim // 2  # elements copied from input to output
         self.D_minus_d = x_dim - self.d  # dependent on d elements
         hidden_layer_width = nodes_per_x*x_dim  # this lets us enter the layer width default argument dependent on x_dim
-        self.MLP = MLP(self.d, self.D_minus_d*2, hidden_layer_width, n_hidden_layers=n_hidden_layers)
+        self.MLP = MLP(self.d, self.D_minus_d*2, hidden_layer_width, n_hidden_layers=n_hidden_layers,
+                       init_zeros=init_zeros)
         self.reversed = reversed
 
 
@@ -25,7 +26,7 @@ class RealNVP(BaseFlow):
             x_d_plus_1_to_D = (z_d_plus_1_to_D - t) * torch.exp(-s)
             log_determinant = -torch.sum(s, dim=-1)
         else:
-            sigma = torch.sigmoid(s)
+            sigma = torch.sigmoid(s)*2 # reparameterise to start at 1
             x_d_plus_1_to_D = (z_d_plus_1_to_D - t) / sigma
             log_determinant = -torch.sum(torch.log(sigma), dim=-1)
         x = torch.cat([x_1_to_d, x_d_plus_1_to_D], dim=-1)
@@ -46,7 +47,7 @@ class RealNVP(BaseFlow):
             z_d_plus_1_to_D = x_d_plus_1_to_D * torch.exp(s) + t
             log_determinant = torch.sum(s, dim=-1)
         else:
-            sigma = torch.sigmoid(s)
+            sigma = torch.sigmoid(s)*2 # reparameterise to start at 1
             z_d_plus_1_to_D = x_d_plus_1_to_D * sigma + t
             log_determinant = torch.sum(torch.log(sigma), dim=-1)
 

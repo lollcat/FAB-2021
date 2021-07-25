@@ -22,17 +22,17 @@ class HMC(BaseTransitionModel):
             self.counter = 0
             self.epsilons = nn.ParameterDict()
             # have to store epsilons like this otherwise we get weird erros
-            self.epsilons["common"] = nn.Parameter(torch.tensor([epsilon*0.5]))
             for i in range(n_distributions-2):
                 for n in range(n_outer):
-                    self.epsilons[f"{i}_{n}"] = nn.Parameter(torch.ones(dim)*epsilon*0.5)
+                    self.epsilons[f"{i}_{n}"] = nn.Parameter(torch.log(torch.exp(torch.ones(dim)*epsilon) - 1.0))
             self.optimizer = torch.optim.AdamW(self.parameters(), lr=lr)
             self.Monitor_NaN = Monitor_NaN()
             self.register_nan_hooks()
+            if self.step_tuning_method == "No-U":
+                self.register_buffer("characteristic_length", torch.ones(n_distributions, dim))  # initialise
         else:
             self.train_params = False
-            self.register_buffer("common_epsilon", torch.tensor([epsilon*0.5]))
-            self.register_buffer("epsilons", torch.ones([n_distributions-2, n_outer])*epsilon*0.5)
+            self.register_buffer("epsilons", torch.ones([n_distributions-2, n_outer])*epsilon)
         self.n_outer = n_outer
         self.L = L
         self.n_distributions = n_distributions
@@ -68,30 +68,29 @@ class HMC(BaseTransitionModel):
             if self.n_distributions > 3:
                 for i, val in enumerate(self.last_dist_p_accepts):
                     interesting_dict[f"dist{self.n_distributions-3}_p_accept_{i}"] = val.item()
-            if self.train_params:
-                interesting_dict["epsilon_shared"] = self.epsilons["common"].item()
-                interesting_dict[f"epsilons_dist0_0_dim0"] = self.epsilons[f"{0}_{0}"][0].cpu().item()
-                interesting_dict[f"epsilons_dist0_0_dim-1"] = self.epsilons[f"{0}_{0}"][-1].cpu().item()
-                if self.n_distributions > 3:
-                    last_dist_n = self.n_distributions - 2 - 1  # (we -1 to account for indexing starting at 0)
-                    interesting_dict[f"epsilons_dist{last_dist_n}_0_dim0"] = \
-                        self.epsilons[f"{last_dist_n}_{0}"][0].cpu().item()
-                    interesting_dict[f"epsilons_dist{last_dist_n}_0_dim-1"] = \
-                        self.epsilons[f"{last_dist_n}_{0}"][-1].cpu().item()
+            epsilon_first_dist_first_loop = self.get_epsilon(0,0)
+            if epsilon_first_dist_first_loop.numel() == 1:
+                interesting_dict[f"epsilons_dist0_loop0"] = epsilon_first_dist_first_loop.cpu().item()
             else:
-                interesting_dict["epsilon_shared"] = self.common_epsilon.item()
-                interesting_dict[f"epsilons_dist0_loop0"] = self.epsilons[0, 0].cpu().item()
-                if self.n_distributions > 3:
-                    last_dist_n = self.n_distributions - 2 - 1  # (we -1 to account for indexing starting at 0)
-                    interesting_dict[f"epsilons_dist{last_dist_n}_loop0"] = self.epsilons[last_dist_n, 0].cpu().item()
+                interesting_dict[f"epsilons_dist0_0_dim0"] = epsilon_first_dist_first_loop[0].cpu().item()
+                interesting_dict[f"epsilons_dist0_0_dim-1"] = epsilon_first_dist_first_loop[-1].cpu().item()
+            if self.n_distributions > 3:
+                last_dist_n = self.n_distributions - 2 - 1
+                epsilon_last_dist_first_loop = self.get_epsilon(last_dist_n, 0)
+                if epsilon_last_dist_first_loop.numel() == 1:
+                    interesting_dict[f"epsilons_dist{last_dist_n}_loop0"] = epsilon_last_dist_first_loop.cpu().item()
+                else:
+                    interesting_dict[f"epsilons_dist{last_dist_n}_0_dim0"] = epsilon_last_dist_first_loop[0].cpu().item()
+                    interesting_dict[f"epsilons_dist{last_dist_n}_0_dim-1"] = epsilon_last_dist_first_loop[-1].cpu().item()
+
             interesting_dict["average_distance"] = self.average_distance
         return interesting_dict
 
     def get_epsilon(self, i, n):
         if self.train_params:
-            return torch.abs(self.epsilons[f"{i}_{n}"] + self.epsilons["common"])
+            return torch.nn.functional.softplus(self.epsilons[f"{i}_{n}"])
         else:
-            return torch.abs(self.epsilons[i, n] + self.common_epsilon)
+            return self.epsilons[i, n]
 
     def HMC_func(self, U, current_q, grad_U, i):
         if self.step_tuning_method == "Expected_target_prob":
@@ -100,8 +99,6 @@ class HMC(BaseTransitionModel):
             current_q = torch.clone(current_q)  # so we can do in place operations, kinda weird hac
         else:
             current_q = current_q.detach()  # otherwise just need to block grad flow
-        if self.step_tuning_method == "No-U":
-            characteristic_length = torch.std(current_q.detach(), dim=0)
         loss = 0
         # need this for grad function
         # base function for HMC written in terms of potential energy function U
@@ -150,16 +147,13 @@ class HMC(BaseTransitionModel):
             if self.step_tuning_method == "p_accept":
                 if p_accept > self.target_p_accept: # too much accept
                     self.epsilons[i, n] = self.epsilons[i, n] * 1.1
-                    self.common_epsilon = self.common_epsilon * 1.05
                 else:
                     self.epsilons[i, n] = self.epsilons[i, n] / 1.1
-                    self.common_epsilon = self.common_epsilon / 1.05
             else: # self.step_tuning_method == "No-U":
                 if p_accept < 0.05 or (self.counter < 100 and p_accept < 0.4):
                     # if p_accept is very low manually decrease step size, as this means that no acceptances so no
                     # gradient flow to use
-                    self.epsilons[f"{i}_{n}"].data = self.epsilons[f"{i}_{n}"].data / 1.5
-                    self.epsilons["common"].data = self.epsilons["common"].data / 1.2
+                    self.epsilons[f"{i}_{n}"].data = self.epsilons[f"{i}_{n}"].data - 0.1
                 if i == 0:
                     self.counter += 1
             if i == 0: # save fist and last distribution info
@@ -176,7 +170,7 @@ class HMC(BaseTransitionModel):
                     weighted_mean_square_distance = acceptance_probability * distance ** 2
                     loss = loss + torch.mean(weighted_mean_square_distance)
             if self.step_tuning_method == "No-U":
-                distance_scaled = torch.linalg.norm((original_q - current_q) / characteristic_length, ord=2, dim=-1)
+                distance_scaled = torch.linalg.norm((original_q - current_q) / self.characteristic_length[i, :], ord=2, dim=-1)
                 weighted_scaled_mean_square_distance = acceptance_probability * distance_scaled ** 2
                 if (self.tune_period is False or self.counter < self.tune_period) and self.step_tuning_method == "No-U":
                     # remove zeros so we don't get infs when we divide
@@ -194,6 +188,9 @@ class HMC(BaseTransitionModel):
                     torch.nn.utils.clip_grad_value_(self.parameters(), 1)
                     # torch.autograd.grad(loss, self.epsilons["0_1"], retain_graph=True)
                     self.optimizer.step()
+        if self.step_tuning_method == "No-U":
+            # set next characteristc lengths
+            self.characteristic_length.data[i, :] = torch.std(current_q.detach(), dim=0)
         return current_q.detach()  # stop gradient flow
 
     def run(self, current_q, log_q_x, i):
