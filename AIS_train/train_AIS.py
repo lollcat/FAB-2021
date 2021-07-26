@@ -160,9 +160,9 @@ class AIS_trainer(LearntDistributionManager):
                             history['mean_log_prob_true_samples'].append(mean_log_q_x_true_samples)
                             history['min_log_prob_true_samples'].append(min_log_q_x_true_samples)
                             pbar.set_description(
-                                f"loss: {np.mean(history['loss'][-epoch_per_save_and_print:])},"
+                                f"loss: {np.round(np.mean(history['loss'][-epoch_per_save_and_print:]), 2)},"
                                 f""f"mean_log_prob_true_samples {round(mean_log_q_x_true_samples, 2)},"
-                                f"ESS {history['ESS'][-1]}")
+                                f"ESS {round(history['ESS'][-1], 2)}")
                         elif hasattr(self.target_dist, "test_set"):
                             test_samples = self.target_dist.test_set(self.device)
                             log_probs_test = self.learnt_sampling_dist.log_prob(test_samples)
@@ -171,14 +171,14 @@ class AIS_trainer(LearntDistributionManager):
                             history['mean_log_q_x_test_samples'].append(mean_log_q_x_test_samples)
                             history['min_log_q_x_test_samples'].append(min_log_q_x_test_samples)
                             pbar.set_description(
-                                f"loss: {np.mean(history['loss'][-epoch_per_save_and_print:])},"
+                                f"loss: {np.round(np.mean(history['loss'][-epoch_per_save_and_print:]), 2)},"
                                 f"mean_log_q_x_test_samples {round(mean_log_q_x_test_samples, 2)},"
                                 f"min_log_q_x_test_samples {round(min_log_q_x_test_samples, 2)}"
-                                f"ESS {history['ESS'][-1]}")
+                                f"ESS {round(history['ESS'][-1], 2)}")
                         else:
                             pbar.set_description(
-                                f"loss: {np.mean(history['loss'][-epoch_per_save_and_print:])},"
-                                f"ESS {history['ESS'][-1]}")
+                                f"loss: {np.round(np.mean(history['loss'][-epoch_per_save_and_print:]), 2)},"
+                                f"ESS {round(history['ESS'][-1], 2)}")
                 if intermediate_plots:
                     if self.current_epoch % epoch_per_plot == 0:
                         plotting_func(self, n_samples=plotting_batch_size,
