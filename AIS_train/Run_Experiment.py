@@ -141,17 +141,17 @@ if __name__ == '__main__':
         current_time = datetime.now().strftime("%Y_%m_%d-%I_%M_%S_%p")
         problem = "ManyWell"
         dim = 64
-        use_memory=True
+        use_memory = False
         epochs = int(2e3)
         n_flow_steps = 20
-        n_distributions = 2 + 4
+        n_distributions = 2 + 50
         batch_size = int(1e3)
         n_samples_expectation = int(batch_size*100)
-        experiment_name = "remember"
+        experiment_name = "not-remember"
         n_plots = 10
         flow_type = "ReverseIAF" # "RealNVP"
         # "Expected_target_prob", "No-U", "p_accept", "No-U-unscaled"
-        HMC_transition_args = {"step_tuning_method": "No-U"}
+        HMC_transition_args = {"step_tuning_method": "p_accept"}
         learnt_dist_kwargs = {"lr": 1e-4, "optimizer": "AdamW",
                               "use_memory_buffer": use_memory,
                               "memory_n_batches": 100}
@@ -171,16 +171,16 @@ if __name__ == '__main__':
         from datetime import datetime
         current_time = datetime.now().strftime("%Y_%m_%d-%I_%M_%S_%p")
         problem = "ManyWell" # "MoG" #
-        dim = 8
-        use_memory = True
+        dim = 64
+        use_memory = False
         epochs = 2000
         n_flow_steps = 5
         n_plots = 2
         n_distributions = 2 + 2
-        experiment_name = "testing5"
+        experiment_name = "local"
         flow_type = "RealNVP" # "ReverseIAF" #
         # "Expected_target_prob", "No-U", "p_accept", "No-U-unscaled"
-        HMC_transition_args = {"step_tuning_method": "No-U"} # "Expected_target_prob","No-U" ,"p_accept"
+        HMC_transition_args = {"step_tuning_method": "p_accept"} # "Expected_target_prob","No-U" ,"p_accept"
         learnt_dist_kwargs = {"lr": 2e-4, "optimizer": "AdamW",
                               "use_memory_buffer": use_memory,
                               "memory_n_batches":10}

@@ -161,7 +161,7 @@ class AIS_trainer(LearntDistributionManager):
                             history['min_log_prob_true_samples'].append(min_log_q_x_true_samples)
                             pbar.set_description(
                                 f"loss: {np.mean(history['loss'][-epoch_per_save_and_print:])},"
-                                f""f"mean_log_prob_true_samples {mean_log_q_x_true_samples},"
+                                f""f"mean_log_prob_true_samples {round(mean_log_q_x_true_samples, 2)},"
                                 f"ESS {history['ESS'][-1]}")
                         elif hasattr(self.target_dist, "test_set"):
                             test_samples = self.target_dist.test_set(self.device)
@@ -172,8 +172,8 @@ class AIS_trainer(LearntDistributionManager):
                             history['min_log_q_x_test_samples'].append(min_log_q_x_test_samples)
                             pbar.set_description(
                                 f"loss: {np.mean(history['loss'][-epoch_per_save_and_print:])},"
-                                f"mean_log_q_x_test_samples {mean_log_q_x_test_samples},"
-                                f"min_log_q_x_test_samples {min_log_q_x_test_samples}"
+                                f"mean_log_q_x_test_samples {round(mean_log_q_x_test_samples, 2)},"
+                                f"min_log_q_x_test_samples {round(min_log_q_x_test_samples, 2)}"
                                 f"ESS {history['ESS'][-1]}")
                         else:
                             pbar.set_description(
