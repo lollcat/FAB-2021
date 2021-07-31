@@ -194,10 +194,10 @@ if __name__ == '__main__':
         problem = "ManyWell" # "MoG" #
         dim = 8
         use_memory = False
-        epochs = 1000
+        epochs = 20
         n_flow_steps = 5
-        n_plots = 2
-        n_distributions = 2 + 2
+        n_plots = 3
+        n_distributions = 2 + 1
         experiment_name = "local"
         flow_type = "RealNVP" # "ReverseIAF" #
         # "Expected_target_prob", "No-U", "p_accept", "No-U-unscaled"
@@ -211,7 +211,7 @@ if __name__ == '__main__':
                     f"HMC{HMC_transition_args['step_tuning_method']}__use_memory{use_memory}"
         print(f"running experiment {save_path} \n\n")
         tester, history = run_experiment(dim, save_path, epochs, n_flow_steps, n_distributions,
-                       flow_type, save=False, n_samples_expectation=int(1e3),
+                       flow_type, save=True, n_samples_expectation=int(1e3),
                        learnt_dist_kwargs=learnt_dist_kwargs, problem=problem, n_plots=n_plots,
                        HMC_transition_args=HMC_transition_args)
         print(f"\n\n finished running experiment {save_path}")

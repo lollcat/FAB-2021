@@ -49,16 +49,23 @@ class FlowModel(nn.Module, BaseLearntDistribution):
             self.Monitor_NaN = Monitor_NaN()
             self.register_nan_hooks()
 
-    def save_model(self, save_path):
+    def save_model(self, save_path, epoch=None):
         model_description = str(self.class_args) + str(*self.class_kwargs)
-        summary_results_path = str(save_path / "model_info.txt")
-        model_path = str(save_path / "model")
+        if epoch is None:
+            summary_results_path = str(save_path / "model_info.txt")
+            model_path = str(save_path / "model")
+        else:
+            summary_results_path = str(save_path / f"model_info_epoch{epoch}.txt")
+            model_path = str(save_path / f"model_epoch{epoch}")
         with open(summary_results_path, "w") as g:
             g.write(model_description)
         torch.save(self.state_dict(), model_path)
 
-    def load_model(self, save_path):
-        model_path = str(save_path / "model")
+    def load_model(self, save_path, epoch=None):
+        if epoch is None:
+            model_path = str(save_path / "model")
+        else:
+            model_path = str(save_path / f"model_epoch{epoch}")
         self.load_state_dict(torch.load(model_path))
         print("loaded flow model")
 

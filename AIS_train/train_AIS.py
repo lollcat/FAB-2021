@@ -97,6 +97,8 @@ class AIS_trainer(LearntDistributionManager):
             current_time = datetime.now().strftime("%Y_%m_%d-%I_%M_%S_%p")
             save_path = save_path / f"training{current_time}"
             save_path.mkdir(parents=True, exist_ok=False)
+            model_during_training_path = save_path / "model_checkpoints"
+            model_during_training_path.mkdir(parents=True, exist_ok=False)
             samples_dict = {
                 "epoch": [],
                 "flow_samples": [],
@@ -186,6 +188,10 @@ class AIS_trainer(LearntDistributionManager):
                                 f"ESS {round(history['ESS'][-1], 6)}")
                 if intermediate_plots:
                     if self.current_epoch % epoch_per_plot == 0:
+                        if save: # save model checkpoint, this makes it easy to replicate plots if we want to
+                            self.learnt_sampling_dist.save_model(model_during_training_path, epoch=self.current_epoch)
+                            self.AIS_train.transition_operator_class.save_model(model_during_training_path,
+                                                                                epoch=self.current_epoch)
                         flow_samples = self.learnt_sampling_dist(plotting_batch_size)[0].cpu()
                         plotting_func(self, n_samples=plotting_batch_size,
                                       title=f"epoch {self.current_epoch}: samples from flow",

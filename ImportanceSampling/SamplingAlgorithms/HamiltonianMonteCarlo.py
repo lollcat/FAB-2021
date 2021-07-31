@@ -41,16 +41,23 @@ class HMC(BaseTransitionModel):
         self.last_dist_p_accepts = [torch.tensor([0.0]) for _ in range(n_outer)]
         self.average_distance = 0
 
-    def save_model(self, save_path):
+    def save_model(self, save_path, epoch=None):
         model_description = str(self.class_args)
-        summary_results_path = str(save_path / "HMC_model_info.txt")
-        model_path = str(save_path / "HMC_model")
+        if epoch is None:
+            summary_results_path = str(save_path / "HMC_model_info.txt")
+            model_path = str(save_path / "HMC_model")
+        else:
+            summary_results_path = str(save_path / f"HMC_model_info_epoch{epoch}.txt")
+            model_path = str(save_path / f"HMC_model_epoch{epoch}")
         with open(summary_results_path, "w") as g:
             g.write(model_description)
         torch.save(self.state_dict(), model_path)
 
-    def load_model(self, save_path):
-        model_path = str(save_path / "HMC_model")
+    def load_model(self, save_path, epoch=None):
+        if epoch is None:
+            model_path = str(save_path / "HMC_model")
+        else:
+            model_path = str(save_path / f"HMC_model_epoch{epoch}")
         self.load_state_dict(torch.load(model_path))
         print("loaded HMC model")
 
