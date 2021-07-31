@@ -224,10 +224,12 @@ if __name__ == '__main__':
     import matplotlib.pyplot as plt
     torch.set_default_dtype(torch.float64)
     torch.manual_seed(1)
-    model = FlowModel(x_dim=2, flow_type="RealNVP",
+    model = FlowModel(x_dim=2, flow_type="ReverseIAF",
                       n_flow_steps=4, scaling_factor=1.5, init_zeros=False)
     model(100)
     x, log_prob = model.forward(100)
+    log_prob_check = model.log_prob(x)
+    print(f"Check sample and log_prob vs sample: should be close to zeros {torch.abs(log_prob - log_prob_check).max()}")
     #  x, log_prob = model.batch_forward(100, 10)
     print(f"std: {torch.std(x, dim=0)}") # test ActNorm
     print(f"std: {torch.mean(x, dim=0)}")

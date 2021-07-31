@@ -97,6 +97,11 @@ class AIS_trainer(LearntDistributionManager):
             current_time = datetime.now().strftime("%Y_%m_%d-%I_%M_%S_%p")
             save_path = save_path / f"training{current_time}"
             save_path.mkdir(parents=True, exist_ok=False)
+            samples_dict = {
+                "epoch": [],
+                "flow_samples": [],
+                "AIS_samples": [],
+                "log_w_AIS": []}
         if jupyter:
             from tqdm import tqdm_notebook as tqdm
         else:
@@ -181,24 +186,30 @@ class AIS_trainer(LearntDistributionManager):
                                 f"ESS {round(history['ESS'][-1], 6)}")
                 if intermediate_plots:
                     if self.current_epoch % epoch_per_plot == 0:
+                        flow_samples = self.learnt_sampling_dist(plotting_batch_size)[0].cpu()
                         plotting_func(self, n_samples=plotting_batch_size,
-                                      title=f"epoch {self.current_epoch}: samples from flow")
+                                      title=f"epoch {self.current_epoch}: samples from flow",
+                                      samples_q=flow_samples)
                         if save:
+                            samples_dict["epoch"].append(self.current_epoch)
+                            samples_dict["flow_samples"].append(flow_samples.numpy())
                             plt.savefig(str(save_path /f"Samples_from_flow_epoch{self.current_epoch}.pdf"))
                         plt.show()
                         n_samples_AIS_plot = min(batch_size, plotting_batch_size) # so plots look consistent
                         # make sure plotting func has option to enter x_samples directly
                         plotting_func(self, n_samples=n_samples_AIS_plot ,
                                       title=f"epoch {self.current_epoch}: samples from AIS",
-                                      samples_q=x_samples[:n_samples_AIS_plot].cpu().detach())
+                                      samples_q=x_samples[:n_samples_AIS_plot].cpu())
                         if save:
+                            samples_dict["AIS_samples"].append(x_samples[:n_samples_AIS_plot].cpu().numpy())
+                            samples_dict["log_w_AIS"].append(log_w[:n_samples_AIS_plot].cpu().numpy())
                             plt.savefig(str(save_path /f"Samples_from_AIS_epoch{self.current_epoch}.pdf"))
                         plt.show()
                         if "re_sampled_x" in locals():
                             if re_sampled_x is not None:
                                 plotting_func(self, n_samples=n_samples_AIS_plot,
                                               title=f"epoch {self.current_epoch}: re-sampled samples from AIS",
-                                              samples_q=re_sampled_x[:n_samples_AIS_plot].cpu().detach())
+                                              samples_q=re_sampled_x[:n_samples_AIS_plot].cpu())
                                 if save:
                                     plt.savefig(str(save_path / f"Resampled_epoch{self.current_epoch}.pdf"))
                                 plt.show()
@@ -206,6 +217,8 @@ class AIS_trainer(LearntDistributionManager):
             import pickle
             with open(str(save_path / "history.pkl"), "wb") as f:
                 pickle.dump(history, f)
+            with open(str(save_path / "samples.pkl"), "wb") as f:
+                pickle.dump(samples_dict, f)
             self.learnt_sampling_dist.save_model(save_path)
             self.AIS_train.transition_operator_class.save_model(save_path)
         return history
@@ -318,7 +331,6 @@ if __name__ == '__main__':
     print(
         f"ESS is {info_dict['effective_sample_size'] / n_samples_estimation}, "
         f"var is {torch.var(info_dict['normalised_sampling_weights'])}")
-
 
 
     """

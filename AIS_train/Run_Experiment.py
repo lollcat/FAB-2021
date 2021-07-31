@@ -25,7 +25,7 @@ from Utils.DebuggingUtils import print_memory_stats
 def run_experiment(dim, save_path, epochs, n_flow_steps, n_distributions,
                    flow_type="ReverseIAF", batch_size=int(1e3), seed=0,
                    n_samples_expectation=int(1e5), save=True, n_plots=5, HMC_transition_args={}, learnt_dist_kwargs={"lr": 1e-4}, problem="ManyWell",
-                   non_default_flow_width = None):
+                   non_default_flow_width=None, KPI_batch_size=int(1e4)):
     local_var_dict = locals().copy()
     summary_results = "*********     Parameters      *******************\n\n"  # for writing to file
     for key in local_var_dict:
@@ -68,6 +68,26 @@ def run_experiment(dim, save_path, epochs, n_flow_steps, n_distributions,
         def plotter(*args, **kwargs):
             plot_marginals(*args, **kwargs, clamp_samples=clamp_at)
 
+    elif problem == "MoG_2D_illustration":
+        assert dim == 2
+        from TargetDistributions.MoG import MoG
+        from FittedModels.utils.plotting_utils import plot_marginals
+        target = MoG(dim=dim, n_mixes=5, min_cov=1, loc_scaling=10)
+        if non_default_flow_width is None:
+            scaling_factor_flow = 10.0
+        else:
+            scaling_factor_flow = non_default_flow_width
+        samples_target = target.sample((batch_size,)).detach().cpu()
+        clamp_at = round(float(torch.max(torch.abs(samples_target)) + 0.5))
+        plot_marginals(None, n_samples=None, title=f"samples from target",
+                       samples_q=samples_target, dim=dim, clamp_samples=float(torch.max(torch.abs(samples_target))))
+        if save:
+            plt.savefig(str(save_path / "target_samples.pdf"))
+        plt.show()
+
+        def plotter(*args, **kwargs):
+            plot_marginals(*args, **kwargs, clamp_samples=clamp_at)
+
     else:
         raise Exception
 
@@ -85,7 +105,8 @@ def run_experiment(dim, save_path, epochs, n_flow_steps, n_distributions,
        f" calculated using {n_samples_expectation} samples \n"
 
     history = tester.train(epochs, batch_size=batch_size, intermediate_plots=True, n_plots=n_plots,
-                           plotting_func=plotter, save_path=save_path, save=save)
+                           plotting_func=plotter, save_path=save_path, save=save,
+                           KPI_batch_size=KPI_batch_size)
 
     plot_history(history)
     if save:
@@ -149,7 +170,7 @@ if __name__ == '__main__':
         n_samples_expectation = int(batch_size*100)
         experiment_name = "not-remember"
         n_plots = 10
-        flow_type = "ReverseIAF" # "RealNVP"
+        flow_type = "ReverseIAF"  # "RealNVP"
         # "Expected_target_prob", "No-U", "p_accept", "No-U-unscaled"
         HMC_transition_args = {"step_tuning_method": "p_accept"}
         learnt_dist_kwargs = {"lr": 1e-4, "optimizer": "AdamW",
@@ -171,16 +192,16 @@ if __name__ == '__main__':
         from datetime import datetime
         current_time = datetime.now().strftime("%Y_%m_%d-%I_%M_%S_%p")
         problem = "ManyWell" # "MoG" #
-        dim = 64
+        dim = 8
         use_memory = False
-        epochs = 2000
+        epochs = 1000
         n_flow_steps = 5
         n_plots = 2
         n_distributions = 2 + 2
         experiment_name = "local"
         flow_type = "RealNVP" # "ReverseIAF" #
         # "Expected_target_prob", "No-U", "p_accept", "No-U-unscaled"
-        HMC_transition_args = {"step_tuning_method": "p_accept"} # "Expected_target_prob","No-U" ,"p_accept"
+        HMC_transition_args = {"step_tuning_method": "No-U"} # "Expected_target_prob","No-U" ,"p_accept"
         learnt_dist_kwargs = {"lr": 2e-4, "optimizer": "AdamW",
                               "use_memory_buffer": use_memory,
                               "memory_n_batches":10}

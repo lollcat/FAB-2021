@@ -7,9 +7,9 @@ from Utils.plotting_utils import plot_3D
 
 def plot_marginals(learnt_dist_manager, n_samples=1000, title=None, samples_q=None,
                    clamp_samples=10, alpha=0.2, dim=None):
-    if dim == None:
+    if dim is None:
         dim = learnt_dist_manager.target_dist.dim
-    if samples_q == None:
+    if samples_q is None:
         samples_q = learnt_dist_manager.learnt_sampling_dist.sample((n_samples,))
     samples_q = torch.clamp(samples_q, -clamp_samples, clamp_samples).cpu().detach().numpy()
     if dim == 2:
