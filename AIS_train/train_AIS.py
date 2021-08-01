@@ -11,6 +11,8 @@ import numpy as np
 from Utils.numerical_utils import quadratic_function as expectation_function
 import pathlib
 from collections import deque
+from FittedModels.utils.model_utils import sample_and_log_w_big_batch_drop_nans
+from Utils.plotting_utils import add_to_history_dict
 
 
 class AIS_trainer(LearntDistributionManager):
@@ -104,6 +106,7 @@ class AIS_trainer(LearntDistributionManager):
                 "flow_samples": [],
                 "AIS_samples": [],
                 "log_w_AIS": []}
+            performance_metrics_long = {}
         if jupyter:
             from tqdm import tqdm_notebook as tqdm
         else:
@@ -111,12 +114,9 @@ class AIS_trainer(LearntDistributionManager):
         epoch_per_save_and_print = max(int(epochs / n_progress_updates), 1)
         if intermediate_plots is True:
             epoch_per_plot = max(int(epochs / n_plots), 1)
-        history = {"ESS": [],
-                    "ESS_batch": [],
+        history = {"ESS_batch": [],
                     "loss": [],
                    "log_w": [],
-                   "kl": [],
-                   "alpha_2_divergence": [],
                    "log_p_x_after_AIS": [],
                    }
         history.update(dict([(key, []) for key in self.AIS_train.transition_operator_class.interesting_info()]))
@@ -133,11 +133,12 @@ class AIS_trainer(LearntDistributionManager):
                 loss, re_sampled_x = self.train_inner_loop(x_samples, log_w)
             if self.current_epoch % epoch_per_save_and_print == 0 or self.current_epoch == epochs:
                 # must do this outside of the torch.no_grad below
-                history["ESS"].append(
-                    self.AIS_train.calculate_expectation(
-                        KPI_batch_size, expectation_function,
-                        batch_size=int(1e3),
-                        drop_nan_and_infs=True)[1]['effective_sample_size'].item() / KPI_batch_size)
+                summary_dict_AIS, long_dict_AIS = self.get_performance_metrics_AIS(KPI_batch_size,
+                                                                                   batch_size)
+                history = add_to_history_dict(history, summary_dict_AIS, additional_name="_AIS")
+                if save:
+                    performance_metrics_long = add_to_history_dict(performance_metrics_long, long_dict_AIS,
+                                                                   additional_name="_AIS")
             with torch.no_grad(): # none of the below steps should require gradients
                 # save info
                 history["loss"].append(loss.item())
@@ -149,8 +150,12 @@ class AIS_trainer(LearntDistributionManager):
                 for key in transition_operator_info:
                     history[key].append(transition_operator_info[key])
                 if self.current_epoch % epoch_per_save_and_print == 0 or self.current_epoch == epochs:
-                    history["kl"].append(self.kl_MC_estimate(KPI_batch_size))
-                    history["alpha_2_divergence"].append(self.alpha_divergence_MC_estimate(KPI_batch_size))
+                    summary_dict, long_dict = self.get_performance_metrics_flow(KPI_batch_size, batch_size)
+                    history = add_to_history_dict(history, summary_dict,
+                                                  additional_name="_flow")
+                    if save:
+                        performance_metrics_long = add_to_history_dict(performance_metrics_long, long_dict,
+                                                                       additional_name="_flow")
                     if self.current_epoch > 0:
                         try:
                             log_p_x = self.target_dist.log_prob(x_samples).detach()
@@ -169,7 +174,7 @@ class AIS_trainer(LearntDistributionManager):
                             pbar.set_description(
                                 f"loss: {np.round(np.mean(history['loss'][-epoch_per_save_and_print:]), 2)},"
                                 f""f"mean_log_prob_true_samples {round(mean_log_q_x_true_samples, 2)},"
-                                f"ESS {round(history['ESS'][-1], 6)}")
+                                f"ESS {round(history['ESS_AIS'][-1], 6)}")
                         elif hasattr(self.target_dist, "test_set"):
                             test_samples = self.target_dist.test_set(self.device)
                             log_probs_test = self.learnt_sampling_dist.log_prob(test_samples)
@@ -181,11 +186,11 @@ class AIS_trainer(LearntDistributionManager):
                                 f"loss: {np.round(np.mean(history['loss'][-epoch_per_save_and_print:]), 2)},"
                                 f"mean_log_q_x_test_samples {round(mean_log_q_x_test_samples, 2)},"
                                 f"min_log_q_x_test_samples {round(min_log_q_x_test_samples, 2)}"
-                                f"ESS {round(history['ESS'][-1], 6)}")
+                                f"ESS {round(history['ESS_AIS'][-1], 6)}")
                         else:
                             pbar.set_description(
                                 f"loss: {np.round(np.mean(history['loss'][-epoch_per_save_and_print:]), 2)},"
-                                f"ESS {round(history['ESS'][-1], 6)}")
+                                f"ESS {round(history['ESS_AIS'][-1], 6)}")
                 if intermediate_plots:
                     if self.current_epoch % epoch_per_plot == 0:
                         if save: # save model checkpoint, this makes it easy to replicate plots if we want to
@@ -225,9 +230,29 @@ class AIS_trainer(LearntDistributionManager):
                 pickle.dump(history, f)
             with open(str(save_path / "samples.pkl"), "wb") as f:
                 pickle.dump(samples_dict, f)
+            with open(str(save_path / "long_performance_metrics.pkl"), "wb") as f:
+                pickle.dump(performance_metrics_long, f)
             self.learnt_sampling_dist.save_model(save_path)
             self.AIS_train.transition_operator_class.save_model(save_path)
         return history
+
+    def get_performance_metrics_AIS(self, KPI_batch_size, batch_size):
+        x, log_w = sample_and_log_w_big_batch_drop_nans(self.AIS_train, KPI_batch_size,
+                                                        batch_size, AIS=True)
+        ESS = self.AIS_train.effective_sample_size_unnormalised_log_weights(log_w)/KPI_batch_size
+        summary_dict, long_dict = self.target_dist.performance_metrics(x, log_w)
+        summary_dict["ESS"] = ESS.item()
+        return summary_dict, long_dict
+
+    def get_performance_metrics_flow(self, KPI_batch_size, batch_size):
+        x, log_w = sample_and_log_w_big_batch_drop_nans(self.AIS_train, KPI_batch_size,
+                                                        batch_size, AIS=False)
+        kl_MC = torch.mean(log_w)
+        alpha_2_MC = torch.logsumexp(2*log_w, dim=-1)
+        summary_dict, long_dict = self.target_dist.performance_metrics(x, log_w)
+        summary_dict["kl"] = kl_MC.item()
+        summary_dict["log_alpha_2_div"] = alpha_2_MC.item()
+        return summary_dict, long_dict
 
     def alpha_div_annealed_samples_re_weight(self, x_samples, log_w):
         # in this version we weight each term using log_w

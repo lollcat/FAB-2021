@@ -9,5 +9,8 @@ class BaseTargetDistribution(nn.Module):
         """returns (unnormalised) log probability of samples x"""
         raise NotImplementedError
 
+    def performance_metrics(self, samples, log_w):
+        raise NotImplementedError
+
 
 

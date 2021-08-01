@@ -7,6 +7,18 @@ import numpy as np
 
 from matplotlib.backends.backend_pdf import PdfPages
 
+@torch.no_grad()
+def add_to_history_dict(history_dict, new_point_dict, additional_name=""):
+    if not (list(new_point_dict.keys())[0] + additional_name) in history_dict.keys():
+        for key in new_point_dict.keys():
+            name = key + additional_name
+            history_dict[name] = []
+    for key in new_point_dict.keys():
+        name = key + additional_name
+        history_dict[name].append(new_point_dict[key])
+    return history_dict
+
+
 def plot_marginals(distribution, n_samples=1000, title=None, samples_q=None,
                    clamp_samples=10, alpha=0.2):
     if samples_q is None:

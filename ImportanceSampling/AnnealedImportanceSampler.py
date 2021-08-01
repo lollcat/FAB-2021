@@ -3,6 +3,7 @@ import torch.nn.functional as F
 from ImportanceSampling.base import BaseImportanceSampler
 from collections.abc import Callable
 import numpy as np
+from FittedModels.utils.model_utils import sample_and_log_w_big_batch_drop_nans
 
 
 class AnnealedImportanceSampler(BaseImportanceSampler):
@@ -21,8 +22,8 @@ class AnnealedImportanceSampler(BaseImportanceSampler):
                  step_size=1.0, transition_operator="Metropolis", HMC_inner_steps=5):
         # this changes meaning depending on algorithm, for Metropolis it scales noise, for HMC it is step size
         self.step_size = torch.tensor([step_size])
-        self.sampling_distribution = sampling_distribution
-        self.target_distribution = target_distribution
+        self.learnt_sampling_dist = sampling_distribution
+        self.target_dist = target_distribution
         self.n_distributions = n_distributions
         self.n_steps_transition_operator = n_steps_transition_operator
         n_linspace_points = int(n_distributions/5) # rough heuristic, copying ratio used in example in AIS paper
@@ -66,11 +67,11 @@ class AnnealedImportanceSampler(BaseImportanceSampler):
 
     @property
     def device(self):
-        return next(self.sampling_distribution.parameters()).device
+        return next(self.learnt_sampling_dist.parameters()).device
 
     def run(self, n_runs):
         log_w = torch.zeros(n_runs).to(self.device)  # log importance weight
-        x_new, log_prob_p0 = self.sampling_distribution(n_runs)
+        x_new, log_prob_p0 = self.learnt_sampling_dist(n_runs)
         log_w += self.intermediate_unnormalised_log_prob(x_new, 1) - log_prob_p0
         for j in range(1, self.n_distributions-1):
             x_new = self.transition_operator(x_new, j)
@@ -87,7 +88,7 @@ class AnnealedImportanceSampler(BaseImportanceSampler):
         # j is the step of the algorithm, and corresponds which intermediate distribution that we are sampling from
         # j = 0 is the sampling distribution, j=N is the target distribution
         beta = self.B_space[j]
-        return (1-beta)*self.sampling_distribution.log_prob(x) + beta*self.target_distribution.log_prob(x)
+        return (1-beta) * self.learnt_sampling_dist.log_prob(x) + beta * self.target_dist.log_prob(x)
 
 
     def calculate_expectation(self, n_samples: int, expectation_function, batch_size=None,
@@ -96,16 +97,8 @@ class AnnealedImportanceSampler(BaseImportanceSampler):
         if batch_size is None:
             samples, log_w = self.run(n_runs=n_samples)
         else:
-            assert n_samples % batch_size == 0.0
-            n_batches = int(n_samples / batch_size)
-            samples = []
-            log_w = []
-            for i in range(n_batches):
-                sample_batch, log_w_batch = self.run(n_runs=batch_size)
-                samples.append(sample_batch.cpu().detach())
-                log_w.append(log_w_batch.cpu().detach())
-            samples = torch.cat(samples, dim=0)
-            log_w = torch.cat(log_w, dim=0)
+            samples, log_w = sample_and_log_w_big_batch_drop_nans(self, n_samples=n_samples,
+                                                                  batch_size=batch_size, AIS=True)
         if drop_nan_and_infs:
             contains_neg_infs = (torch.isinf(log_w) & (log_w < torch.tensor(0.0))) | torch.isnan(log_w)
             log_w = log_w[~contains_neg_infs]
@@ -125,29 +118,15 @@ class AnnealedImportanceSampler(BaseImportanceSampler):
             -> (torch.tensor, dict):
         with torch.no_grad():
             if batch_size is None:
-                samples, log_q = self.sampling_distribution(n_samples)
+                samples, log_q = self.learnt_sampling_dist(n_samples)
                 nice_indices = ~(torch.isinf(log_q) | torch.isnan(log_q))
                 samples = samples[nice_indices]
                 log_q = log_q[nice_indices].cpu().detach()
-                log_p = self.target_distribution.log_prob(samples).cpu().detach()
+                log_p = self.target_dist.log_prob(samples).cpu().detach()
                 log_w = log_p - log_q
             else:
-                assert n_samples % batch_size == 0.0
-                n_batches = int(n_samples / batch_size)
-                samples = []
-                log_w = []
-                for i in range(n_batches):
-                    samples_batch, log_q = self.sampling_distribution(batch_size)
-                    nice_indices = (~(torch.isinf(log_q) | torch.isnan(log_q)))
-                    samples_batch = samples_batch[nice_indices]
-                    nice_indices = nice_indices.cpu().detach()
-                    log_q = log_q.cpu().detach()[nice_indices]
-                    log_p = self.target_distribution.log_prob(samples_batch).cpu().detach()
-                    log_w_batch = log_p - log_q
-                    log_w.append(log_w_batch)
-                    samples.append(samples_batch.cpu().detach())
-                samples = torch.cat(samples, dim=0)
-                log_w = torch.cat(log_w, dim=0)
+                samples, log_w = sample_and_log_w_big_batch_drop_nans(self, n_samples=n_samples,
+                                                                      batch_size=batch_size, AIS=False)
             if drop_nan_and_infs:
                 contains_neg_infs = (torch.isinf(log_w) & (log_w < torch.tensor(0.0))) | torch.isnan(log_w)
                 log_w = log_w[~contains_neg_infs]

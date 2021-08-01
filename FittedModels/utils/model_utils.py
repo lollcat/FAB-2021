@@ -18,18 +18,18 @@ def sample_and_log_prob_big_batch_drop_nans(tester, n_samples, batch_size):
   log_q = torch.cat(log_q, dim=0)
   return samples, log_q
 
-def sample_and_log_w_big_batch_drop_nans(tester, n_samples, batch_size, AIS = False):
+def sample_and_log_w_big_batch_drop_nans(AIS_train, n_samples, batch_size, AIS = False):
   assert n_samples % batch_size == 0
   n_batches = int(n_samples / batch_size)
   samples = []
   log_w = []
   for i in range(n_batches):
       if not AIS:
-          samples_batch, log_q_batch = tester.learnt_sampling_dist(batch_size)
-          log_p_batch = tester.target_dist.log_prob(samples_batch)
+          samples_batch, log_q_batch = AIS_train.learnt_sampling_dist(batch_size)
+          log_p_batch = AIS_train.target_dist.log_prob(samples_batch)
           log_w_batch = log_p_batch - log_q_batch
       else:
-          samples_batch, log_w_batch = tester.AIS_train.run(batch_size)
+          samples_batch, log_w_batch = AIS_train.run(batch_size)
       nice_indices = (~(torch.isinf(log_w_batch) | torch.isnan(log_w_batch))).cpu().detach()
       samples_batch = samples_batch.detach().cpu()[nice_indices]
       log_w_batch = log_w_batch.detach().cpu()[nice_indices]

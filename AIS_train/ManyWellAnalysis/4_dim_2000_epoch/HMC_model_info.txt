@@ -1,0 +1,1 @@
+{'n_distributions': 4, 'dim': 4, 'epsilon': 1.0, 'n_outer': 1, 'L': 5, 'step_tuning_method': 'p_accept', 'target_p_accept': 0.65, 'lr': 0.001, 'tune_period': False}

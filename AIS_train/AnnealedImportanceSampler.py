@@ -19,8 +19,8 @@ class AnnealedImportanceSampler(BaseAIS):
         # this changes meaning depending on algorithm, for Metropolis it scales noise, for HMC it is step size
         self.dim = sampling_distribution.dim
         self.loss_type = loss_type
-        self.sampling_distribution = sampling_distribution
-        self.target_distribution = target_distribution
+        self.learnt_sampling_dist = sampling_distribution
+        self.target_dist = target_distribution
         self.setup_n_distributions(n_distributions=n_distributions, distribution_spacing=distribution_spacing)
         if transition_operator == "HMC":
             from ImportanceSampling.SamplingAlgorithms.HamiltonianMonteCarlo import HMC
@@ -36,9 +36,9 @@ class AnnealedImportanceSampler(BaseAIS):
 
     def run(self, n_runs):
         log_w = torch.zeros(n_runs).to(self.device)  # log importance weight
-        self.sampling_distribution.set_requires_grad(False)
+        self.learnt_sampling_dist.set_requires_grad(False)
         with torch.no_grad():
-            x_new, log_prob_p0 = self.sampling_distribution(n_runs)
+            x_new, log_prob_p0 = self.learnt_sampling_dist(n_runs)
             nan_indices = (torch.sum(torch.isnan(x_new) | torch.isinf(x_new), dim=-1) |
                           torch.isinf(log_prob_p0) | torch.isnan(log_prob_p0)).bool()
             n_nan_indices = torch.sum(nan_indices)
@@ -53,7 +53,7 @@ class AnnealedImportanceSampler(BaseAIS):
             log_w += self.intermediate_unnormalised_log_prob(x_new, 1) - log_prob_p0
         for j in range(1, self.n_distributions-1):
             x_new, log_w = self.perform_transition(x_new, log_w, j)
-        self.sampling_distribution.set_requires_grad(True)
+        self.learnt_sampling_dist.set_requires_grad(True)
         return x_new, log_w
 
     def perform_transition(self, x_new, log_w, j):
@@ -67,7 +67,7 @@ class AnnealedImportanceSampler(BaseAIS):
         # j is the step of the algorithm, and corresponds which intermediate distribution that we are sampling from
         # j = 0 is the sampling distribution, j=N is the target distribution
         beta = self.B_space[j]
-        return (1-beta)*self.sampling_distribution.log_prob(x) + beta*self.target_distribution.log_prob(x)
+        return (1-beta) * self.learnt_sampling_dist.log_prob(x) + beta * self.target_dist.log_prob(x)
 
     def setup_n_distributions(self, n_distributions, distribution_spacing="geometric"):
         self.n_distributions = n_distributions

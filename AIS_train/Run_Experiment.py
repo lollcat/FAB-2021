@@ -192,9 +192,9 @@ if __name__ == '__main__':
         from datetime import datetime
         current_time = datetime.now().strftime("%Y_%m_%d-%I_%M_%S_%p")
         problem = "ManyWell" # "MoG" #
-        dim = 8
+        dim = 2
         use_memory = False
-        epochs = 20
+        epochs = 100
         n_flow_steps = 5
         n_plots = 3
         n_distributions = 2 + 1
@@ -202,7 +202,7 @@ if __name__ == '__main__':
         flow_type = "RealNVP" # "ReverseIAF" #
         # "Expected_target_prob", "No-U", "p_accept", "No-U-unscaled"
         HMC_transition_args = {"step_tuning_method": "No-U"} # "Expected_target_prob","No-U" ,"p_accept"
-        learnt_dist_kwargs = {"lr": 2e-4, "optimizer": "AdamW",
+        learnt_dist_kwargs = {"lr": 1e-3, "optimizer": "AdamW",
                               "use_memory_buffer": use_memory,
                               "memory_n_batches":10}
         save_path = f"Results/{experiment_name}__{problem}" \
@@ -211,7 +211,7 @@ if __name__ == '__main__':
                     f"HMC{HMC_transition_args['step_tuning_method']}__use_memory{use_memory}"
         print(f"running experiment {save_path} \n\n")
         tester, history = run_experiment(dim, save_path, epochs, n_flow_steps, n_distributions,
-                       flow_type, save=True, n_samples_expectation=int(1e3),
+                       flow_type, save=False, n_samples_expectation=int(1e3),
                        learnt_dist_kwargs=learnt_dist_kwargs, problem=problem, n_plots=n_plots,
                        HMC_transition_args=HMC_transition_args)
         print(f"\n\n finished running experiment {save_path}")

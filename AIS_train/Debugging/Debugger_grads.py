@@ -8,11 +8,11 @@ class Debugger(AnnealedImportanceSampler):
     def run_with_checks(self, n_runs):
         # first set flow init zeros to false so we can see what's cracking if our learnt distribution is a flow
         log_w = torch.zeros(n_runs).to(self.device)  # log importance weight
-        x_new, log_prob_p0 = self.sampling_distribution(n_runs)
+        x_new, log_prob_p0 = self.learnt_sampling_dist(n_runs)
         log_w += self.intermediate_unnormalised_log_prob(x_new, 1) - log_prob_p0
-        print(torch.autograd.grad(torch.sum(x_new), self.sampling_distribution.flow_blocks[
+        print(torch.autograd.grad(torch.sum(x_new), self.learnt_sampling_dist.flow_blocks[
             0].AutoregressiveNN.FirstLayer.latent_to_layer.weight, retain_graph=True))
-        print(torch.autograd.grad(torch.sum(log_w), self.sampling_distribution.flow_blocks[
+        print(torch.autograd.grad(torch.sum(log_w), self.learnt_sampling_dist.flow_blocks[
             0].AutoregressiveNN.FirstLayer.latent_to_layer.weight, retain_graph=True))
         for j in range(1, self.n_distributions-1):
             x_new = self.Metropolis_transition(x_new, j)
@@ -22,9 +22,9 @@ class Debugger(AnnealedImportanceSampler):
                 if (j+1) % self.save_spacing == 0:
                     self.log_w_history.append(log_w.cpu().detach())
                     self.samples_history.append(x_new.cpu().detach())
-        print(torch.autograd.grad(torch.sum(x_new), self.sampling_distribution.flow_blocks[
+        print(torch.autograd.grad(torch.sum(x_new), self.learnt_sampling_dist.flow_blocks[
             0].AutoregressiveNN.FirstLayer.latent_to_layer.weight, retain_graph=True))
-        print(torch.autograd.grad(torch.sum(log_w), self.sampling_distribution.flow_blocks[
+        print(torch.autograd.grad(torch.sum(log_w), self.learnt_sampling_dist.flow_blocks[
             0].AutoregressiveNN.FirstLayer.latent_to_layer.weight, retain_graph=True))
         return x_new, log_w
 
