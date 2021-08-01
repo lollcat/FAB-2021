@@ -19,3 +19,9 @@ class BaseImportanceSampler(abc.ABC):
             torch.isnan(unnormalised_sampling_log_weights) | torch.isinf(unnormalised_sampling_log_weights))]
         normalised_sampling_weights = F.softmax(unnormalised_sampling_log_weights, dim=-1)
         return self.effective_sample_size(normalised_sampling_weights)
+
+    def estimate_expectation_given_samples_and_log_w(self, expectation_function, samples, log_w):
+        normalised_importance_weights = F.softmax(log_w, dim=-1)
+        function_values = expectation_function(samples)
+        expectation = normalised_importance_weights.T @ function_values
+        return expectation

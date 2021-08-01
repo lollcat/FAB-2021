@@ -22,13 +22,17 @@ class AnnealedImportanceSampler(BaseAIS):
         self.learnt_sampling_dist = sampling_distribution
         self.target_dist = target_distribution
         self.setup_n_distributions(n_distributions=n_distributions, distribution_spacing=distribution_spacing)
-        if transition_operator == "HMC":
-            from ImportanceSampling.SamplingAlgorithms.HamiltonianMonteCarlo import HMC
-            self.transition_operator_class = HMC(dim=self.dim, n_distributions=n_distributions,
-                                                 **transition_operator_kwargs)
+        if n_distributions > 2:
+            if transition_operator == "HMC":
+                from ImportanceSampling.SamplingAlgorithms.HamiltonianMonteCarlo import HMC
+                self.transition_operator_class = HMC(dim=self.dim, n_distributions=n_distributions,
+                                                     **transition_operator_kwargs)
+            else:
+                raise NotImplementedError  # "We currently just focus on using HMC, but we do have a version of Metropolis
+                # and NUTS that should be easy to introduce as options here
         else:
-            raise NotImplementedError  # "We currently just focus on using HMC, but we do have a version of Metropolis
-            # and NUTS that should be easy to introduce as options here
+            from ImportanceSampling.SamplingAlgorithms.base import BaseTransitionModel
+            self.transition_operator_class = BaseTransitionModel()  # blank
         self.found_nans = 0
 
     def to(self, device):

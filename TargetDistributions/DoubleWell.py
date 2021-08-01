@@ -64,7 +64,6 @@ class ManyWellEnergy(DoubleWellEnergy):
         self.true_energy_difference = 1.73 # calculated by by evaluating linspace of points changing x1, setting x2=0
         self.shallow_well_bounds = [-1.75, -1.65]
         self.deep_well_bounds = [1.7, 1.8]
-        self.n_batches_stat_aggregation = 20  # calculate mean
 
     @property
     def test_set_(self):
@@ -91,13 +90,18 @@ class ManyWellEnergy(DoubleWellEnergy):
         return super(ManyWellEnergy, self).log_prob(x)
 
     @torch.no_grad()
-    def performance_metrics(self, x_samples, log_w):
+    def performance_metrics(self, train_class, x_samples, log_w,
+                            n_batches_stat_aggregation=20):
         assert x_samples.shape[0] % self.n_batches_stat_aggregation == 0
         samples_per_batch = x_samples.shape[0] // self.n_batches_stat_aggregation
         free_energy_differences = np.empty((self.n_batches_stat_aggregation, self.n_wells))
-        for batch_number in range(self.n_batches_stat_aggregation):
-            x_samples_batch = x_samples[batch_number * samples_per_batch:(batch_number + 1) * samples_per_batch]
-            log_w_batch = log_w[batch_number * samples_per_batch:(batch_number + 1) * samples_per_batch]
+        for i, batch_number in enumerate(range(n_batches_stat_aggregation)):
+            if i != n_batches_stat_aggregation - 1:
+                log_w_batch = log_w[batch_number * samples_per_batch:(batch_number + 1) * samples_per_batch]
+                x_samples_batch = x_samples[batch_number * samples_per_batch:(batch_number + 1) * samples_per_batch]
+            else:
+                log_w_batch = log_w[batch_number * samples_per_batch:]
+                x_samples_batch = x_samples[batch_number * samples_per_batch:]
             for well_number in range(self.n_wells):
                 dim1_index = well_number*2
                 relevant_x_samples_indices_lower_well = (x_samples_batch[:, dim1_index] < self.shallow_well_bounds[1]) & \
