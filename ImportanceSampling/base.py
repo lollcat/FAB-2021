@@ -25,3 +25,4 @@ class BaseImportanceSampler(abc.ABC):
         function_values = expectation_function(samples)
         expectation = normalised_importance_weights.T @ function_values
         return expectation
+

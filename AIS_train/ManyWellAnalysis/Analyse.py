@@ -30,7 +30,7 @@ if __name__ == '__main__':
     tester = AIS_trainer(target, learnt_sampler, n_distributions=n_distributions
                          , tranistion_operator_kwargs=HMC_transition_args, transition_operator="HMC",
                          **learnt_dist_kwargs)
-    """
+
     from_flow = lambda n_samples: sample_and_log_w_big_batch_drop_nans(tester, n_samples=n_samples, batch_size=int(1e4),
                                                                        AIS=False)
     from_AIS = lambda n_samples: sample_and_log_w_big_batch_drop_nans(tester, n_samples=n_samples, batch_size=int(1e4),
@@ -41,6 +41,7 @@ if __name__ == '__main__':
     bias, std, bias_w, std_w = bias_uncertainty(target, hist_x_flow, hists_y_flow, whist_x_flow, whists_y_flow)
     fig = plot_energy(target, hist_x_flow, hists_y_flow, whist_x_flow, whists_y_flow, ylabel=True, nstd=1.0)
     plt.show()
+    
     """
     from FittedModels.utils.model_utils import sample_and_log_w_big_batch_drop_nans
     x, log_w = sample_and_log_w_big_batch_drop_nans(tester, 10000, 1000, AIS = False)
@@ -52,7 +53,7 @@ if __name__ == '__main__':
     x, log_w = sample_and_log_w_big_batch_drop_nans(tester, 10000, 1000, AIS=False)
     short_dict, long_dict = target.performance_metrics(x, log_w)
     print(short_dict)
-
+    """
 
 
 

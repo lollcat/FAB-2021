@@ -352,7 +352,7 @@ if __name__ == '__main__':
     tester = AIS_trainer(target, learnt_sampler, n_distributions=6,
                          transition_operator="HMC", lr=5e-4,
                          tranistion_operator_kwargs=HMC_transition_operator_args,
-                         use_memory_buffer=False)
+                         use_memory_buffer=False, AIS_kwargs={"Beta_end": 1.0})
     plot_samples(tester)
     plt.show()
 

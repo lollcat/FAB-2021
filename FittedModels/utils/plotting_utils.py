@@ -11,12 +11,21 @@ def plot_marginals(learnt_dist_manager, n_samples=1000, title=None, samples_q=No
         dim = learnt_dist_manager.target_dist.dim
     if samples_q is None:
         samples_q = learnt_dist_manager.learnt_sampling_dist.sample((n_samples,))
-    samples_q = torch.clamp(samples_q, -clamp_samples, clamp_samples).cpu().detach().numpy()
+    if isinstance(clamp_samples, int):
+        samples_q = torch.clamp(samples_q, -clamp_samples, clamp_samples).cpu().detach().numpy()
+    else:
+        for i, clamp_dim in enumerate(clamp_samples):  # list of min max per dimension
+            samples_q[:, i] = torch.clamp(samples_q[:, i], clamp_dim[0], clamp_dim[1])
+        samples_q = samples_q.cpu().detach().numpy()
     if dim == 2:
         if learnt_dist_manager is not None:
             n_points_contour = 200
-            x_points_dim1 = torch.linspace(-clamp_samples, clamp_samples, n_points_contour)
-            x_points_dim2 = torch.linspace(-clamp_samples, clamp_samples, n_points_contour)
+            if isinstance(clamp_samples, int):
+                x_points_dim1 = torch.linspace(-clamp_samples, clamp_samples, n_points_contour)
+                x_points_dim2 = torch.linspace(-clamp_samples, clamp_samples, n_points_contour)
+            else:
+                x_points_dim1 = torch.linspace(clamp_samples[0][0], clamp_samples[0][1], n_points_contour)
+                x_points_dim2 = torch.linspace(clamp_samples[1][0], clamp_samples[1][1], n_points_contour)
             x_points = torch.tensor(list(itertools.product(x_points_dim1, x_points_dim2)))
             p_x = learnt_dist_manager.target_dist.log_prob(x_points.to(learnt_dist_manager.device))
             p_x = torch.clamp_min(p_x, -1000)
@@ -28,8 +37,6 @@ def plot_marginals(learnt_dist_manager, n_samples=1000, title=None, samples_q=No
             plt.xlabel(r"$x_1$")
             plt.ylabel(r"$x_2$")
         plt.plot(samples_q[:, 0], samples_q[:, 1], "o", alpha=alpha)
-        plt.xlim(-clamp_samples, clamp_samples)
-        plt.ylim(-clamp_samples, clamp_samples)
         if title != None:
             plt.suptitle(title)
     else:

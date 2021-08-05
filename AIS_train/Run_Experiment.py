@@ -70,6 +70,7 @@ def run_experiment(dim, save_path, epochs, n_flow_steps, n_distributions,
             plot_marginals(*args, **kwargs, clamp_samples=clamp_at)
 
     elif problem == "MoG_2D_illustration":
+        assert seed == 2
         assert dim == 2
         from TargetDistributions.MoG import MoG
         from FittedModels.utils.plotting_utils import plot_marginals
@@ -79,9 +80,9 @@ def run_experiment(dim, save_path, epochs, n_flow_steps, n_distributions,
         else:
             scaling_factor_flow = non_default_flow_width
         samples_target = target.sample((batch_size,)).detach().cpu()
-        clamp_at = round(float(torch.max(torch.abs(samples_target)) + 0.5))
+        clamp_at = [[-25, 20], [-20, 10]] #round(float(torch.max(torch.abs(samples_target)) + 0.5))
         plot_marginals(None, n_samples=None, title=f"samples from target",
-                       samples_q=samples_target, dim=dim, clamp_samples=float(torch.max(torch.abs(samples_target))))
+                       samples_q=samples_target, dim=dim, clamp_samples=clamp_at)
         if save:
             plt.savefig(str(save_path / "target_samples.pdf"))
         plt.show()
@@ -118,7 +119,6 @@ def run_experiment(dim, save_path, epochs, n_flow_steps, n_distributions,
     history = tester.train(epochs, batch_size=batch_size, intermediate_plots=True, n_plots=n_plots,
                            plotting_func=plotter, save_path=save_path, save=save,
                            KPI_batch_size=KPI_batch_size)
-
     plot_history(history)
     if save:
         plt.savefig(str(save_path / "histories.pdf"))
@@ -147,7 +147,7 @@ def run_experiment(dim, save_path, epochs, n_flow_steps, n_distributions,
     if save:
         plt.savefig(str(save_path / "plots_AIS_samples_final.pdf"))
     plt.show()
-    plotter(tester, n_samples=None, title=f"Samples from flow after trainin",
+    plotter(tester, n_samples=None, title=f"Samples from flow after training",
             samples_q=x_flow, alpha=0.01)
     if save:
         plt.savefig(str(save_path / "plots_flo_samples_final.pdf"))
@@ -198,8 +198,9 @@ if __name__ == '__main__':
     else:
         from datetime import datetime
         current_time = datetime.now().strftime("%Y_%m_%d-%I_%M_%S_%p")
-        problem = "MoG_2D_illustration" # "ManyWell" # "MoG" #
-        dim = 2
+        problem =  "ManyWell" #  "ManyWell" # "MoG" # # "MoG_2D_illustration"
+        dim = 4
+        save = False
         use_memory = False
         epochs = 500
         batch_size = int(1e2)
@@ -215,14 +216,14 @@ if __name__ == '__main__':
         learnt_dist_kwargs = {"lr": 5e-4, "optimizer": "AdamW",
                               "use_memory_buffer": use_memory,
                               "memory_n_batches":10,
-                              "alpha": 0.1}  #  , "loss_type": "kl_q"# "alpha_2_q"
+                              "alpha": 0.1, "loss_type": "kl_q"} # "alpha_2_q"
         save_path = f"Results/{experiment_name}__{problem}" \
                     f"{dim}dim_{flow_type}_epochs{epochs}_flowsteps{n_flow_steps}_dist{n_distributions}" \
                     f"__{current_time}" \
                     f"HMC{HMC_transition_args['step_tuning_method']}__use_memory{use_memory}"
         print(f"running experiment {save_path} \n\n")
         tester, history = run_experiment(dim, save_path, epochs, n_flow_steps, n_distributions,
-                       flow_type, save=False, n_samples_expectation=n_samples_expectation,
+                       flow_type, save=save, n_samples_expectation=n_samples_expectation,
                        learnt_dist_kwargs=learnt_dist_kwargs, problem=problem, n_plots=n_plots,
                        HMC_transition_args=HMC_transition_args, seed=2, KPI_batch_size=KPI_batch_size)
         print(f"\n\n finished running experiment {save_path}")

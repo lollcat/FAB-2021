@@ -18,3 +18,6 @@ class BaseTransitionModel(nn.Module):
     def interesting_info(self):
         # dict of any interesting information for plotting
         return {}
+
+    def save_model(self, *args, **kwargs):
+        print("base model doesn't save")

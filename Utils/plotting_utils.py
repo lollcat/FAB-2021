@@ -9,10 +9,11 @@ from matplotlib.backends.backend_pdf import PdfPages
 
 @torch.no_grad()
 def add_to_history_dict(history_dict, new_point_dict, additional_name=""):
-    if not (list(new_point_dict.keys())[0] + additional_name) in history_dict.keys():
-        for key in new_point_dict.keys():
-            name = key + additional_name
-            history_dict[name] = []
+    if len(new_point_dict.keys()) > 0:
+        if not (list(new_point_dict.keys())[0] + additional_name) in history_dict.keys():
+            for key in new_point_dict.keys():
+                name = key + additional_name
+                history_dict[name] = []
     for key in new_point_dict.keys():
         name = key + additional_name
         history_dict[name].append(new_point_dict[key])

@@ -92,9 +92,10 @@ class ManyWellEnergy(DoubleWellEnergy):
     @torch.no_grad()
     def performance_metrics(self, train_class, x_samples, log_w,
                             n_batches_stat_aggregation=20):
-        assert x_samples.shape[0] % self.n_batches_stat_aggregation == 0
-        samples_per_batch = x_samples.shape[0] // self.n_batches_stat_aggregation
-        free_energy_differences = np.empty((self.n_batches_stat_aggregation, self.n_wells))
+        return {}, {} # currently don't trust energy differences as useful
+        assert x_samples.shape[0] % n_batches_stat_aggregation == 0
+        samples_per_batch = x_samples.shape[0] // n_batches_stat_aggregation
+        free_energy_differences = np.empty((n_batches_stat_aggregation, self.n_wells))
         for i, batch_number in enumerate(range(n_batches_stat_aggregation)):
             if i != n_batches_stat_aggregation - 1:
                 log_w_batch = log_w[batch_number * samples_per_batch:(batch_number + 1) * samples_per_batch]
