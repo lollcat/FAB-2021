@@ -7,7 +7,7 @@ class HMC(BaseTransitionModel):
     """
     Following: https: // arxiv.org / pdf / 1206.1901.pdf
     """
-    def __init__(self, n_distributions, dim, epsilon=1.0, n_outer=1, L=5, step_tuning_method="No-U",
+    def __init__(self, n_distributions, dim, epsilon=1.0, n_outer=1, L=5, step_tuning_method="p_accept",
                  target_p_accept=0.65, lr=1e-3, tune_period=False):
         self.class_args = locals().copy()
         del(self.class_args["self"])
@@ -53,12 +53,12 @@ class HMC(BaseTransitionModel):
             g.write(model_description)
         torch.save(self.state_dict(), model_path)
 
-    def load_model(self, save_path, epoch=None):
+    def load_model(self, save_path, epoch=None, device='cpu'):
         if epoch is None:
             model_path = str(save_path / "HMC_model")
         else:
             model_path = str(save_path / f"HMC_model_epoch{epoch}")
-        self.load_state_dict(torch.load(model_path))
+        self.load_state_dict(torch.load(model_path, map_location=torch.device(device)))
         print("loaded HMC model")
 
     def register_nan_hooks(self):

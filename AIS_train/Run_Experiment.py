@@ -88,7 +88,7 @@ def run_experiment(dim, save_path, epochs, n_flow_steps, n_distributions,
         plt.show()
 
         def plotter(*args, **kwargs):
-            plot_marginals(*args, **kwargs, clamp_samples=clamp_at)
+            plot_marginals(*args, **kwargs, clamp_samples=clamp_at, log=True, clip_min=-100, n_contour_lines=30)
 
     else:
         raise Exception
@@ -198,11 +198,11 @@ if __name__ == '__main__':
     else:
         from datetime import datetime
         current_time = datetime.now().strftime("%Y_%m_%d-%I_%M_%S_%p")
-        problem =  "ManyWell" #  "ManyWell" # "MoG" # # "MoG_2D_illustration"
+        problem = "ManyWell" #  "ManyWell" # "MoG" # #
         dim = 4
         save = False
         use_memory = False
-        epochs = 500
+        epochs = 400
         batch_size = int(1e2)
         n_samples_expectation = batch_size*10
         KPI_batch_size = batch_size*10
@@ -213,10 +213,10 @@ if __name__ == '__main__':
         flow_type = "RealNVP" # "ReverseIAF" #
         HMC_tune_options = [ "No-U", "p_accept", "No-U-unscaled" ]
         HMC_transition_args = {"step_tuning_method": HMC_tune_options[2]} # "Expected_target_prob","No-U" ,"p_accept"
-        learnt_dist_kwargs = {"lr": 5e-4, "optimizer": "AdamW",
+        learnt_dist_kwargs = {"lr": 8e-4, "optimizer": "AdamW",
                               "use_memory_buffer": use_memory,
-                              "memory_n_batches":10,
-                              "alpha": 0.1, "loss_type": "kl_q"} # "alpha_2_q"
+                              "memory_n_batches": 50}
+                             # "alpha": 0.1, "loss_type": "kl_q"} # "alpha_2_q"
         save_path = f"Results/{experiment_name}__{problem}" \
                     f"{dim}dim_{flow_type}_epochs{epochs}_flowsteps{n_flow_steps}_dist{n_distributions}" \
                     f"__{current_time}" \

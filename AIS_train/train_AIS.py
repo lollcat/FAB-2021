@@ -57,7 +57,13 @@ class AIS_trainer(LearntDistributionManager):
         self.to(device=self.device)
         self.use_memory_buffer = use_memory_buffer
         if self.use_memory_buffer:
-            self.memory_buffer = deque(maxlen=memory_n_batches)
+            self.memory_buffer_x = None # deque(maxlen=memory_n_batches)
+            self.memory_buffer_log_w = None
+            self.memory_position_counter = 0
+            self.max_memory_points = None
+            self.max_memory_batches = memory_n_batches
+            self.n_gradient_update_batches = int(self.max_memory_batches / 10)  # update using a 10_th of the memory
+
 
     def to(self, device):
         """device is cuda or cpu"""
@@ -67,19 +73,42 @@ class AIS_trainer(LearntDistributionManager):
         self.target_dist.to(self.device)
         self.AIS_train.to(device)
 
+    @property
+    def n_memory_samples(self):
+        return self.memory_buffer_x.shape[0]
+
+    def add_to_memory(self, x_samples, log_w):
+        batch_size = x_samples.shape[0]
+        if self.memory_position_counter == 0:
+            self.max_memory_points = self.max_memory_batches * batch_size
+            self.memory_buffer_x = x_samples.detach().cpu()
+            self.memory_buffer_log_w = log_w.detach().cpu()
+        elif self.n_memory_samples < self.max_memory_points: # continue to fill memory
+            self.memory_buffer_x = torch.cat([self.memory_buffer_x, x_samples.detach().cpu()])
+            self.memory_buffer_log_w = torch.cat([self.memory_buffer_log_w, log_w.detach().cpu()])
+        else: # replace old memory
+            self.memory_buffer_x[self.memory_position_counter*batch_size:
+                                 (self.memory_position_counter + 1)*batch_size] = x_samples.detach().cpu()
+            self.memory_buffer_log_w[self.memory_position_counter * batch_size:
+                                 (self.memory_position_counter + 1) * batch_size] = log_w.detach().cpu()
+        if self.memory_position_counter >= self.max_memory_batches-1:
+            self.memory_position_counter = 0
+        else:
+            self.memory_position_counter += 1
+        return
+
     def train_loop_with_memory(self, x_samples, log_w):
         total_loss = 0
-        self.memory_buffer.append((x_samples.detach().cpu(), log_w.detach().cpu()))
-        for i, (x_samples, log_w) in enumerate(reversed(self.memory_buffer)):
-            x_samples = x_samples.to(self.device)
-            log_w = log_w.to(self.device)
-            if i == 0:
-                loss= self.train_inner_loop(x_samples, log_w)
-            else:
-                loss = self.train_inner_loop(x_samples, log_w)[0]
+        self.add_to_memory(x_samples, log_w)
+        batch_size = x_samples.shape[0]
+        for i in range(self.n_gradient_update_batches):
+            batch_indices = np.random.choice(np.arange(self.n_memory_samples), batch_size,
+                                             replace=False)
+            x_samples = self.memory_buffer_x[batch_indices].to(self.device)
+            log_w = self.memory_buffer_log_w[batch_indices].to(self.device)
+            loss = self.train_inner_loop(x_samples, log_w)
             total_loss += torch.nan_to_num(loss)
         return total_loss
-
 
 
     def train_inner_loop(self, x_samples, log_w):

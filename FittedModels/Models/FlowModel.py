@@ -61,12 +61,12 @@ class FlowModel(nn.Module, BaseLearntDistribution):
             g.write(model_description)
         torch.save(self.state_dict(), model_path)
 
-    def load_model(self, save_path, epoch=None):
+    def load_model(self, save_path, epoch=None, device='cpu'):
         if epoch is None:
             model_path = str(save_path / "model")
         else:
             model_path = str(save_path / f"model_epoch{epoch}")
-        self.load_state_dict(torch.load(model_path))
+        self.load_state_dict(torch.load(model_path, map_location=torch.device(device)))
         print("loaded flow model")
 
     def to(self, device):

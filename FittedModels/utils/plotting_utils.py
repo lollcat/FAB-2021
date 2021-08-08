@@ -6,12 +6,18 @@ import numpy as np
 from Utils.plotting_utils import plot_3D
 
 def plot_marginals(learnt_dist_manager, n_samples=1000, title=None, samples_q=None,
-                   clamp_samples=10, alpha=0.2, dim=None):
+                   clamp_samples=10, alpha=0.2, dim=None, n_points_contour=200, marker='o', log=True
+                   , n_contour_lines=10, clip_min=-10):
+    # currenntly assuming this is used for Many well problem
+    if log is True:
+        map_log_or_exp = lambda x: torch.clamp_min(x, clip_min)
+    else:
+        map_log_or_exp = lambda x: torch.exp(x)
     if dim is None:
         dim = learnt_dist_manager.target_dist.dim
     if samples_q is None:
         samples_q = learnt_dist_manager.learnt_sampling_dist.sample((n_samples,))
-    if isinstance(clamp_samples, int):
+    if isinstance(clamp_samples, int) or isinstance(clamp_samples, float) :
         samples_q = torch.clamp(samples_q, -clamp_samples, clamp_samples).cpu().detach().numpy()
     else:
         for i, clamp_dim in enumerate(clamp_samples):  # list of min max per dimension
@@ -19,7 +25,6 @@ def plot_marginals(learnt_dist_manager, n_samples=1000, title=None, samples_q=No
         samples_q = samples_q.cpu().detach().numpy()
     if dim == 2:
         if learnt_dist_manager is not None:
-            n_points_contour = 200
             if isinstance(clamp_samples, int):
                 x_points_dim1 = torch.linspace(-clamp_samples, clamp_samples, n_points_contour)
                 x_points_dim2 = torch.linspace(-clamp_samples, clamp_samples, n_points_contour)
@@ -28,18 +33,38 @@ def plot_marginals(learnt_dist_manager, n_samples=1000, title=None, samples_q=No
                 x_points_dim2 = torch.linspace(clamp_samples[1][0], clamp_samples[1][1], n_points_contour)
             x_points = torch.tensor(list(itertools.product(x_points_dim1, x_points_dim2)))
             p_x = learnt_dist_manager.target_dist.log_prob(x_points.to(learnt_dist_manager.device))
-            p_x = torch.clamp_min(p_x, -1000)
+            p_x = map_log_or_exp(p_x)
             p_x = p_x.cpu().detach().numpy()
             p_x = p_x.reshape((n_points_contour, n_points_contour))
             x_points_dim1 = x_points[:, 0].reshape((n_points_contour, n_points_contour)).numpy()
             x_points_dim2 = x_points[:, 1].reshape((n_points_contour, n_points_contour)).numpy()
-            plt.contour(x_points_dim1, x_points_dim2, p_x, levels=80)
+            plt.contour(x_points_dim1, x_points_dim2, p_x, levels= n_contour_lines)
             plt.xlabel(r"$x_1$")
             plt.ylabel(r"$x_2$")
-        plt.plot(samples_q[:, 0], samples_q[:, 1], "o", alpha=alpha)
+        plt.plot(samples_q[:, 0], samples_q[:, 1], marker, alpha=alpha)
         if title != None:
             plt.suptitle(title)
     else:
+        # we do following trick because dim are indpependant
+        # first get varying log probs
+        x_varying = torch.linspace(-clamp_samples, clamp_samples, n_points_contour)
+        x_zeros = torch.zeros_like(x_varying)
+        x_points_double_well_dim = torch.stack([x_varying, x_zeros]).T
+        contours_double_well_dim = learnt_dist_manager.target_dist.log_prob_2D(x_points_double_well_dim)
+
+        # next we get non_varying dim
+        x_points_uni_modal = torch.stack([x_zeros, x_varying]).T
+        contours_uni_modal_dim = learnt_dist_manager.target_dist.log_prob_2D(x_points_uni_modal)
+
+        x_points = torch.tensor(list(itertools.product(x_varying, x_varying)))
+        x_points_dim1 = x_points[:, 0].reshape((n_points_contour, n_points_contour)).numpy()
+        x_points_dim2 = x_points[:, 1].reshape((n_points_contour, n_points_contour)).numpy()
+        well_contours_z = {}
+        well_contours_z["well-well"] = map_log_or_exp(contours_double_well_dim[:, None] + contours_double_well_dim[None, :])
+        well_contours_z["no-well"] = map_log_or_exp(contours_uni_modal_dim[:, None] + contours_double_well_dim[None, :])
+        well_contours_z["well-no"] = map_log_or_exp(contours_double_well_dim[:, None] + contours_uni_modal_dim[None, :])
+        well_contours_z["no-no"] = map_log_or_exp(contours_uni_modal_dim[:, None] + contours_uni_modal_dim[None, :])
+
         fig, axs = plt.subplots(dim, dim,
                                 figsize=(3*dim, 3 * dim),
                                 sharex="row", sharey="row")
@@ -48,9 +73,18 @@ def plot_marginals(learnt_dist_manager, n_samples=1000, title=None, samples_q=No
         for i in range(dim):
             for j in range(dim):
                 if i != j:
-                    axs[i, j].plot(samples_q[:, i], samples_q[:, j], "o", alpha=alpha)
+                    dim_1_name = ["well", "no"][i % 2]
+                    dim_2_name = ["well", "no"][j % 2]
+                    axs[i, j].plot(samples_q[:, j], samples_q[:, i],  marker, alpha=alpha)
                     axs[i, j].set_xlim(-clamp_samples, clamp_samples)
                     axs[i, j].set_ylim(-clamp_samples, clamp_samples)
+                    axs[i, j].contour(x_points_dim2, x_points_dim1,
+                                      well_contours_z[f"{dim_1_name}-{dim_2_name}"],
+                                levels= n_contour_lines)
+                if j == 0:
+                    axs[i, j].set_ylabel(f"dim {i +1}")
+                if i == dim-1:
+                    axs[i, j].set_xlabel(f"dim {j + 1}")
     plt.tight_layout()
 
 def plot_samples_vs_contours_many_well(learnt_dist_manager, n_samples=1000,
@@ -195,4 +229,18 @@ def plot_samples(learnt_dist_manager, n_samples=1000, title=None, samples_q=None
 
 
 if __name__ == '__main__':
-    pass
+    import matplotlib.pyplot as plt
+    from AIS_train.train_AIS import AIS_trainer
+    from FittedModels.Models.FlowModel import FlowModel
+    from TargetDistributions.DoubleWell import ManyWellEnergy
+    dim = 4
+    tester = AIS_trainer
+    learnt_sampler = FlowModel(x_dim=dim)
+    target = ManyWellEnergy(dim=dim, a=-0.5, b=-6)
+    tester = AIS_trainer(target, learnt_sampler)
+    flow_samples = tester.learnt_sampling_dist(1000)[0].detach()
+    plot_marginals(tester, n_samples=500, title=None, samples_q=flow_samples,
+                   clamp_samples=2.5, alpha=0.3, dim=None, n_points_contour=50, marker="x",
+                   n_contour_lines=10, clip_min=-5)
+    plt.show()
+
