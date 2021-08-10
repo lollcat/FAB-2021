@@ -21,10 +21,12 @@ class HMC(BaseTransitionModel):
             self.train_params = True
             self.counter = 0
             self.epsilons = nn.ParameterDict()
+            self.epsilons["common"] = nn.Parameter(
+                torch.log(torch.exp(torch.tensor([epsilon])) - 1.0) * 0.5)
             # have to store epsilons like this otherwise we get weird erros
             for i in range(n_distributions-2):
                 for n in range(n_outer):
-                    self.epsilons[f"{i}_{n}"] = nn.Parameter(torch.log(torch.exp(torch.ones(dim)*epsilon) - 1.0))
+                    self.epsilons[f"{i}_{n}"] = nn.Parameter(torch.log(torch.exp(torch.ones(dim)*epsilon) - 1.0)*0.5)
             self.optimizer = torch.optim.AdamW(self.parameters(), lr=lr)
             self.Monitor_NaN = Monitor_NaN()
             self.register_nan_hooks()
@@ -32,7 +34,8 @@ class HMC(BaseTransitionModel):
                 self.register_buffer("characteristic_length", torch.ones(n_distributions, dim))  # initialise
         else:
             self.train_params = False
-            self.register_buffer("epsilons", torch.ones([n_distributions-2, n_outer])*epsilon)
+            self.register_buffer("common_epsilon", torch.tensor([epsilon * 0.5]))
+            self.register_buffer("epsilons", torch.ones([n_distributions-2, n_outer])*epsilon * 0.5)
         self.n_outer = n_outer
         self.L = L
         self.n_distributions = n_distributions
@@ -95,9 +98,9 @@ class HMC(BaseTransitionModel):
 
     def get_epsilon(self, i, n):
         if self.train_params:
-            return torch.nn.functional.softplus(self.epsilons[f"{i}_{n}"])
+            return torch.nn.functional.softplus(self.epsilons[f"{i}_{n}"] + self.epsilons["common"])
         else:
-            return self.epsilons[i, n]
+            return self.epsilons[i, n] + self.common_epsilon
 
     def HMC_func(self, U, current_q, grad_U, i):
         if self.step_tuning_method == "Expected_target_prob":
@@ -154,13 +157,16 @@ class HMC(BaseTransitionModel):
             if self.step_tuning_method == "p_accept":
                 if p_accept > self.target_p_accept: # too much accept
                     self.epsilons[i, n] = self.epsilons[i, n] * 1.1
+                    self.common_epsilon = self.common_epsilon * 1.05
                 else:
                     self.epsilons[i, n] = self.epsilons[i, n] / 1.1
+                    self.common_epsilon = self.common_epsilon / 1.05
             else: # self.step_tuning_method == "No-U":
-                if p_accept < 0.05 or (self.counter < 100 and p_accept < 0.4):
+                if p_accept < 0.1 or (self.counter < 100 and p_accept < 0.4):
                     # if p_accept is very low manually decrease step size, as this means that no acceptances so no
                     # gradient flow to use
-                    self.epsilons[f"{i}_{n}"].data = self.epsilons[f"{i}_{n}"].data - 0.1
+                    self.epsilons[f"{i}_{n}"].data = self.epsilons[f"{i}_{n}"].data - 0.2
+                    self.epsilons["common"].data = self.epsilons["common"].data - 0.2
                 if i == 0:
                     self.counter += 1
             if i == 0: # save fist and last distribution info

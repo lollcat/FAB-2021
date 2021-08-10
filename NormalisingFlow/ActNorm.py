@@ -9,7 +9,7 @@ class ActNorm(BaseFlow):
     """
     https: // arxiv.org / pdf / 1807.03039.pdf
     """
-    def __init__(self, x_dim, use_exp = False):
+    def __init__(self, x_dim, use_exp=False):
         super(ActNorm, self).__init__()
         self.loc = nn.Parameter(torch.ones(x_dim))
         self.scale = nn.Parameter(torch.ones(x_dim))

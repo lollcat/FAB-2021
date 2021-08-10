@@ -167,26 +167,23 @@ if __name__ == '__main__':
         from datetime import datetime
         current_time = datetime.now().strftime("%Y_%m_%d-%I_%M_%S_%p")
         problem = "ManyWell"
-        dim = 64
-        use_memory = False
+        dim = 32
         epochs = int(2e3)
         n_flow_steps = 20
         n_distributions = 2 + 50
         batch_size = int(1e3)
         KPI_batch_size = batch_size * 10
         n_samples_expectation = int(batch_size*100)
-        experiment_name = "not-remember"
+        experiment_name = "Week2"
         n_plots = 10
         flow_type = "ReverseIAF"  # "RealNVP"
         # "Expected_target_prob", "No-U", "p_accept", "No-U-unscaled"
         HMC_transition_args = {"step_tuning_method": "p_accept"}
-        learnt_dist_kwargs = {"lr": 1e-4, "optimizer": "AdamW",
-                              "use_memory_buffer": use_memory,
-                              "memory_n_batches": 100}
+        learnt_dist_kwargs = {"lr": 1e-4, "optimizer": "AdamW"}
         save_path = f"Results/{experiment_name}__{problem}" \
                     f"{dim}dim_{flow_type}_epochs{epochs}_flowsteps{n_flow_steps}_dist{n_distributions}" \
                     f"__{current_time}" \
-                    f"HMC{HMC_transition_args['step_tuning_method']}__use_memory{use_memory}"
+                    f"HMC{HMC_transition_args['step_tuning_method']}"
         print(f"running experiment {save_path} \n\n")
         assert n_samples_expectation % batch_size == 0
         tester, history = run_experiment(dim, save_path, epochs, n_flow_steps, n_distributions,
@@ -201,26 +198,22 @@ if __name__ == '__main__':
         problem = "ManyWell" #  "ManyWell" # "MoG" # #
         dim = 4
         save = False
-        use_memory = False
-        epochs = 400
+        epochs = 200
         batch_size = int(1e2)
         n_samples_expectation = batch_size*10
         KPI_batch_size = batch_size*10
         n_flow_steps = 10
         n_plots = 5
-        n_distributions = 2 + 2
+        n_distributions = 2 + 3
         experiment_name = "local"
         flow_type = "RealNVP" # "ReverseIAF" #
         HMC_tune_options = [ "No-U", "p_accept", "No-U-unscaled" ]
-        HMC_transition_args = {"step_tuning_method": HMC_tune_options[2]} # "Expected_target_prob","No-U" ,"p_accept"
-        learnt_dist_kwargs = {"lr": 8e-4, "optimizer": "AdamW",
-                              "use_memory_buffer": use_memory,
-                              "memory_n_batches": 50}
-                             # "alpha": 0.1, "loss_type": "kl_q"} # "alpha_2_q"
+        HMC_transition_args = {"step_tuning_method": HMC_tune_options[1]} # "Expected_target_prob","No-U" ,"p_accept"
+        learnt_dist_kwargs = {"lr": 1e-2, "optimizer": "AdamW"}
         save_path = f"Results/{experiment_name}__{problem}" \
                     f"{dim}dim_{flow_type}_epochs{epochs}_flowsteps{n_flow_steps}_dist{n_distributions}" \
                     f"__{current_time}" \
-                    f"HMC{HMC_transition_args['step_tuning_method']}__use_memory{use_memory}"
+                    f"HMC{HMC_transition_args['step_tuning_method']}"
         print(f"running experiment {save_path} \n\n")
         tester, history = run_experiment(dim, save_path, epochs, n_flow_steps, n_distributions,
                        flow_type, save=save, n_samples_expectation=n_samples_expectation,

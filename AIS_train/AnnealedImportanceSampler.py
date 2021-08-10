@@ -13,13 +13,12 @@ class AnnealedImportanceSampler(BaseAIS):
     f_n(x) = p_0 ^ (1 - bt) + p_N ^ bt
     where 0 = b_0 < b_1 ... < b_d = 1
     """
-    def __init__(self, loss_type, sampling_distribution, target_distribution,
+    def __init__(self, sampling_distribution, target_distribution,
                  n_distributions=20, distribution_spacing="linear", transition_operator="HMC",
                  transition_operator_kwargs=None, Beta_end=1.0):
         self.Beta_end = Beta_end  # typically 1, but if we set = 2 then we approach p^2/q
         # this changes meaning depending on algorithm, for Metropolis it scales noise, for HMC it is step size
         self.dim = sampling_distribution.dim
-        self.loss_type = loss_type
         self.learnt_sampling_dist = sampling_distribution
         self.target_dist = target_distribution
         self.setup_n_distributions(n_distributions=n_distributions, distribution_spacing=distribution_spacing)
@@ -112,8 +111,7 @@ if __name__ == '__main__':
     target = MoG(dim=dim, n_mixes=2, min_cov=1, loc_scaling=3)
     learnt_sampler = FlowModel(x_dim=dim, scaling_factor=3.0)
     HMC_transition_operator_args = {}
-    test = AnnealedImportanceSampler(loss_type="kl",
-                                     sampling_distribution=learnt_sampler,
+    test = AnnealedImportanceSampler(sampling_distribution=learnt_sampler,
                                      target_distribution=target, n_distributions=5,
                                      transition_operator="HMC",
                                      transition_operator_kwargs=HMC_transition_operator_args)

@@ -28,7 +28,7 @@ class AIS_trainer(LearntDistributionManager):
                  ):
         assert loss_type in ["alpha_2_IS", "alpha_2_q", "kl_q"]
         self.loss_type = loss_type
-        self.AIS_train = AnnealedImportanceSampler(loss_type, fitted_model, target_distribution,
+        self.AIS_train = AnnealedImportanceSampler(fitted_model, target_distribution,
                                                    transition_operator=transition_operator,
                                                    n_distributions=n_distributions,
                                                    **AIS_kwargs,
@@ -47,6 +47,7 @@ class AIS_trainer(LearntDistributionManager):
         self.target_dist = target_distribution
         if loss_type == "alpha_2_IS": # main method
             self.loss = self.alpha_div_annealed_samples_re_weight
+            assert self.alpha ==2
         elif loss_type == "alpha_2_q":
             self.loss = lambda x_samples, log_w: torch.logsumexp(2*log_w, dim=-1)
         else:
@@ -167,12 +168,11 @@ class AIS_trainer(LearntDistributionManager):
         for self.current_epoch in pbar:
             if self.loss_type == "alpha_2_IS":
                 x_samples, log_w = self.AIS_train.run(batch_size)
+                x_samples, log_w = x_samples.detach(), log_w.detach() # be extra careful that these are detached
             else:
                 x_samples, log_q = self.learnt_sampling_dist(batch_size)
                 log_p = self.target_dist.log_prob(x_samples)
                 log_w = log_p - log_q
-                #nice_indices = (~(torch.isinf(log_w) | torch.isnan(log_w))).cpu().detach()
-                #log_w = log_w[nice_indices]
             if self.use_memory_buffer:
                 loss = self.train_loop_with_memory(x_samples, log_w)
             else:
@@ -364,7 +364,7 @@ if __name__ == '__main__':
 
     torch.manual_seed(2)
     n_plots = 5
-    epochs = 1000
+    epochs = 100
     step_size = 1.0
     batch_size = int(1e3)
     dim = 2
@@ -378,8 +378,8 @@ if __name__ == '__main__':
     fig = plot_distribution(target, bounds=[[-30, 20], [-20, 20]])
     plt.show()
     learnt_sampler = FlowModel(x_dim=dim, scaling_factor=1.0, flow_type=flow_type, n_flow_steps=n_flow_steps)
-    tester = AIS_trainer(target, learnt_sampler, n_distributions=6,
-                         transition_operator="HMC", lr=5e-4,
+    tester = AIS_trainer(target, learnt_sampler, n_distributions=10,
+                         transition_operator="HMC", lr=1e-3,
                          tranistion_operator_kwargs=HMC_transition_operator_args,
                          use_memory_buffer=False, AIS_kwargs={"Beta_end": 1.0})
     plot_samples(tester)
