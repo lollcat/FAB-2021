@@ -41,6 +41,7 @@ class MoG(BaseTargetDistribution):
         self.distribution = self.get_distribution
         self.expectation_function = quadratic_function
         self.true_expectation = MC_estimate_true_expectation(self, self.expectation_function, int(1e6)).item()
+        print(f"true expectation is {self.true_expectation}")
 
     def to(self, device):
         super(MoG, self).to(device)

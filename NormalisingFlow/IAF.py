@@ -5,7 +5,8 @@ from NormalisingFlow.base import BaseFlow
 
 
 class IAF(BaseFlow):
-    def __init__(self, x_dim, nodes_per_x=3, n_hidden_layers=1, reversed=True, use_exp=False, init_zeros=True):
+    def __init__(self, x_dim, nodes_per_x=3, n_hidden_layers=1,
+                 reversed=True, use_exp=False, init_zeros=True):
         super(IAF, self).__init__()
         self.use_exp = use_exp
         self.x_dim = x_dim
@@ -15,6 +16,8 @@ class IAF(BaseFlow):
         self.reversed = reversed
 
     def inverse(self, x):
+        if self.reversed:
+            x = x.flip(dims=(-1,))
         log_determinant = torch.zeros(x.shape[0]).to(x.device)
         m, s = self.AutoregressiveNN(x)
         if self.use_exp:
@@ -45,6 +48,8 @@ class IAF(BaseFlow):
                 sigma = torch.sigmoid(s)*2 # reparameterise to start at 1 when we init autoregressive NN to 0
                 z[:, i] = (x[:, i] - (1-sigma[:, i])*m[:, i]) / sigma[:, i]
                 log_determinant -= torch.log(sigma[:, i])
+        if self.reversed:
+            z = z.flip(dims=(-1,))
         return z, log_determinant
 
 class Reverse_IAF(IAF):

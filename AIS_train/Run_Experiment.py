@@ -25,8 +25,9 @@ import pickle
 
 def run_experiment(dim, save_path, epochs, n_flow_steps, n_distributions,
                    flow_type="ReverseIAF", batch_size=int(1e3), seed=0,
-                   n_samples_expectation=int(1e5), save=True, n_plots=5, HMC_transition_args={}, learnt_dist_kwargs={"lr": 1e-4}, problem="ManyWell",
-                   non_default_flow_width=None, KPI_batch_size=int(1e4)):
+                   n_samples_expectation=int(1e5), save=True, n_plots=5, HMC_transition_args={},
+                   train_AIS_kwargs={"lr": 1e-4}, problem="ManyWell",
+                   non_default_flow_width=None, KPI_batch_size=int(1e4), learnt_sampler_kwargs={}):
     local_var_dict = locals().copy()
     summary_results = "*********     Parameters      *******************\n\n"  # for writing to file
     for key in local_var_dict:
@@ -79,25 +80,19 @@ def run_experiment(dim, save_path, epochs, n_flow_steps, n_distributions,
             scaling_factor_flow = 1.0
         else:
             scaling_factor_flow = non_default_flow_width
-        samples_target = target.sample((batch_size,)).detach().cpu()
-        clamp_at = [[-25, 20], [-20, 10]] #round(float(torch.max(torch.abs(samples_target)) + 0.5))
-        plot_marginals(None, n_samples=None, title=f"samples from target",
-                       samples_q=samples_target, dim=dim, clamp_samples=clamp_at)
-        if save:
-            plt.savefig(str(save_path / "target_samples.pdf"))
-        plt.show()
-
+        clamp_at = [[-25, 20], [-20, 10]]
         def plotter(*args, **kwargs):
-            plot_marginals(*args, **kwargs, clamp_samples=clamp_at, log=True, clip_min=-100, n_contour_lines=30)
+            plot_marginals(*args, **kwargs, clamp_samples=clamp_at, log=True,
+                           clip_min=-1e10, n_contour_lines=80)
 
     else:
         raise Exception
 
     learnt_sampler = FlowModel(x_dim=dim, scaling_factor=scaling_factor_flow, flow_type=flow_type,
-                               n_flow_steps=n_flow_steps)
+                               n_flow_steps=n_flow_steps, **learnt_sampler_kwargs)
     tester = AIS_trainer(target, learnt_sampler, n_distributions=n_distributions
                          , tranistion_operator_kwargs=HMC_transition_args, transition_operator="HMC",
-                         **learnt_dist_kwargs)
+                         **train_AIS_kwargs)
     summary_results += "\n\n *******************************    Results ********************* \n\n"
     summary_dict_before_AIS, long_dict_before_AIS = tester.get_performance_metrics_AIS(n_samples_expectation,
                                                                                   batch_size=batch_size)
@@ -163,7 +158,38 @@ def run_experiment(dim, save_path, epochs, n_flow_steps, n_distributions,
 
 if __name__ == '__main__':
     testing_local = True
-    if not testing_local:
+    if testing_local:
+        from datetime import datetime
+        current_time = datetime.now().strftime("%Y_%m_%d-%I_%M_%S_%p")
+        problem = "ManyWell" # "MoG_2D_illustration" #  "ManyWell" # "MoG" # # "MoG_2D_illustration"
+        dim = 4
+        save = False
+        epochs = 100
+        batch_size = int(1e2)
+        n_samples_expectation = batch_size*10
+        KPI_batch_size = batch_size*10
+        n_flow_steps = 10
+        n_plots = 5
+        n_distributions = 2 + 2
+        experiment_name = "local"
+        flow_type = "RealNVP"  # "RealNVP" # "RealNVPMix" # "RealNVPMix" # "alpha_2_IS"
+        HMC_tune_options = [ "No-U", "p_accept", "No-U-unscaled" ]
+        HMC_transition_args = {"step_tuning_method": HMC_tune_options[1]} # "Expected_target_prob","No-U" ,"p_accept"
+        train_AIS_kwargs = {"lr": 5e-3, "optimizer": "AdamW", "loss_type": "alpha_2_NIS"}   # "alpha_2_IS" # "alpha_2_NIS" "kl_p"
+        learnt_sampler_kwargs = {"init_zeros": True}
+        save_path = f"Results/{experiment_name}__{problem}" \
+                    f"{dim}dim_{flow_type}_epochs{epochs}_flowsteps{n_flow_steps}_dist{n_distributions}" \
+                    f"__{current_time}" \
+                    f"HMC{HMC_transition_args['step_tuning_method']}"
+        print(f"running experiment {save_path} \n\n")
+        tester, history = run_experiment(dim, save_path, epochs, n_flow_steps, n_distributions,
+                                         flow_type, save=save, n_samples_expectation=n_samples_expectation,
+                                         train_AIS_kwargs=train_AIS_kwargs, problem=problem, n_plots=n_plots,
+                                         HMC_transition_args=HMC_transition_args, seed=2, KPI_batch_size=KPI_batch_size,
+                                         learnt_sampler_kwargs=learnt_sampler_kwargs)
+        print(f"\n\n finished running experiment {save_path}")
+
+    else:
         from datetime import datetime
         current_time = datetime.now().strftime("%Y_%m_%d-%I_%M_%S_%p")
         problem = "ManyWell"
@@ -179,7 +205,7 @@ if __name__ == '__main__':
         flow_type = "ReverseIAF"  # "RealNVP"
         # "Expected_target_prob", "No-U", "p_accept", "No-U-unscaled"
         HMC_transition_args = {"step_tuning_method": "p_accept"}
-        learnt_dist_kwargs = {"lr": 1e-4, "optimizer": "AdamW"}
+        train_AIS_kwargs = {"lr": 1e-4, "optimizer": "AdamW"}
         save_path = f"Results/{experiment_name}__{problem}" \
                     f"{dim}dim_{flow_type}_epochs{epochs}_flowsteps{n_flow_steps}_dist{n_distributions}" \
                     f"__{current_time}" \
@@ -187,36 +213,9 @@ if __name__ == '__main__':
         print(f"running experiment {save_path} \n\n")
         assert n_samples_expectation % batch_size == 0
         tester, history = run_experiment(dim, save_path, epochs, n_flow_steps, n_distributions,
-                       flow_type, learnt_dist_kwargs=learnt_dist_kwargs, n_plots=n_plots,
-                       batch_size=batch_size, n_samples_expectation=n_samples_expectation, problem=problem,
-                       HMC_transition_args=HMC_transition_args, KPI_batch_size=KPI_batch_size)
+                                         flow_type, train_AIS_kwargs=train_AIS_kwargs, n_plots=n_plots,
+                                         batch_size=batch_size, n_samples_expectation=n_samples_expectation, problem=problem,
+                                         HMC_transition_args=HMC_transition_args, KPI_batch_size=KPI_batch_size)
         print(f"\n\nfinished running experiment {save_path}")
 
-    else:
-        from datetime import datetime
-        current_time = datetime.now().strftime("%Y_%m_%d-%I_%M_%S_%p")
-        problem = "ManyWell" #  "ManyWell" # "MoG" # #
-        dim = 4
-        save = False
-        epochs = 200
-        batch_size = int(1e2)
-        n_samples_expectation = batch_size*10
-        KPI_batch_size = batch_size*10
-        n_flow_steps = 10
-        n_plots = 5
-        n_distributions = 2 + 3
-        experiment_name = "local"
-        flow_type = "RealNVP" # "ReverseIAF" #
-        HMC_tune_options = [ "No-U", "p_accept", "No-U-unscaled" ]
-        HMC_transition_args = {"step_tuning_method": HMC_tune_options[1]} # "Expected_target_prob","No-U" ,"p_accept"
-        learnt_dist_kwargs = {"lr": 1e-2, "optimizer": "AdamW"}
-        save_path = f"Results/{experiment_name}__{problem}" \
-                    f"{dim}dim_{flow_type}_epochs{epochs}_flowsteps{n_flow_steps}_dist{n_distributions}" \
-                    f"__{current_time}" \
-                    f"HMC{HMC_transition_args['step_tuning_method']}"
-        print(f"running experiment {save_path} \n\n")
-        tester, history = run_experiment(dim, save_path, epochs, n_flow_steps, n_distributions,
-                       flow_type, save=save, n_samples_expectation=n_samples_expectation,
-                       learnt_dist_kwargs=learnt_dist_kwargs, problem=problem, n_plots=n_plots,
-                       HMC_transition_args=HMC_transition_args, seed=2, KPI_batch_size=KPI_batch_size)
-        print(f"\n\n finished running experiment {save_path}")
+

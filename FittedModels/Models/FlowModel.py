@@ -11,12 +11,14 @@ class FlowModel(nn.Module, BaseLearntDistribution):
     we are also assuming that we are only interested in p(x), so return this for both forwards and backwards,
     we could add methods for p(z) if this comes into play
     """
-    def __init__(self, x_dim, flow_type="RealNVP", n_flow_steps=10, scaling_factor=1.0, prevent_NaNs=True,
+    def __init__(self, x_dim, flow_type="RealNVP", n_flow_steps=10,
+                 scaling_factor=1.0, prevent_NaNs=True, use_ActNorm=True,
                  *flow_args, **flow_kwargs):
         super(FlowModel, self).__init__()
         self.class_args = (x_dim, flow_type, n_flow_steps, scaling_factor, *flow_args)
         self.class_kwargs = flow_kwargs
         self.dim = x_dim
+        self.use_ActNorm = use_ActNorm
         self.scaling_factor = nn.Parameter(torch.tensor([scaling_factor]))
         self.register_buffer("prior_mean", torch.zeros(x_dim))
         self.register_buffer("covariance_matrix", torch.eye(x_dim))
@@ -29,12 +31,15 @@ class FlowModel(nn.Module, BaseLearntDistribution):
         elif flow_type == "ReverseIAF":
             from NormalisingFlow.IAF import Reverse_IAF
             flow = Reverse_IAF
-        elif flow_type == "ReverseIAF_MIX":
-            from NormalisingFlow.IAF_mix import Reverse_IAF_MIX
+        elif flow_type == "ReverseIAF_multi":
+            from NormalisingFlow.IAF_multi import Reverse_IAF_MIX
             flow = Reverse_IAF_MIX
         elif flow_type == "RealNVP":
             from NormalisingFlow.RealNVP import RealNVP
             flow = RealNVP
+        elif flow_type == "RealNVPMix":
+            from NormalisingFlow.Mixture_of_RNVP import MixRealNVP
+            flow = MixRealNVP
         else:
             raise Exception("incorrectly specified flow")
         self.flow_blocks = nn.ModuleList([])
@@ -42,7 +47,8 @@ class FlowModel(nn.Module, BaseLearntDistribution):
             reversed = i % 2 == 0
             flow_block = flow(x_dim, reversed=reversed, *flow_args, **flow_kwargs)
             self.flow_blocks.append(flow_block)
-            self.flow_blocks.append(ActNorm(x_dim))
+            if use_ActNorm:
+                self.flow_blocks.append(ActNorm(x_dim))
         self.prior = self.get_prior()
 
         if prevent_NaNs:
@@ -135,33 +141,6 @@ class FlowModel(nn.Module, BaseLearntDistribution):
         z = x
         return z, log_prob
 
-    def x_to_z_with_check(self, x):
-        """
-        log prob but checks if samples have support
-        """
-        log_prob = torch.zeros(x.shape[0], device=x.device)
-        x, log_det = self.un_widen(x)
-        log_prob += log_det
-        for flow_step in self.flow_blocks[::-1]:
-            x, log_determinant = flow_step.forward(x)
-            log_prob += log_determinant
-        valid_samples = self.prior.support.check(x)
-        if not valid_samples.all():
-            n_valid_samples = torch.sum(valid_samples)
-            print(f"\ndiscarding samples too far out prior {valid_samples.shape[0] - n_valid_samples} out of "
-                  f"{valid_samples.shape[0] }\n")
-            x_flat = torch.masked_select(x, valid_samples[:, None].repeat(1, self.dim))
-            x = x_flat.unflatten(dim=0, sizes=(n_valid_samples, self.dim))
-            log_prob = torch.masked_select(log_prob, valid_samples)
-        prior_prob = self.prior.log_prob(x)
-        log_prob += prior_prob
-        z = x
-        return z, log_prob, valid_samples
-
-    def log_prob_checked(self, x):
-        z, log_prob, valid_samples = self.x_to_z_with_check(x)
-        return log_prob, valid_samples
-
     def log_prob(self, x):
         x, log_prob = self.x_to_z(x)
         return log_prob
@@ -231,8 +210,8 @@ if __name__ == '__main__':
     import matplotlib.pyplot as plt
     torch.set_default_dtype(torch.float64)
     torch.manual_seed(1)
-    model = FlowModel(x_dim=2, flow_type="ReverseIAF",
-                      n_flow_steps=4, scaling_factor=1.5, init_zeros=False)
+    model = FlowModel(x_dim=2, flow_type="RealNVPMix",
+                      n_flow_steps=4, scaling_factor=1.5, init_zeros=False) # "ReverseIAF"
     model(100)
     x, log_prob = model.forward(100)
     log_prob_check = model.log_prob(x)
@@ -243,7 +222,6 @@ if __name__ == '__main__':
     log_prob_ = model.batch_log_prob(x, 10)
     samples = model.batch_sample((100,), 10)
     model.check_forward_backward_consistency()
-    model.check_normalisation_constant(n=int(1e7))
-    #plot_distribution(model, bounds=[[-2, 2], [-2, 2]])
-    #plt.show()
-
+    model.check_normalisation_constant(n=int(1e6))
+    plot_distribution(model, bounds=[[-2, 2], [-2, 2]])
+    plt.show()

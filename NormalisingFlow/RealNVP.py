@@ -17,6 +17,8 @@ class RealNVP(BaseFlow):
 
 
     def inverse(self, z):
+        if self.reversed:
+            z = z.flip(dims=(-1,))
         z_1_to_d = z[:, 0:self.d]
         z_d_plus_1_to_D = z[:, self.d:]
         x_1_to_d = z_1_to_d
@@ -52,6 +54,8 @@ class RealNVP(BaseFlow):
             log_determinant = torch.sum(torch.log(sigma), dim=-1)
 
         z = torch.cat([z_1_to_d, z_d_plus_1_to_D], dim=-1)
+        if self.reversed:
+            z = z.flip(dims=(-1,))
         return z, log_determinant
 
 
@@ -59,9 +63,9 @@ class RealNVP(BaseFlow):
 if __name__ == '__main__':
     dim = 5
     x = torch.randn((11, dim))
-    test = RealNVP(x_dim=dim, reversed=True)
-    y, log_determinant_forward = test(x)
-    x_out, log_determinant_backward = test.forward(y)
+    test = RealNVP(x_dim=dim, reversed=True, init_zeros=False)
+    y, log_determinant_forward = test.forward(x)
+    x_out, log_determinant_backward = test.inverse(y)
     print(log_determinant_forward, log_determinant_backward)
     print(y.shape, log_determinant_forward.shape)
     assert torch.max(torch.abs(x_out - x)) < 1e-6

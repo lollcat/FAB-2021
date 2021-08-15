@@ -26,7 +26,7 @@ class AIS_trainer(LearntDistributionManager):
                  memory_n_batches=100, allow_ignore_nan_loss=True, clip_grad_norm=True,
                  alpha=2.0
                  ):
-        assert loss_type in ["alpha_2_IS", "alpha_2_q", "kl_q"]
+        assert loss_type in ["alpha_2_IS", "alpha_2_q", "kl_q", "kl_p", "alpha_2_NIS"]
         self.loss_type = loss_type
         self.AIS_train = AnnealedImportanceSampler(fitted_model, target_distribution,
                                                    transition_operator=transition_operator,
@@ -47,11 +47,19 @@ class AIS_trainer(LearntDistributionManager):
         self.target_dist = target_distribution
         if loss_type == "alpha_2_IS": # main method
             self.loss = self.alpha_div_annealed_samples_re_weight
-            assert self.alpha ==2
+            assert self.alpha == 2
         elif loss_type == "alpha_2_q":
+            assert self.AIS_train.n_distributions < 3
             self.loss = lambda x_samples, log_w: torch.logsumexp(2*log_w, dim=-1)
+        elif loss_type == "kl_p":  # as used in Neural Importance Sampling Paper
+            self.loss = lambda x_samples, log_w: torch.mean(-torch.exp(log_w).detach() * \
+                                                 self.learnt_sampling_dist.log_prob(x_samples))
+        elif loss_type == "alpha_2_NIS":
+            self.loss = lambda x_samples, log_w: torch.mean(-torch.exp(2*log_w).detach() * \
+                                                 self.learnt_sampling_dist.log_prob(x_samples))
         else:
             assert loss_type == "kl_q"
+            assert self.AIS_train.n_distributions < 3
             self.loss = lambda x_samples, log_w: -torch.mean(log_w)
         torch_optimizer = getattr(torch.optim, optimizer)
         self.optimizer = torch_optimizer(self.learnt_sampling_dist.parameters(), lr=lr)
@@ -166,7 +174,7 @@ class AIS_trainer(LearntDistributionManager):
             history.update({'mean_log_q_x_test_samples': [], 'min_log_q_x_test_samples': []})
         pbar = tqdm(range(epochs))
         for self.current_epoch in pbar:
-            if self.loss_type == "alpha_2_IS":
+            if self.AIS_train.n_distributions > 2:
                 x_samples, log_w = self.AIS_train.run(batch_size)
                 x_samples, log_w = x_samples.detach(), log_w.detach() # be extra careful that these are detached
             else:
