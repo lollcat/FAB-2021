@@ -161,8 +161,8 @@ if __name__ == '__main__':
     if testing_local:
         from datetime import datetime
         current_time = datetime.now().strftime("%Y_%m_%d-%I_%M_%S_%p")
-        problem = "ManyWell" # "MoG_2D_illustration" #  "ManyWell" # "MoG" # # "MoG_2D_illustration"
-        dim = 4
+        problem = "MoG_2D_illustration" #  "ManyWell" # "MoG" # # "MoG_2D_illustration" # "ManyWell" #
+        dim = 2
         save = False
         epochs = 100
         batch_size = int(1e2)
@@ -170,12 +170,12 @@ if __name__ == '__main__':
         KPI_batch_size = batch_size*10
         n_flow_steps = 10
         n_plots = 5
-        n_distributions = 2 + 2
+        n_distributions = 2 + 0
         experiment_name = "local"
         flow_type = "RealNVP"  # "RealNVP" # "RealNVPMix" # "RealNVPMix" # "alpha_2_IS"
         HMC_tune_options = [ "No-U", "p_accept", "No-U-unscaled" ]
         HMC_transition_args = {"step_tuning_method": HMC_tune_options[1]} # "Expected_target_prob","No-U" ,"p_accept"
-        train_AIS_kwargs = {"lr": 5e-3, "optimizer": "AdamW", "loss_type": "alpha_2_NIS"}   # "alpha_2_IS" # "alpha_2_NIS" "kl_p"
+        train_AIS_kwargs = {"lr": 1e-4, "optimizer": "AdamW", "loss_type":  "kl_p"}   # "alpha_2_IS" # "alpha_2_NIS"
         learnt_sampler_kwargs = {"init_zeros": True}
         save_path = f"Results/{experiment_name}__{problem}" \
                     f"{dim}dim_{flow_type}_epochs{epochs}_flowsteps{n_flow_steps}_dist{n_distributions}" \
