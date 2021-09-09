@@ -40,7 +40,15 @@ def run_experiment(dim, save_path, epochs, n_flow_steps, n_distributions,
 
     torch.set_default_dtype(torch.float64)
     torch.manual_seed(seed)
-    if problem == "ManyWell":
+    if problem == "AladineDipeptide":
+        from TargetDistributions.AladineDipeptide.AD import main
+        target = main()
+        plotter = lambda *args, **kwargs: None
+        if non_default_flow_width is None:
+            scaling_factor_flow = 1.0
+        else:
+            scaling_factor_flow = non_default_flow_width
+    elif problem == "ManyWell":
         from TargetDistributions.DoubleWell import ManyWellEnergy
         from FittedModels.utils.plotting_utils import plot_samples_vs_contours_many_well
         target = ManyWellEnergy(dim=dim, a=-0.5, b=-6)
@@ -161,21 +169,22 @@ if __name__ == '__main__':
     if testing_local:
         from datetime import datetime
         current_time = datetime.now().strftime("%Y_%m_%d-%I_%M_%S_%p")
-        problem = "MoG_2D_illustration" #  "ManyWell" # "MoG" # # "MoG_2D_illustration" # "ManyWell" #
-        dim = 2
+        problem =  "AladineDipeptide"   #  "AladineDipeptide"   #  "ManyWell" # "MoG" # # "MoG_2D_illustration" # "ManyWell" #
+        dim = 60
         save = False
-        epochs = 100
+        epochs = 500
         batch_size = int(1e2)
         n_samples_expectation = batch_size*10
         KPI_batch_size = batch_size*10
         n_flow_steps = 10
         n_plots = 5
-        n_distributions = 2 + 0
+        n_distributions = 2 + 1
         experiment_name = "local"
         flow_type = "RealNVP"  # "RealNVP" # "RealNVPMix" # "RealNVPMix" # "alpha_2_IS"
         HMC_tune_options = [ "No-U", "p_accept", "No-U-unscaled" ]
         HMC_transition_args = {"step_tuning_method": HMC_tune_options[1]} # "Expected_target_prob","No-U" ,"p_accept"
-        train_AIS_kwargs = {"lr": 1e-4, "optimizer": "AdamW", "loss_type":  "kl_p"}   # "alpha_2_IS" # "alpha_2_NIS"
+        train_AIS_kwargs = {"lr": 1e-3, "optimizer": "AdamW"}
+                            #"use_memory_buffer": True, "memory_n_batches": 20}   # "alpha_2_IS" # "alpha_2_NIS" , "loss_type":  "kl_p"
         learnt_sampler_kwargs = {"init_zeros": True}
         save_path = f"Results/{experiment_name}__{problem}" \
                     f"{dim}dim_{flow_type}_epochs{epochs}_flowsteps{n_flow_steps}_dist{n_distributions}" \

@@ -42,7 +42,7 @@ class AnnealedImportanceSampler(BaseAIS):
         log_w = torch.zeros(n_runs).to(self.device)  # log importance weight
         self.learnt_sampling_dist.set_requires_grad(False)
         with torch.no_grad():
-            x_new, log_prob_p0 = self.learnt_sampling_dist(n_runs)
+            x_new, log_prob_p0 = self.learnt_sampling_dist.z_to_x(batch_size=n_runs)
             nan_indices = (torch.sum(torch.isnan(x_new) | torch.isinf(x_new), dim=-1) |
                           torch.isinf(log_prob_p0) | torch.isnan(log_prob_p0)).bool()
             n_nan_indices = torch.sum(nan_indices)
@@ -64,7 +64,7 @@ class AnnealedImportanceSampler(BaseAIS):
         target_p_x = lambda x: self.intermediate_unnormalised_log_prob(x, j)
         x_new = self.transition_operator_class.run(x_new, target_p_x, j-1)
         log_w = log_w + self.intermediate_unnormalised_log_prob(x_new, j + 1) - \
-                 self.intermediate_unnormalised_log_prob(x_new, j)
+                self.intermediate_unnormalised_log_prob(x_new, j)
         return x_new, log_w
 
     def intermediate_unnormalised_log_prob(self, x, j):

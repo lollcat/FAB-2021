@@ -52,10 +52,10 @@ class AIS_trainer(LearntDistributionManager):
             assert self.AIS_train.n_distributions < 3
             self.loss = lambda x_samples, log_w: torch.logsumexp(2*log_w, dim=-1)
         elif loss_type == "kl_p":  # as used in Neural Importance Sampling Paper
-            self.loss = lambda x_samples, log_w: torch.mean(-torch.exp(log_w).detach() * \
-                                                 self.learnt_sampling_dist.log_prob(x_samples))
+            self.loss = lambda x_samples, log_w: \
+                -torch.mean(torch.exp(log_w.detach()) * self.learnt_sampling_dist.log_prob(x_samples))
         elif loss_type == "alpha_2_NIS":
-            self.loss = lambda x_samples, log_w: torch.mean(-torch.exp(2*log_w).detach() * \
+            self.loss = lambda x_samples, log_w: -torch.mean(torch.exp(2*log_w.detach())* \
                                                  self.learnt_sampling_dist.log_prob(x_samples))
         else:
             assert loss_type == "kl_q"
@@ -71,7 +71,7 @@ class AIS_trainer(LearntDistributionManager):
             self.memory_position_counter = 0
             self.max_memory_points = None
             self.max_memory_batches = memory_n_batches
-            self.n_gradient_update_batches = int(self.max_memory_batches / 10)  # update using a 10_th of the memory
+            self.n_gradient_update_batches = int(self.max_memory_batches / 20)  # update using a 10_th of the memory
 
 
     def to(self, device):
@@ -349,14 +349,16 @@ class AIS_trainer(LearntDistributionManager):
         # also check that we have valid log probs
         valid_indices = ~torch.isinf(log_q_x) & ~torch.isnan(log_q_x)
         if valid_indices.all():
+            log_w_normed = log_w.detach() - torch.logsumexp(log_w.detach(), dim=0)
             return - self.alpha_one_minus_alpha_sign * \
-                   torch.logsumexp((self.alpha - 1) * (log_p_x - log_q_x) + log_w.detach(), dim=0)
+                   torch.logsumexp((self.alpha - 1) * (log_p_x - log_q_x) + log_w_normed, dim=0)
         else:
             log_w = log_w[valid_indices]
             log_q_x = log_q_x[valid_indices]
             log_p_x = log_p_x[valid_indices]
+            log_w_normed = log_w.detach() - torch.logsumexp(log_w.detach(), dim=0)
             return - self.alpha_one_minus_alpha_sign * \
-                   torch.logsumexp((self.alpha - 1) * (log_p_x - log_q_x) + log_w.detach(), dim=0)
+                   torch.logsumexp((self.alpha - 1) * (log_p_x - log_q_x) + log_w_normed, dim=0)
 
 
 if __name__ == '__main__':
@@ -372,22 +374,22 @@ if __name__ == '__main__':
 
     torch.manual_seed(2)
     n_plots = 5
-    epochs = 100
+    epochs = 500
     step_size = 1.0
     batch_size = int(1e3)
     dim = 2
     n_samples_estimation = int(1e4)
     flow_type = "RealNVP"  # "ReverseIAF"  #"ReverseIAF_MIX" #"ReverseIAF" #IAF"  #
     n_flow_steps = 5
-    HMC_transition_operator_args = {"step_tuning_method": "p_accept"} # "Expected_target_prob", "No-U", "p_accept"
+    HMC_transition_operator_args = {"step_tuning_method": "p_accept"}  # "Expected_target_prob", "No-U", "p_accept"
     print(HMC_transition_operator_args)
     target = MoG(dim=dim, n_mixes=5, min_cov=1, loc_scaling=10)
     true_expectation = MC_estimate_true_expectation(target, expectation_function, int(1e5))
     fig = plot_distribution(target, bounds=[[-30, 20], [-20, 20]])
     plt.show()
     learnt_sampler = FlowModel(x_dim=dim, scaling_factor=1.0, flow_type=flow_type, n_flow_steps=n_flow_steps)
-    tester = AIS_trainer(target, learnt_sampler, n_distributions=10,
-                         transition_operator="HMC", lr=1e-3,
+    tester = AIS_trainer(target, learnt_sampler, n_distributions=4,
+                         transition_operator="HMC", lr=1e-2,
                          tranistion_operator_kwargs=HMC_transition_operator_args,
                          use_memory_buffer=False, AIS_kwargs={"Beta_end": 1.0})
     plot_samples(tester)

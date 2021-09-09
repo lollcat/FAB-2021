@@ -1,6 +1,7 @@
 from AIS_train.train_AIS import AIS_trainer as base
 from AIS_train.p2_over_q_AIS_train.AnnealedImportanceSampler import AnnealedImportanceSampler
 import torch
+import torch.nn.functional as F
 import numpy as np
 
 class AIS_trainer(base):
@@ -52,17 +53,19 @@ class AIS_trainer(base):
             x_samples = x_samples[valid_indices, :]
 
         log_q_x = self.learnt_sampling_dist.log_prob(x_samples.detach())
-        log_p_x = self.target_dist.log_prob(x_samples.detach())
+        # log_p_x = self.target_dist.log_prob(x_samples.detach())
 
         # also check that we have valid log probs
         valid_indices = ~torch.isinf(log_q_x) & ~torch.isnan(log_q_x)
         if valid_indices.all():
-            return torch.logsumexp((2*log_p_x - log_q_x) - (2*log_p_x - log_q_x).detach() + log_w.detach(), dim=0)
+            return - torch.sum(F.softmax(log_w, dim=-1) * log_q_x)
+            # return torch.logsumexp((2*log_p_x - log_q_x) - (2*log_p_x - log_q_x).detach() + log_w.detach(), dim=0)
         else:
             log_w = log_w[valid_indices]
             log_q_x = log_q_x[valid_indices]
-            log_p_x = log_p_x[valid_indices]
-            return torch.logsumexp((2*log_p_x - log_q_x) - (2*log_p_x - log_q_x).detach() + log_w.detach(), dim=0)
+            return - torch.sum(F.softmax(log_w, dim=-1) * log_q_x)
+            # log_p_x = log_p_x[valid_indices]
+            # return torch.logsumexp((2*log_p_x - log_q_x) - (2*log_p_x - log_q_x).detach() + log_w.detach(), dim=0)
 
 if __name__ == '__main__':
     from FittedModels.Models.FlowModel import FlowModel
@@ -77,7 +80,7 @@ if __name__ == '__main__':
 
     torch.manual_seed(2)
     n_plots = 5
-    epochs = 100
+    epochs = 500
     step_size = 1.0
     batch_size = int(1e3)
     dim = 2
@@ -91,8 +94,8 @@ if __name__ == '__main__':
     fig = plot_distribution(target, bounds=[[-30, 20], [-20, 20]])
     plt.show()
     learnt_sampler = FlowModel(x_dim=dim, scaling_factor=1.0, flow_type=flow_type, n_flow_steps=n_flow_steps)
-    tester = AIS_trainer(target, learnt_sampler, n_distributions=10,
-                         transition_operator="HMC", lr=1e-3,
+    tester = AIS_trainer(target, learnt_sampler, n_distributions=4,
+                         transition_operator="HMC", lr=1e-2,
                          tranistion_operator_kwargs=HMC_transition_operator_args,
                          use_memory_buffer=False)
     plot_samples(tester)
