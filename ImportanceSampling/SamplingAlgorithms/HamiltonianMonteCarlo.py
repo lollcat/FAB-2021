@@ -8,7 +8,7 @@ class HMC(BaseTransitionModel):
     Following: https: // arxiv.org / pdf / 1206.1901.pdf
     """
     def __init__(self, n_distributions, dim, epsilon=1.0, n_outer=1, L=5, step_tuning_method="p_accept",
-                 target_p_accept=0.65, lr=1e-3, tune_period=False):
+                 target_p_accept=0.65, lr=1e-1, tune_period=False, common_epsilon_init_weight=0.1):
         self.class_args = locals().copy()
         del(self.class_args["self"])
         del(self.class_args["__class__"])
@@ -22,20 +22,22 @@ class HMC(BaseTransitionModel):
             self.counter = 0
             self.epsilons = nn.ParameterDict()
             self.epsilons["common"] = nn.Parameter(
-                torch.log(torch.exp(torch.tensor([epsilon])) - 1.0) * 0.5)
+                torch.log(torch.tensor([epsilon])) * common_epsilon_init_weight)
             # have to store epsilons like this otherwise we get weird erros
             for i in range(n_distributions-2):
                 for n in range(n_outer):
-                    self.epsilons[f"{i}_{n}"] = nn.Parameter(torch.log(torch.exp(torch.ones(dim)*epsilon) - 1.0)*0.5)
-            self.optimizer = torch.optim.AdamW(self.parameters(), lr=lr)
+                    self.epsilons[f"{i}_{n}"] = nn.Parameter(torch.log(
+                        torch.ones(dim)*epsilon*(1 - common_epsilon_init_weight)))
             self.Monitor_NaN = Monitor_NaN()
-            self.register_nan_hooks()
+            #self.register_nan_hooks()
             if self.step_tuning_method == "No-U":
                 self.register_buffer("characteristic_length", torch.ones(n_distributions, dim))  # initialise
+            self.optimizer = torch.optim.AdamW(self.parameters(), lr=lr)
         else:
             self.train_params = False
-            self.register_buffer("common_epsilon", torch.tensor([epsilon * 0.5]))
-            self.register_buffer("epsilons", torch.ones([n_distributions-2, n_outer])*epsilon * 0.5)
+            self.register_buffer("common_epsilon", torch.tensor([epsilon * common_epsilon_init_weight]))
+            self.register_buffer("epsilons", torch.ones([n_distributions-2, n_outer])*epsilon *
+                                 (1 - common_epsilon_init_weight))
         self.n_outer = n_outer
         self.L = L
         self.n_distributions = n_distributions
@@ -64,11 +66,17 @@ class HMC(BaseTransitionModel):
         self.load_state_dict(torch.load(model_path, map_location=torch.device(device)))
         print("loaded HMC model")
 
+    def register_nan_hooks(self, parameter):
+        parameter.register_hook(
+            lambda grad: self.Monitor_NaN.overwrite_NaN_grad(grad, print_=False, replace_with=0.0))
+
+    """
     def register_nan_hooks(self):
         for parameter in self.parameters():
             # replace with positive number so it decreases step size when we get nans
             parameter.register_hook(
                 lambda grad: self.Monitor_NaN.overwrite_NaN_grad(grad, print_=False, replace_with=0.0))
+    """
 
     def interesting_info(self):
         interesting_dict = {}
@@ -98,9 +106,10 @@ class HMC(BaseTransitionModel):
 
     def get_epsilon(self, i, n):
         if self.train_params:
-            return torch.nn.functional.softplus(self.epsilons[f"{i}_{n}"] + self.epsilons["common"])
+            return torch.exp(self.epsilons[f"{i}_{n}"]) + torch.exp(self.epsilons["common"])
         else:
             return self.epsilons[i, n] + self.common_epsilon
+
 
     def HMC_func(self, U, current_q, grad_U, i):
         if self.step_tuning_method == "Expected_target_prob":
@@ -126,7 +135,7 @@ class HMC(BaseTransitionModel):
             # Now loop through position and momentum leapfrogs
             for l in range(self.L):
                 epsilon = self.get_epsilon(i, n)
-                if (l != self.L - 1 and self.step_tuning_method == "No-U") or not self.train_params:
+                if (l != self.L - 1 and self.step_tuning_method in ["No-U", "No-U-unscaled"]) or not self.train_params:
                     epsilon = epsilon.detach()
                 # Make full step for position
                 q = q + epsilon * p
@@ -134,13 +143,17 @@ class HMC(BaseTransitionModel):
                 if l != self.L-1:
                     p = p - epsilon * grad_U(q)
 
+            if self.train_params:
+                self.register_nan_hooks(q)  # to prevent Nan gradients in the loss
             # make a half step for momentum at the end
             p = p - epsilon * grad_U(q) / 2
+            if self.train_params:
+                self.register_nan_hooks(p)
             # Negate momentum at end of trajectory to make proposal symmetric
             p = -p
 
             U_current = U(current_q)
-            U_proposed = U(q)
+            U_proposed = torch.nan_to_num(U(q))
             current_K = torch.sum(current_p**2, dim=-1) / 2
             proposed_K = torch.sum(p**2, dim=-1) / 2
 
@@ -152,7 +165,6 @@ class HMC(BaseTransitionModel):
             acceptance_probability = torch.clamp(acceptance_probability, min=0.0, max=1.0)
             accept = acceptance_probability > torch.rand(acceptance_probability.shape).to(q.device)
             current_q[accept] = q[accept]
-
             p_accept = torch.mean(acceptance_probability)
             if self.step_tuning_method == "p_accept":
                 if p_accept > self.target_p_accept: # too much accept
@@ -162,11 +174,11 @@ class HMC(BaseTransitionModel):
                     self.epsilons[i, n] = self.epsilons[i, n] / 1.1
                     self.common_epsilon = self.common_epsilon / 1.05
             else: # self.step_tuning_method == "No-U":
-                if p_accept < 0.1 or (self.counter < 100 and p_accept < 0.4):
+                if p_accept < 0.01: # or (self.counter < 100 and p_accept < 0.4):
                     # if p_accept is very low manually decrease step size, as this means that no acceptances so no
                     # gradient flow to use
-                    self.epsilons[f"{i}_{n}"].data = self.epsilons[f"{i}_{n}"].data - 0.2
-                    self.epsilons["common"].data = self.epsilons["common"].data - 0.2
+                    self.epsilons[f"{i}_{n}"].data = self.epsilons[f"{i}_{n}"].data - 0.05
+                    self.epsilons["common"].data = self.epsilons["common"].data - 0.05
                 if i == 0:
                     self.counter += 1
             if i == 0: # save fist and last distribution info
@@ -180,8 +192,10 @@ class HMC(BaseTransitionModel):
                 if i == 0:
                     self.average_distance = torch.mean(distance).detach().cpu()
                 if self.step_tuning_method == "No-U-unscaled":
+                    # torch.autograd.grad(torch.mean(weighted_mean_square_distance), self.epsilons[f"{i}_{n}"], retain_graph=True)
+                    # torch.autograd.grad(loss, self.epsilons[f"{i}_{n}"], retain_graph=True)
                     weighted_mean_square_distance = acceptance_probability * distance ** 2
-                    loss = loss + torch.mean(weighted_mean_square_distance)
+                    loss = loss - torch.mean(weighted_mean_square_distance)
             if self.step_tuning_method == "No-U":
                 distance_scaled = torch.linalg.norm((original_q - current_q) / self.characteristic_length[i, :], ord=2, dim=-1)
                 weighted_scaled_mean_square_distance = acceptance_probability * distance_scaled ** 2
@@ -216,9 +230,13 @@ class HMC(BaseTransitionModel):
             return - log_q_x(x)
 
         def grad_U(q: torch.Tensor):
-            q = q.clone().detach().requires_grad_(True) #  need this to get gradients
+            q = q.clone().requires_grad_(True) #  need this to get gradients
             y = U(q)
-            return torch.clamp(torch.autograd.grad(y, q, grad_outputs=torch.ones_like(y))[0], max=1e6, min=-1e6)
+            return torch.nan_to_num(
+                torch.clamp(
+                torch.autograd.grad(y, q, grad_outputs=torch.ones_like(y))[0],
+                max=1e4, min=-1e4),
+                nan=0.0, posinf=0.0, neginf=0.0)
 
         current_q = self.HMC_func(U, current_q, grad_U, i)
         return current_q

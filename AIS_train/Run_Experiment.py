@@ -48,6 +48,19 @@ def run_experiment(dim, save_path, epochs, n_flow_steps, n_distributions,
             scaling_factor_flow = 1.0
         else:
             scaling_factor_flow = non_default_flow_width
+
+    elif problem == "ManyWellStretch":
+        from TargetDistributions.DoubleWellStretch import StretchManyWellEnergy
+        from FittedModels.utils.plotting_utils import plot_samples_vs_contours_many_well
+        target = StretchManyWellEnergy(dim=dim, a=-0.5, b=-6)
+        clamp_samples = [0.5, 2]
+        def plotter(*args, **kwargs):
+            plot_samples_vs_contours_many_well(*args, **kwargs, clamp_samples=clamp_samples)
+        if non_default_flow_width is None:
+            scaling_factor_flow = 2.0
+        else:
+            scaling_factor_flow = non_default_flow_width
+
     elif problem == "ManyWell":
         from TargetDistributions.DoubleWell import ManyWellEnergy
         from FittedModels.utils.plotting_utils import plot_samples_vs_contours_many_well
@@ -169,7 +182,8 @@ if __name__ == '__main__':
     if testing_local:
         from datetime import datetime
         current_time = datetime.now().strftime("%Y_%m_%d-%I_%M_%S_%p")
-        problem =  "AladineDipeptide"   #  "AladineDipeptide"   #  "ManyWell" # "MoG" # # "MoG_2D_illustration" # "ManyWell" #
+        #     #  "ManyWell" # "MoG" # # "MoG_2D_illustration" # "ManyWell" "ManyWellStretch"
+        problem = "AladineDipeptide"
         dim = 60
         save = False
         epochs = 500
@@ -182,7 +196,7 @@ if __name__ == '__main__':
         experiment_name = "local"
         flow_type = "RealNVP"  # "RealNVP" # "RealNVPMix" # "RealNVPMix" # "alpha_2_IS"
         HMC_tune_options = [ "No-U", "p_accept", "No-U-unscaled" ]
-        HMC_transition_args = {"step_tuning_method": HMC_tune_options[1]} # "Expected_target_prob","No-U" ,"p_accept"
+        HMC_transition_args = {"step_tuning_method": HMC_tune_options[-1]}
         train_AIS_kwargs = {"lr": 1e-3, "optimizer": "AdamW"}
                             #"use_memory_buffer": True, "memory_n_batches": 20}   # "alpha_2_IS" # "alpha_2_NIS" , "loss_type":  "kl_p"
         learnt_sampler_kwargs = {"init_zeros": True}

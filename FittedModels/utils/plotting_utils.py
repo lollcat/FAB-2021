@@ -90,12 +90,17 @@ def plot_marginals(learnt_dist_manager, n_samples=1000, title=None, samples_q=No
 def plot_samples_vs_contours_many_well(learnt_dist_manager, n_samples=1000,
                                        n_points_contour=100, title=None, samples_q=None,
                                        log_prob_contour=True, clamp_samples=5, alpha=0.2):
+    if isinstance(clamp_samples, int):
+        clamp_samples = [clamp_samples, clamp_samples]
     # when we can't sample from target distribution
     if samples_q is None:
         samples_q = learnt_dist_manager.learnt_sampling_dist.sample((n_samples,))
-    samples_q = torch.clamp(samples_q, -clamp_samples, clamp_samples).cpu().detach().numpy()
-    x_points_dim1 = torch.linspace(-clamp_samples, clamp_samples, n_points_contour)
-    x_points_dim2 = torch.linspace(-clamp_samples, clamp_samples, n_points_contour)
+    samples_dim = samples_q.shape[-1]
+    clamp_torch = torch.ones(samples_dim)*clamp_samples[1]
+    clamp_torch[..., torch.arange(samples_dim) % 2 == 0] = clamp_samples[0]
+    samples_q = torch.clamp(samples_q, -clamp_torch, clamp_torch).cpu().detach().numpy()
+    x_points_dim1 = torch.linspace(-clamp_samples[0], clamp_samples[0], n_points_contour)
+    x_points_dim2 = torch.linspace(-clamp_samples[1], clamp_samples[1], n_points_contour)
     x_points = torch.tensor(list(itertools.product(x_points_dim1, x_points_dim2)))
     with torch.no_grad():
         p_x = learnt_dist_manager.target_dist.log_prob_2D(x_points.to(learnt_dist_manager.device))
@@ -107,14 +112,16 @@ def plot_samples_vs_contours_many_well(learnt_dist_manager, n_samples=1000,
         x_points_dim1 = x_points[:, 0].reshape((n_points_contour, n_points_contour)).numpy()
         x_points_dim2 = x_points[:, 1].reshape((n_points_contour, n_points_contour)).numpy()
     n_plots = learnt_dist_manager.target_dist.n_wells
-    fig, axs = plt.subplots(n_plots, 2, figsize=(7, 3 * n_plots), sharex="row", sharey="row")
+    fig, axs = plt.subplots(n_plots, 2, figsize=(7, 3 * n_plots))
     if len(axs.shape) == 1:  # need another axis for slicing
         axs = axs[np.newaxis, :]
     for i in range(n_plots):
         axs[i, 0].plot(samples_q[:, i*2], samples_q[:, i*2+1], "o", alpha=alpha)
-        axs[i, 0].set_xlim(-clamp_samples, clamp_samples)
+        axs[i, 0].set_xlim(-clamp_samples[0], clamp_samples[0])
+        axs[i, 0].set_ylim(-clamp_samples[1], clamp_samples[1])
         axs[i, 1].contour(x_points_dim1, x_points_dim2, p_x, levels=80)
-        axs[i, 1].set_xlim(-clamp_samples, clamp_samples)
+        axs[i, 1].set_xlim(-clamp_samples[0], clamp_samples[0])
+        axs[i, 1].set_ylim(-clamp_samples[1], clamp_samples[1])
     if title is not None:
         fig.suptitle(title)
     plt.tight_layout()

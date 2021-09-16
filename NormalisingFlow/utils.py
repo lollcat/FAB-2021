@@ -10,5 +10,5 @@ class Monitor_NaN:
             if self.found_Nan is False and print_:
                 print(f"found a NaN and overwrote it during flow gradient calculation: {name}")
                 self.found_Nan = True
-            grad[torch.isnan(grad)] = replace_with
+            grad[torch.isnan(grad) | torch.isinf(grad)] = replace_with
         return grad
