@@ -29,7 +29,7 @@ class HMC(BaseTransitionModel):
                     self.epsilons[f"{i}_{n}"] = nn.Parameter(torch.log(
                         torch.ones(dim)*epsilon*(1 - common_epsilon_init_weight)))
             self.Monitor_NaN = Monitor_NaN()
-            #self.register_nan_hooks()
+            self.register_nan_hooks_model()
             if self.step_tuning_method == "No-U":
                 self.register_buffer("characteristic_length", torch.ones(n_distributions, dim))  # initialise
             self.optimizer = torch.optim.AdamW(self.parameters(), lr=lr)
@@ -70,13 +70,13 @@ class HMC(BaseTransitionModel):
         parameter.register_hook(
             lambda grad: self.Monitor_NaN.overwrite_NaN_grad(grad, print_=False, replace_with=0.0))
 
-    """
-    def register_nan_hooks(self):
+
+    def register_nan_hooks_model(self):
         for parameter in self.parameters():
             # replace with positive number so it decreases step size when we get nans
             parameter.register_hook(
                 lambda grad: self.Monitor_NaN.overwrite_NaN_grad(grad, print_=False, replace_with=0.0))
-    """
+
 
     def interesting_info(self):
         interesting_dict = {}

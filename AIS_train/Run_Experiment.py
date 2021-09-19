@@ -183,20 +183,20 @@ if __name__ == '__main__':
         from datetime import datetime
         current_time = datetime.now().strftime("%Y_%m_%d-%I_%M_%S_%p")
         #     #  "ManyWell" # "MoG" # # "MoG_2D_illustration" # "ManyWell" "ManyWellStretch"
-        problem = "AladineDipeptide"
-        dim = 60
+        problem = "ManyWellStretch"
+        dim = 8
         save = False
-        epochs = 500
-        batch_size = int(1e2)
+        epochs = int(5e2)
+        batch_size = int(5e2)
         n_samples_expectation = batch_size*10
         KPI_batch_size = batch_size*10
         n_flow_steps = 10
         n_plots = 5
-        n_distributions = 2 + 1
+        n_distributions = 2 + 3
         experiment_name = "local"
         flow_type = "RealNVP"  # "RealNVP" # "RealNVPMix" # "RealNVPMix" # "alpha_2_IS"
         HMC_tune_options = [ "No-U", "p_accept", "No-U-unscaled" ]
-        HMC_transition_args = {"step_tuning_method": HMC_tune_options[-1]}
+        HMC_transition_args = {"step_tuning_method": HMC_tune_options[0]}
         train_AIS_kwargs = {"lr": 1e-3, "optimizer": "AdamW"}
                             #"use_memory_buffer": True, "memory_n_batches": 20}   # "alpha_2_IS" # "alpha_2_NIS" , "loss_type":  "kl_p"
         learnt_sampler_kwargs = {"init_zeros": True}
