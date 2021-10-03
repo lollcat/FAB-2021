@@ -6,7 +6,8 @@ class StretchManyWellEnergy(DoubleWellEnergy):
     # randomly stretch/squish some dimensions
     def __init__(self, dim=4, max_scale=100, seed=0, *args, **kwargs):
         torch.manual_seed(seed)
-        self.squish_factors = 1 / (torch.rand(size=(dim,))*max_scale + 1) # sample unoformly between 1 and 1 + max_scale
+        self.squish_factors = torch.tensor(1.) / \
+                              (torch.rand(size=(dim,))*max_scale + 1) # sample unoformly between 1 and 1 + max_scale
         self.squish_factors[0] = 1.0
         assert dim % 2 == 0
         self.n_wells = dim // 2
@@ -37,10 +38,10 @@ class StretchManyWellEnergy(DoubleWellEnergy):
         return (self.test_set_ + torch.randn_like(self.test_set_)*0.05).to(device)
 
     def get_untransformed_x(self, x):                                                        
-        return x / self.squish_factors
+        return x / self.squish_factors.to(x.device)
 
     def get_transformed_x(self, x):
-        return x * self.squish_factors
+        return x * self.squish_factors.to(x.device)
 
     def log_prob(self, x):
         x = self.get_transformed_x(x)
