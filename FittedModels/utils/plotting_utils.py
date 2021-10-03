@@ -235,6 +235,43 @@ def plot_samples(learnt_dist_manager, n_samples=1000, title=None, samples_q=None
     plt.tight_layout()
 
 
+def plot_samples_vs_contours_stretched_DW(learnt_dist_manager, clamp_samples, n_samples=1000,
+                                       n_points_contour=100, title=None, samples_q=None,
+                                       log_prob_contour=True, alpha=0.2):
+    # when we can't sample from target distribution
+    if samples_q is None:
+        samples_q = learnt_dist_manager.learnt_sampling_dist.sample((n_samples,))
+    samples_dim = samples_q.shape[-1]
+    samples_q = torch.clamp(samples_q, -clamp_samples, clamp_samples).cpu().detach().numpy()
+    x_points_dim1 = torch.linspace(-2, 2, n_points_contour)
+    x_points_dim2 = torch.linspace(-2, 2, n_points_contour)
+    x_points = torch.tensor(list(itertools.product(x_points_dim1, x_points_dim2)))
+    with torch.no_grad():
+        p_x = learnt_dist_manager.target_dist.log_prob_2D(x_points.to(learnt_dist_manager.device))
+        p_x = torch.clamp_min(p_x, -1000)
+        if not log_prob_contour:
+            p_x = torch.exp(p_x)  # bad naming convention but makes life easy
+        p_x = p_x.cpu().detach().numpy()
+        p_x = p_x.reshape((n_points_contour, n_points_contour))
+        x_points_dim1 = x_points[:, 0].reshape((n_points_contour, n_points_contour)).numpy()
+        x_points_dim2 = x_points[:, 1].reshape((n_points_contour, n_points_contour)).numpy()
+    n_plots = learnt_dist_manager.target_dist.n_wells
+    fig, axs = plt.subplots(n_plots, 2, figsize=(7, 3 * n_plots))
+    if len(axs.shape) == 1:  # need another axis for slicing
+        axs = axs[np.newaxis, :]
+    for i in range(n_plots):
+        axs[i, 0].plot(samples_q[:, i*2], samples_q[:, i*2+1], "o", alpha=alpha)
+        axs[i, 0].set_xlim(-clamp_samples[i*2], clamp_samples[i*2])
+        axs[i, 0].set_ylim(-clamp_samples[i*2 + 1], clamp_samples[i*2 + 1])
+        axs[i, 1].contour(x_points_dim1*learnt_dist_manager.target_dist.squish_factors[i*2].numpy(),
+                          x_points_dim2*learnt_dist_manager.target_dist.squish_factors[i*2 + 1].numpy(), p_x, levels=80)
+        axs[i, 1].set_xlim(-clamp_samples[i*2], clamp_samples[i*2])
+        axs[i, 1].set_ylim(-clamp_samples[i*2 + 1], clamp_samples[i*2 + 1])
+    if title is not None:
+        fig.suptitle(title)
+    plt.tight_layout()
+
+
 if __name__ == '__main__':
     import matplotlib.pyplot as plt
     from AIS_train.train_AIS import AIS_trainer
@@ -250,4 +287,3 @@ if __name__ == '__main__':
                    clamp_samples=2.5, alpha=0.3, dim=None, n_points_contour=50, marker="x",
                    n_contour_lines=10, clip_min=-5)
     plt.show()
-

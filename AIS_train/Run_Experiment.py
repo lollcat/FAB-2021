@@ -51,11 +51,11 @@ def run_experiment(dim, save_path, epochs, n_flow_steps, n_distributions,
 
     elif problem == "ManyWellStretch":
         from TargetDistributions.DoubleWellStretch import StretchManyWellEnergy
-        from FittedModels.utils.plotting_utils import plot_samples_vs_contours_many_well
+        from FittedModels.utils.plotting_utils import plot_samples_vs_contours_stretched_DW
         target = StretchManyWellEnergy(dim=dim, a=-0.5, b=-6)
-        clamp_samples = [0.5, 2]
+        clamp_samples = target.clamp_samples
         def plotter(*args, **kwargs):
-            plot_samples_vs_contours_many_well(*args, **kwargs, clamp_samples=clamp_samples)
+            plot_samples_vs_contours_stretched_DW(*args, **kwargs, clamp_samples=clamp_samples)
         if non_default_flow_width is None:
             scaling_factor_flow = 2.0
         else:
@@ -196,7 +196,7 @@ if __name__ == '__main__':
         experiment_name = "local"
         flow_type = "RealNVP"  # "RealNVP" # "RealNVPMix" # "RealNVPMix" # "alpha_2_IS"
         HMC_tune_options = [ "No-U", "p_accept", "No-U-unscaled" ]
-        HMC_transition_args = {"step_tuning_method": HMC_tune_options[0]}
+        HMC_transition_args = {"step_tuning_method": HMC_tune_options[1]}
         train_AIS_kwargs = {"lr": 1e-3, "optimizer": "AdamW"}
                             #"use_memory_buffer": True, "memory_n_batches": 20}   # "alpha_2_IS" # "alpha_2_NIS" , "loss_type":  "kl_p"
         learnt_sampler_kwargs = {"init_zeros": True}
