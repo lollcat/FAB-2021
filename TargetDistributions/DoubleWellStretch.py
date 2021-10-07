@@ -4,11 +4,11 @@ from TargetDistributions.DoubleWell import DoubleWellEnergy
 
 class StretchManyWellEnergy(DoubleWellEnergy):
     # randomly stretch/squish some dimensions
-    def __init__(self, dim=4, max_scale=100, seed=0, *args, **kwargs):
+    def __init__(self, dim=4, max_scale=10, seed=0, *args, **kwargs):
         torch.manual_seed(seed)
         self.squish_factors = torch.tensor(1.) / \
                               (torch.rand(size=(dim,))*max_scale + 1) # sample unoformly between 1 and 1 + max_scale
-        self.squish_factors[0] = 1.0
+        self.squish_factors[0:2] = 1.0  # leave one pair unsquished
         assert dim % 2 == 0
         self.n_wells = dim // 2
         super(StretchManyWellEnergy, self).__init__(dim=2, *args, **kwargs)
