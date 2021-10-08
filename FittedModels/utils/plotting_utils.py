@@ -263,8 +263,8 @@ def plot_samples_vs_contours_stretched_DW(learnt_dist_manager, clamp_samples, n_
         axs[i, 0].plot(samples_q[:, i*2], samples_q[:, i*2+1], "o", alpha=alpha)
         axs[i, 0].set_xlim(-clamp_samples[i*2], clamp_samples[i*2])
         axs[i, 0].set_ylim(-clamp_samples[i*2 + 1], clamp_samples[i*2 + 1])
-        axs[i, 1].contour(x_points_dim1*learnt_dist_manager.target_dist.squish_factors[i*2].numpy(),
-                          x_points_dim2*learnt_dist_manager.target_dist.squish_factors[i*2 + 1].numpy(), p_x, levels=80)
+        axs[i, 1].contour(x_points_dim1/learnt_dist_manager.target_dist.squish_factors[i*2].numpy(),
+                          x_points_dim2/learnt_dist_manager.target_dist.squish_factors[i*2 + 1].numpy(), p_x, levels=80)
         axs[i, 1].set_xlim(-clamp_samples[i*2], clamp_samples[i*2])
         axs[i, 1].set_ylim(-clamp_samples[i*2 + 1], clamp_samples[i*2 + 1])
     if title is not None:
