@@ -24,7 +24,7 @@ class StretchManyWellEnergy(DoubleWellEnergy):
             self.test_set__ = self.get_untransformed_x(self.test_set__)
         else:
             print("using test set containing not all modes to prevent memory issues")
-        self.clamp_samples = torch.ones(dim)*self.squish_factors*2
+        self.clamp_samples = 1/(torch.ones(dim)*self.squish_factors)*2.5
 
     @property
     def test_set_(self):
