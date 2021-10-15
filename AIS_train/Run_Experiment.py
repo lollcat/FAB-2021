@@ -27,7 +27,8 @@ def run_experiment(dim, save_path, epochs, n_flow_steps, n_distributions,
                    flow_type="ReverseIAF", batch_size=int(1e3), seed=0,
                    n_samples_expectation=int(1e5), save=True, n_plots=5, HMC_transition_args={},
                    train_AIS_kwargs={"lr": 1e-4}, problem="ManyWell",
-                   non_default_flow_width=None, KPI_batch_size=int(1e4), learnt_sampler_kwargs={}):
+                   non_default_flow_width=None, KPI_batch_size=int(1e4), learnt_sampler_kwargs={},
+                   problem_kwargs={}):
     local_var_dict = locals().copy()
     summary_results = "*********     Parameters      *******************\n\n"  # for writing to file
     for key in local_var_dict:
@@ -52,7 +53,7 @@ def run_experiment(dim, save_path, epochs, n_flow_steps, n_distributions,
     elif problem == "ManyWellStretch":
         from TargetDistributions.DoubleWellStretch import StretchManyWellEnergy
         from FittedModels.utils.plotting_utils import plot_samples_vs_contours_stretched_DW
-        target = StretchManyWellEnergy(dim=dim, a=-0.5, b=-6)
+        target = StretchManyWellEnergy(dim=dim, a=-0.5, b=-6, seed=seed, **problem_kwargs)
         clamp_samples = target.clamp_samples
         def plotter(*args, **kwargs):
             plot_samples_vs_contours_stretched_DW(*args, **kwargs, clamp_samples=clamp_samples)
@@ -184,7 +185,9 @@ if __name__ == '__main__':
         current_time = datetime.now().strftime("%Y_%m_%d-%I_%M_%S_%p")
         #     #  "ManyWell" # "MoG" # # "MoG_2D_illustration" # "ManyWell" "ManyWellStretch"
         problem = "ManyWellStretch"
-        dim = 8
+        problem_kwargs = {"max_scale": 5}
+        dim = 4
+        seed = 0
         save = False
         epochs = int(5e2)
         batch_size = int(5e2)
@@ -208,8 +211,10 @@ if __name__ == '__main__':
         tester, history = run_experiment(dim, save_path, epochs, n_flow_steps, n_distributions,
                                          flow_type, save=save, n_samples_expectation=n_samples_expectation,
                                          train_AIS_kwargs=train_AIS_kwargs, problem=problem, n_plots=n_plots,
-                                         HMC_transition_args=HMC_transition_args, seed=2, KPI_batch_size=KPI_batch_size,
-                                         learnt_sampler_kwargs=learnt_sampler_kwargs)
+                                         HMC_transition_args=HMC_transition_args, seed=seed,
+                                         KPI_batch_size=KPI_batch_size,
+                                         learnt_sampler_kwargs=learnt_sampler_kwargs,
+                                         problem_kwargs=problem_kwargs)
         print(f"\n\n finished running experiment {save_path}")
 
     else:
