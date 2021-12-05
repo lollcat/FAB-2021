@@ -1,7 +1,21 @@
-# MPhil Thesis
+# Flow Annealed Importance Sampling Bootstrap
+## Ellis Workshop
+By Laurence Illing Midgley, Vincent Stimper, Gregor N. C. Simm and Jos ́e Miguel Hern ́andez-Lobato. 
+
+### Mixture of Gaussians Problem
+ - [Notebook](https://github.com/lollcat/FAB-2021/blob/ToyProblems/FAB_ellis_paper/MoG/MoG.ipynb) for training FAB, and NF
+ - [Notebook](https://github.com/lollcat/FAB-2021/blob/ToyProblems/FAB_ellis_paper/MoG/SFNsipynb.ipynb) for training SNF
+ - [Notebook](https://github.com/lollcat/FAB-2021/blob/ToyProblems/FAB_ellis_paper/MoG/Plots.ipynb) for plotting results
+
+### "Many Well" Problem
+ - [Notebook](https://github.com/lollcat/FAB-2021/blob/ToyProblems/FAB_ellis_paper/ManyWell/Workshop_run_FAB.ipynb) for training FAB
+ - [Notebook](https://github.com/lollcat/FAB-2021/blob/ToyProblems/FAB_ellis_paper/ManyWell/Workshop_run_NF.ipynb) for training a standard normalising flow with KL-divergence
+ - [Notebook](https://github.com/lollcat/FAB-2021/blob/ToyProblems/FAB_ellis_paper/ManyWell/FAB_vs_NF.ipynb) for plotting results
+
+## MPhil Thesis
 [Report](https://github.com/lollcat/FAB-MPHIL-2021/blob/ToyProblems/LaurenceMidgley_Dissertation.pdf)
 
-## Abstract
+### Abstract
 How can we approximate expectations over a target distribution (the target) that we cannot sample from? 
 Two major approaches are Markov chain Monte Carlo (MCMC) and importance sampling. 
 MCMC, the current state-of-the-art, generates samples in a Markov chain that converges to the target, which we can use for approximation by Monte Carlo (MC)
