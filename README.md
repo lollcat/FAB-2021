@@ -1,5 +1,5 @@
 # Flow Annealed Importance Sampling Bootstrap
-## Ellis Workshop
+## Ellis Workshop / arXiv Paper
 By Laurence Illing Midgley, Vincent Stimper, Gregor N. C. Simm and Jos ́e Miguel Hern ́andez-Lobato. 
 
 ### Mixture of Gaussians Problem
