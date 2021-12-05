@@ -6,11 +6,14 @@ By Laurence Illing Midgley, Vincent Stimper, Gregor N. C. Simm and Jos ́e Migue
  - [Notebook](https://github.com/lollcat/FAB-2021/blob/ToyProblems/FAB_ellis_paper/MoG/MoG.ipynb) for training FAB, and NF
  - [Notebook](https://github.com/lollcat/FAB-2021/blob/ToyProblems/FAB_ellis_paper/MoG/SFNsipynb.ipynb) for training SNF
  - [Notebook](https://github.com/lollcat/FAB-2021/blob/ToyProblems/FAB_ellis_paper/MoG/Plots.ipynb) for plotting results
+![MoG](../FAB_ellis_paper/MoG.png)
 
 ### "Many Well" Problem
  - [Notebook](https://github.com/lollcat/FAB-2021/blob/ToyProblems/FAB_ellis_paper/ManyWell/Workshop_run_FAB.ipynb) for training FAB
  - [Notebook](https://github.com/lollcat/FAB-2021/blob/ToyProblems/FAB_ellis_paper/ManyWell/Workshop_run_NF.ipynb) for training a standard normalising flow with KL-divergence
  - [Notebook](https://github.com/lollcat/FAB-2021/blob/ToyProblems/FAB_ellis_paper/ManyWell/FAB_vs_NF.ipynb) for plotting results
+
+![ManyWell](../FAB_ellis_paper/ManyWell.png)
 
 ## MPhil Thesis
 [Report](https://github.com/lollcat/FAB-MPHIL-2021/blob/ToyProblems/LaurenceMidgley_Dissertation.pdf)
