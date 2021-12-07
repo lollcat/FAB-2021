@@ -1,6 +1,6 @@
 # Flow Annealed Importance Sampling Bootstrap
 ## Ellis Workshop / arXiv Paper
-By Laurence Illing Midgley, Vincent Stimper, Gregor N. C. Simm and Jos ́e Miguel Hern ́andez-Lobato. 
+By Laurence Illing Midgley, Vincent Stimper, Gregor N. C. Simm and José Miguel Hernández-Lobato. 
 
 ### Mixture of Gaussians Problem
  - [Notebook](https://github.com/lollcat/FAB-2021/blob/ToyProblems/FAB_ellis_paper/MoG/MoG.ipynb) for training FAB, and NF
