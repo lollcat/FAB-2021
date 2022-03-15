@@ -1,4 +1,7 @@
 # Flow Annealed Importance Sampling Bootstrap (FAB)
+ - New improved implementations: [FAB-Torch](https://github.com/lollcat/FAB-TORCH) and [FAB-JAX](https://github.com/lollcat/FAB-JAX). 
+ - [Arxiv paper](https://arxiv.org/abs/2111.11510)
+
 ## Ellis Workshop / arXiv Paper
 By Laurence Illing Midgley, Vincent Stimper, Gregor N. C. Simm and José Miguel Hernández-Lobato. 
 
@@ -18,7 +21,6 @@ By Laurence Illing Midgley, Vincent Stimper, Gregor N. C. Simm and José Miguel 
 
 ## Notes on the code
  - See [here](https://github.com/lollcat/FAB-2021/blob/1c02d44ecbc295c952e64b89fbbfc735dfc9333f/AIS_train/train_AIS.py#L334) for the function that calculates the FAB loss, given the importance weights. 
- - I am currently working on creating cleaner implementations of FAB See [FAB-Torch](https://github.com/lollcat/FAB-TORCH) and [FAB-JAX](https://github.com/lollcat/FAB-JAX). 
 
 ## MPhil Thesis
 [Report](https://github.com/lollcat/FAB-MPHIL-2021/blob/ToyProblems/LaurenceMidgley_Dissertation.pdf)
