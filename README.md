@@ -1,5 +1,5 @@
 # Flow Annealed Importance Sampling Bootstrap (FAB)
- - New improved implementations: [FAB-Torch](https://github.com/lollcat/FAB-TORCH) and [FAB-JAX](https://github.com/lollcat/FAB-JAX). 
+ - New improved implementations: [FAB-Torch](https://github.com/lollcat/FAB-TORCH) and [fab-jax](https://github.com/lollcat/fab-jax). 
  - [Arxiv paper](https://arxiv.org/abs/2111.11510)
 
 ## Ellis Workshop / arXiv Paper
